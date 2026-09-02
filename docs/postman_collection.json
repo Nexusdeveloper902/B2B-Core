@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "Presence Platform — Core API (EN/ES)",
+    "description": "Presence Platform core backend. Bilingual (EN/ES) API collection.\n\nPlataforma de Presencia — backend central. Colección bilingüe (EN/ES).\n\nHOW TO USE / CÓMO USAR:\n1. Run `php artisan migrate --seed` — the seeder PRINTS the credential_uids and reader api_keys to the console.\n2. Set the collection variables below (classroom_reader_key, recycling_reader_key, credential_uid) to the printed values.\n\nAUTH PATTERNS:\n- Device endpoints (tap, classify): header `Authorization: Bearer <reader.api_key>`\n- Admin/teacher endpoints (mode, redeem, nl-query): log in via the dashboard (session cookie) or use a personal access token.\n\nToday (default) is filled with the Postman `{{$timestamp}}` where useful.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000" },
+    { "key": "classroom_reader_key", "value": "PASTE_FROM_SEEDER_OUTPUT" },
+    { "key": "recycling_reader_key", "value": "PASTE_FROM_SEEDER_OUTPUT" },
+    { "key": "credential_uid", "value": "PASTE_FROM_SEEDER_OUTPUT" },
+    { "key": "student_id", "value": "1" },
+    { "key": "reward_id", "value": "3" },
+    { "key": "reader_id", "value": "1" },
+    { "key": "event_id", "value": "1" },
+    { "key": "admin_pat", "value": "OPTIONAL_PERSONAL_ACCESS_TOKEN" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{classroom_reader_key}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 Device — Tap (Classroom) / Dispositivo — Tap (Aula)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{classroom_reader_key}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Accept-Language", "value": "en" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"credential_uid\": \"{{credential_uid}}\",\n  \"client_timestamp\": null\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/events/tap",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "events", "tap"]
+        },
+        "description": "Phase B — the core presence loop.\n\nSend the card's credential_uid; the reader is identified by its Bearer key (never trust a client-supplied reader ID).\n\nResponse 200: { status, event_id, event_type, student_first_name, next_step }\nResponse 401: invalid/missing Bearer token.\nResponse 404: card not recognized / not active.\n\nTip: set Accept-Language: es to receive Spanish messages."
+      }
+    },
+    {
+      "name": "02 Device — Tap (Recycling) / Dispositivo — Tap (Reciclaje)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{recycling_reader_key}}" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"credential_uid\": \"{{credential_uid}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/events/tap",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "events", "tap"]
+        },
+        "description": "A recycling tap only logs the event; points are awarded AFTER classification. next_step = \"awaiting_classification\" — take event_id for the classify call."
+      }
+    },
+    {
+      "name": "03 Device — Classify + Earn / Dispositivo — Clasificar + Ganar",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{recycling_reader_key}}" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "event_id", "value": "{{event_id}}", "type": "text" },
+            {
+              "key": "image",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/recycling/classify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "recycling", "classify"]
+        },
+        "description": "Phase C — multipart: event_id + image file (any test image works for the contract). Idempotent: re-submitting the same event_id does NOT double-award points.\n\nResponse 200: { status, already_classified, material_class, confidence, points_awarded, new_balance }\nPoints table (config/recycling.php): plastic=10, paper=5, metal=15, glass=8, other=0."
+      }
+    },
+    {
+      "name": "04 Admin — Change reader mode / Cambiar modo del lector",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"active_event_type\": \"PAE_LUNCH\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/readers/{{reader_id}}/mode",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "readers", "{{reader_id}}", "mode"]
+        },
+        "description": "Phase B — relabel a reader (CLASS_ATTENDANCE / PAE_BREAKFAST / PAE_LUNCH / RECYCLING_DEPOSIT / ENTRY). Admin-only (403 for teachers, 401 for guests). PUT works too."
+      }
+    },
+    {
+      "name": "05 Desk — Redeem reward / Canjear recompensa",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reward_id\": {{reward_id}}\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/students/{{student_id}}/redeem",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "students", "{{student_id}}", "redeem"]
+        },
+        "description": "Phase D — the spend half of the loop. Admin or teacher.\n\nResponse 200: { status, student_id, reward, new_balance, ledger_id }\nResponse 422: insufficient points, includes current_balance + shortfall."
+      }
+    },
+    {
+      "name": "05b Desk — Redemption failure example / Ejemplo de fallo",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reward_id\": 1\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/students/{{student_id}}/redeem",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "students", "{{student_id}}", "redeem"]
+        },
+        "description": "Redeem the 50-point 'Canteen discount voucher' with a low balance to see the clean 422 + shortfall."
+      }
+    },
+    {
+      "name": "06 Admin — NL query / Consulta en lenguaje natural",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"How many students attended class today, 2026-09-02?\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/nl-query",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "nl-query"]
+        },
+        "description": "Phase E — Gemini function-calling; the LLM only SELECTS functions, the backend computes the real answer.\n\nResponse 200: { status, answer, functions_called }\nResponse 503: { status: 'blocked', blocked_reason } when no GEMINI_API_KEY is configured (honest blocker, not a fake answer)."
+      }
+    },
+    {
+      "name": "07 Health / Salud",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/up",
+          "host": ["{{base_url}}"],
+          "path": ["up"]
+        },
+        "description": "Laravel health check endpoint."
+      }
+    }
+  ]
+}
