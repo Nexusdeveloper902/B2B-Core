@@ -1,0 +1,228 @@
+/* Presence Platform — dashboard styles (no build step, plain CSS) */
+
+:root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #1d2433;
+    --muted: #67718a;
+    --primary: #2453ff;
+    --primary-dark: #1a3ecc;
+    --ok: #178a50;
+    --warn: #b7791f;
+    --err: #c0392b;
+    --late: #b3541e;
+    --border: #e3e8f2;
+    --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+/* Top navigation */
+.topnav {
+    background: #10182d;
+    color: #fff;
+}
+.nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.brand {
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    letter-spacing: .3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.brand-dot {
+    width: 10px; height: 10px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: inline-block;
+}
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.nav-right a { color: #cfd6ea; text-decoration: none; font-size: 14px; }
+.nav-right a:hover { color: #fff; }
+.nav-user { color: #9fb0d8; font-size: 13px; }
+.locale-switch a { color: #9fb0d8; text-decoration: none; font-size: 12px; font-weight: 700; }
+.locale-switch a.active { color: #fff; text-decoration: underline; }
+.inline-form { display: inline; }
+.linklike {
+    background: none;
+    border: none;
+    color: #cfd6ea;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+.linklike:hover { color: #fff; text-decoration: underline; }
+
+/* Layout */
+.container {
+    max-width: 1100px;
+    margin: 24px auto 40px;
+    padding: 0 20px;
+}
+.footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 18px 0 30px;
+}
+.page-head h1 { margin: 0 0 4px; font-size: 22px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+/* Cards */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 18px;
+}
+.auth-card { max-width: 420px; margin: 48px auto; }
+.card h2 { margin: 0 0 12px; font-size: 17px; }
+
+/* Forms */
+label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 13px; }
+input[type="text"], input[type="email"], input[type="password"], select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    font-size: 14px;
+    background: #fbfcfe;
+}
+input:focus, select:focus { outline: 2px solid #b8c8ff; border-color: var(--primary); }
+.field-error { color: var(--err); font-size: 13px; margin: 8px 0 0; }
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    border: none;
+    border-radius: 7px;
+    padding: 9px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #e8ecf7;
+    color: var(--ink);
+}
+.btn:hover { background: #d9dfee; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-small { padding: 6px 10px; font-size: 12px; }
+.btn-block { width: 100%; margin-top: 18px; }
+.btn:disabled { opacity: .6; cursor: wait; }
+
+/* Tables */
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+    text-align: left;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--muted);
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--border);
+}
+.table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+.table tr:last-child td { border-bottom: none; }
+code {
+    background: #eef1fa;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 12.5px;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+.badge-present { background: #e2f5ea; color: var(--ok); }
+.badge-late { background: #fdf0e4; color: var(--late); }
+.badge-absent { background: #fbe9e7; color: var(--err); }
+
+/* Stats grid */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+}
+.stat-value { font-size: 30px; font-weight: 800; color: var(--primary); }
+.stat-label { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+/* Two-column admin layout */
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+.mode-form { display: flex; gap: 8px; align-items: center; }
+.mode-form select { width: auto; min-width: 210px; }
+
+#nl-query-form, #redeem-form { display: flex; gap: 8px; flex-wrap: wrap; }
+#nl-query-form input { flex: 1; min-width: 220px; }
+#redeem-form select { flex: 1; min-width: 180px; width: auto; }
+
+.nl-answer {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #f2f5fc;
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+}
+.answer-ok { background: #e9f7ef; border-color: #bfe6cf; }
+.answer-error { background: #fdeceb; border-color: #f3c1bc; }
+.hidden { display: none; }
+
+.flash { border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.flash-ok { background: #e9f7ef; color: var(--ok); }
+.flash-warn { background: #fdf6e3; color: var(--warn); }
+
+.hint { color: var(--muted); font-size: 12.5px; margin-top: 14px; }
+.student-links { list-style: none; padding: 0; margin: 0; }
+.student-links li { padding: 6px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.student-links li:last-child { border-bottom: none; }
+.student-links a { color: var(--primary); text-decoration: none; font-weight: 600; }
+.tiny-link { font-size: 11px; color: var(--primary); margin-left: 8px; text-decoration: none; }
