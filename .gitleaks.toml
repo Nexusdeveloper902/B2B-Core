@@ -1,0 +1,18 @@
+# gitleaks configuration — B2B-Core
+#
+# Extends the default ruleset (nothing weakened) and allowlists exactly one
+# literal: the deliberately-invalid bearer token "nope-invalid-key" that the
+# bilingual e2e suite (scripts/e2e.sh) sends to prove the 401 rejection path.
+# It is not a credential of any kind; without this allowlist the generic
+# `curl-auth-header` rule false-positives on it and blocks CI.
+
+title = "gitleaks config — B2B-Core"
+
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "Deliberately-invalid literal token used to test the 401 path in the e2e suite (not a credential)"
+  regexes = [
+    '''nope-invalid-key''',
+  ]

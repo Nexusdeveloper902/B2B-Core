@@ -221,16 +221,18 @@ so the whole suite works on machines with no `php` on PATH at all.
 ## Arch Linux
 
 Arch is the priority platform. `sudo pacman -S php` ships a `/etc/php/php.ini`
-with most `extension=` lines **commented out**, so a fresh install fails
-Laravel's extension requirements until they are enabled. `./run doctor` detects
-this and prints the exact fix:
+with most `extension=` lines **commented out**, and — importantly — current
+Arch **splits the SQLite extensions into a separate `php-sqlite` package**
+(the main `php` package no longer contains `pdo_sqlite.so`/`sqlite3.so`), so
+a fresh install fails Laravel's extension requirements until both are fixed.
+`./run doctor` detects this and prints the exact fix:
 
 ```bash
-sudo pacman -S --needed php composer
+sudo pacman -S --needed php php-sqlite composer
 # Enable the extensions the platform needs (as printed by ./run doctor):
 sudo sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\1/' /etc/php/php.ini
-./run doctor   # verify → all green
-./run setup && ./run serve
+./run setup && ./run doctor   # verify → all green
+./run serve
 ```
 
 The `sed` one-liner is not folklore: the `arch-smoke` CI job applies exactly

@@ -35,9 +35,11 @@ jobs:
 
       - name: Job summary
         run: |
-          echo "### Workflows lint" >> "$GITHUB_STEP_SUMMARY"
-          echo "actionlint validated .github/workflows/*.yml: YAML syntax, expression contexts, shellcheck of run blocks." >> "$GITHUB_STEP_SUMMARY"
-          echo "This job exists because an invalid expression (secrets context in a job-level if) silently disabled CI — see ADR-012." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Workflows lint"
+            echo "actionlint validated .github/workflows/*.yml: YAML syntax, expression contexts, shellcheck of run blocks."
+            echo "This job exists because an invalid expression (secrets context in a job-level if) silently disabled CI — see ADR-012."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   lint:
     name: "Lint (quality gate: Pint + bash + docs parity)"
@@ -92,20 +94,19 @@ jobs:
           [ "$rc" -eq 2 ]
 
   unit:
-    name: Unit tests (PHP ${{ matrix.php }})
+    # PHP 8.3 was dropped: the locked dependency graph (Laravel 13.30 /
+    # symfony 8.1) requires PHP >= 8.4.1. PHP 8.5 is exercised by the
+    # arch-smoke job below (Arch currently ships PHP 8.5.10).
+    name: Unit tests (PHP 8.4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.3', '8.4']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP ${{ matrix.php }}
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
@@ -117,8 +118,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-${{ matrix.php }}-
+          key: ${{ runner.os }}-composer-8.4-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-8.4-
 
       - name: Bootstrap via the run suite
         run: ./run setup --ci
@@ -127,20 +128,17 @@ jobs:
         run: ./run test unit
 
   integration:
-    name: Integration tests (PHP ${{ matrix.php }})
+    # PHP 8.3 dropped (lock requires >= 8.4.1); PHP 8.5 covered by arch-smoke.
+    name: Integration tests (PHP 8.4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.3', '8.4']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP ${{ matrix.php }}
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
@@ -152,8 +150,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-${{ matrix.php }}-
+          key: ${{ runner.os }}-composer-8.4-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-8.4-
 
       - name: Bootstrap via the run suite
         run: ./run setup --ci
@@ -210,8 +208,11 @@ jobs:
     env:
       HOME: /root
     steps:
-      - name: Install base toolchain (git + php + composer; no node needed)
-        run: pacman -Syu --noconfirm archlinux-keyring git php composer
+      - name: Install base toolchain (git + php + php-sqlite + composer; no node needed)
+        # php-sqlite is REQUIRED: current Arch splits the pdo_sqlite/sqlite3
+        # extensions out of the main php package into php-sqlite (verified
+        # against extra/php 8.5.10-1 and extra/php-sqlite 8.5.10-1).
+        run: pacman -Syu --noconfirm archlinux-keyring git php php-sqlite composer
 
       - name: Clone without JS actions (keeps this job node-free)
         run: |
@@ -221,11 +222,17 @@ jobs:
         run: |
           sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\1/' /etc/php/php.ini
 
-      - name: Doctor must be fully green after the documented remediation
-        run: ./run doctor
+      - name: PHP diagnostics (always visible — modules, ini, load warnings)
+        run: |
+          php -v
+          php --ini
+          php -m 2>&1 | sort
 
       - name: Setup (CI mode) through the run suite
         run: ./run setup --ci
+
+      - name: Doctor must be fully green after the documented remediation + setup
+        run: ./run doctor
 
       - name: Quality gate (Pint + bash syntax + docs parity)
         run: |
@@ -259,11 +266,11 @@ jobs:
       - name: Provision the hermetic toolchain into .tools/
         run: ./run toolchain
 
-      - name: Doctor must be green purely via the hermetic toolchain
-        run: ./run doctor
-
       - name: Full setup with the static PHP
         run: ./run setup
+
+      - name: Doctor must be green purely via the hermetic toolchain (after setup)
+        run: ./run doctor
 
       - name: Unit tests on the static PHP
         run: ./run test unit
@@ -333,6 +340,9 @@ jobs:
         run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
 
       - name: Run the live NL-query smoke test (single light call)
-        run: ./run test feature --filter=NlQueryApiTest --live-llm
+        # No --live-llm flag: the live test is gated by the RUN_LIVE_LLM_TESTS
+        # env var + GEMINI_API_KEY (see scripts/test.sh header and
+        # NlQueryApiTest); artisan test rejects unknown options.
+        run: ./run test feature --filter=NlQueryApiTest
         env:
           RUN_LIVE_LLM_TESTS: '1'
