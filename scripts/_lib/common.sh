@@ -170,8 +170,8 @@ resolve_php() {
         arch)
             err "On Arch install PHP and enable extensions:"
             err "En Arch instala PHP y habilita las extensiones:"
-            err "  sudo pacman -S --needed php"
-            err "  sudo sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\\1/' /etc/php/php.ini"
+            err "  sudo pacman -S --needed php php-sqlite composer"
+            err "  sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini"
             ;;
         debian)
             err "On Debian/Ubuntu: sudo apt-get install php-cli php-sqlite3 php-curl php-mbstring php-xml php-zip"

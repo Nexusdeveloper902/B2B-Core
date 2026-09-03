@@ -219,8 +219,11 @@ jobs:
           git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" .
 
       - name: Enable required PHP extensions (the exact remediation ./run doctor prints)
+        # '/pattern/s/^;//' needs no backreference — immune to the double-prefix
+        # and printf-%b escaping bugs that produced 'extension=extension=X' lines
+        # (which made PHP abort ini parsing and silently drop extension=zip).
         run: |
-          sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\1/' /etc/php/php.ini
+          sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
 
       - name: PHP diagnostics (always visible — modules, ini, load warnings)
         run: |

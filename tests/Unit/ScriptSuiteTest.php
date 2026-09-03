@@ -168,7 +168,7 @@ class ScriptSuiteTest extends TestCase
     }
 
     #[Test]
-    public function php_minimum_version_matches_the_ci_matrix_floor(): void
+    public function php_minimum_version_matches_the_ci_version_floor(): void
     {
         $common = (string) file_get_contents(base_path('scripts/_lib/common.sh'));
         $this->assertMatchesRegularExpression(
@@ -179,14 +179,19 @@ class ScriptSuiteTest extends TestCase
         preg_match('/B2B_PHP_MIN_VERSION="([^"]+)"/', $common, $m);
         $minimum = $m[1];
 
+        // The lock file (Laravel 13.30 / symfony 8.1) requires PHP >= 8.4.1, so
+        // the workflow pins 8.4 (with 8.5 exercised by the arch-smoke job).
+        // Every php-version the workflow uses must satisfy the runtime floor
+        // the script suite enforces.
         $ciYaml = (string) file_get_contents(base_path('.github/workflows/ci.yml'));
-        preg_match("/php:\s*\['([^']+)',\s*'([^']+)'\]/", $ciYaml, $matrix);
-        $this->assertCount(3, $matrix, 'could not parse the PHP matrix from ci.yml');
-        $this->assertSame(
-            $minimum,
-            $matrix[1],
-            "ci.yml matrix floor [{$matrix[1]}] must equal B2B_PHP_MIN_VERSION [{$minimum}]"
-        );
+        preg_match_all("/php-version:\s*'([^']+)'/", $ciYaml, $versions);
+        $this->assertNotEmpty($versions[1], 'could not parse php-version values from ci.yml');
+        foreach ($versions[1] as $version) {
+            $this->assertTrue(
+                version_compare($version, $minimum, '>='),
+                "ci.yml uses PHP {$version} which is below B2B_PHP_MIN_VERSION [{$minimum}]"
+            );
+        }
     }
 
     #[Test]
