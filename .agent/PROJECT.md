@@ -167,3 +167,36 @@ This run made the GitHub Actions pipeline REAL (TASK-004, ADR-012):
   zero at 390px (DOM-verified).
 - **A11y floor**: skip link, `:focus-visible` outlines, WCAG contrast
   audited 22/22 pairs, `prefers-reduced-motion` honored.
+
+---
+
+## RUN-2026-09-03-core-004 — appended project facts (Gemini key + model swap)
+
+This run rotated the dead AIza key to the owner's new AQ-format key and
+made the live NL-query feature actually, verifiably work. Repository
+reality updates:
+
+- **LLM model**: `gemini-3.1-flash-lite` is the default everywhere
+  (`GEMINI_MODEL` / `GEMINI_VISION_MODEL` config defaults, .env.example,
+  GeminiClassifier, AppServiceProvider, bilingual docs). Owner directive.
+- **The live NL-query path works end-to-end** — first time in project
+  history: CI run 33786816821 shows the live test passing (3.33s) with a
+  real function-calling round-trip. Everything before TASK-006 was a
+  masked skip (OBS-007).
+- **Gemini 3.x wire contract** (ADR-015, unit-locked): function
+  declarations use lowercase OpenAPI types; the model turn is echoed
+  back verbatim (raw `parts`, preserving `thoughtSignature`).
+- **Test secrets must be process env, not .env**: phpunit.xml env entries
+  (force=false) outrank dotenv — the CI smoke job passes
+  `GEMINI_API_KEY` as step env. Appending to `.env` is a silent no-op.
+- **The live-LLM smoke job is self-verifying**: skip-with-key = hard
+  failure; failure tails laravel.log (blocked queries log their exact
+  cause there — the API response stays generic); the raw probe prints
+  the bare Google error + reachable flash models.
+- **Leak tripwires** (DocumentationTest): AIza…, AQ.… (new AI Studio
+  key format), ghp_… — all pattern-scanned over tracked files in every
+  CI run (plus gitleaks).
+- **Sandbox geo-block (OBS-002) stands**: Gemini live calls from the
+  build sandbox are refused by region; the CI runner is the designated
+  live verifier (differential auth evidence: fake key 401, real key
+  geo-400, runner 200).
