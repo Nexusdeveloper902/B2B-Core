@@ -8,6 +8,9 @@
 # goes through "$PHP_BIN" resolved here (ADR-010 resolution chain).
 #
 # Environment overrides (documented in docs/SCRIPTS.md):
+#   B2B_OS                   force the OS class (linux|macos|windows) —
+#                           auto-detected when unset (Git Bash/MSYS/Cygwin
+#                           => windows; WSL => linux)
 #   B2B_PHP                  force a PHP binary path (must be >= 8.3 + exts)
 #   B2B_COMPOSER             force a Composer binary path
 #   B2B_STATIC_PHP_VERSION   pin the hermetic static-PHP version
@@ -24,6 +27,32 @@
 _B2B_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 B2B_ROOT="$(cd -- "${_B2B_LIB_DIR}/../.." && pwd -P)"
 cd -- "$B2B_ROOT" || { echo "fatal: cannot cd to $B2B_ROOT" >&2; exit 1; }
+
+# --- OS detection (Linux first; Windows = auto-detected fallback) -------------
+# B2B_OS: linux | macos | windows | unknown. Git Bash / MSYS / Cygwin are
+# "windows" (uname -s starts with MINGW/MSYS/CYGWIN); WSL reports "Linux"
+# and IS the Linux path (it runs the same ELF binaries). An explicit B2B_OS
+# env var always wins — that is the seam the tests and power users use.
+# Resolved ONCE here; every OS-aware branch below checks is_windows.
+detect_os() {
+    B2B_KERNEL="$(uname -s 2>/dev/null || echo unknown)"
+    case "${B2B_KERNEL}" in
+        Linux*)                      B2B_OS="linux" ;;
+        Darwin*)                     B2B_OS="macos" ;;
+        MINGW*|MSYS*|CYGWIN*)        B2B_OS="windows" ;;
+        *)
+            if [ "${OS:-}" = "Windows_NT" ]; then B2B_OS="windows"; else B2B_OS="unknown"; fi
+            ;;
+    esac
+    return 0
+}
+
+# Resolve once at source time (an explicit B2B_OS env var wins verbatim).
+case "${B2B_OS:-}" in
+    linux|macos|windows) B2B_KERNEL="$(uname -s 2>/dev/null || echo unknown)" ;;
+    *) detect_os ;;
+esac
+is_windows() { [ "${B2B_OS:-}" = "windows" ]; }
 
 # --- Output helpers ------------------------------------------------------------
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -74,12 +103,16 @@ PHP_REQUIRED_MODULES=(
 )
 
 # Candidate interpreters, in resolution order: env override -> PATH -> .tools
+# On Windows the hermetic .tools/php is NEVER probed: it is a Linux ELF
+# (ADR-017 — the chain degrades to override -> system php.exe).
 php_candidates() {
     if [ -n "${B2B_PHP:-}" ]; then printf '%s\n' "$B2B_PHP"; fi
     local p
     p="$(command -v php 2>/dev/null || true)"
     [ -n "$p" ] && printf '%s\n' "$p"
-    [ -x "$B2B_ROOT/.tools/php" ] && printf '%s\n' "$B2B_ROOT/.tools/php"
+    if ! is_windows; then
+        [ -x "$B2B_ROOT/.tools/php" ] && printf '%s\n' "$B2B_ROOT/.tools/php"
+    fi
     return 0
 }
 
@@ -88,7 +121,23 @@ composer_candidates() {
     local c
     c="$(command -v composer 2>/dev/null || true)"
     [ -n "$c" ] && printf '%s\n' "$c"
-    [ -x "$B2B_ROOT/.tools/composer" ] && printf '%s\n' "$B2B_ROOT/.tools/composer"
+    if is_windows; then
+        # Windows Composer installs expose .bat/.cmd wrappers (and sometimes
+        # a bare phar) on PATH — bash cannot auto-resolve .bat/.cmd by name,
+        # so each spelling is probed explicitly (ADR-017).
+        local name
+        for name in composer.bat composer.cmd composer.phar; do
+            c="$(command -v "$name" 2>/dev/null || true)"
+            [ -n "$c" ] && printf '%s\n' "$c"
+        done
+    fi
+    if is_windows; then
+        # The hermetic phar is a plain file — -x is unreliable on Windows
+        # mounts (noacl emulation), so presence is the probe there.
+        [ -f "$B2B_ROOT/.tools/composer" ] && printf '%s\n' "$B2B_ROOT/.tools/composer"
+    else
+        [ -x "$B2B_ROOT/.tools/composer" ] && printf '%s\n' "$B2B_ROOT/.tools/composer"
+    fi
     return 0
 }
 
@@ -165,6 +214,18 @@ resolve_php() {
 
     err "No usable PHP found (need >= ${B2B_PHP_MIN_VERSION} + extensions)."
     err "No se encontró un PHP utilizable (se requiere >= ${B2B_PHP_MIN_VERSION} + extensiones)."
+    if is_windows; then
+        # Windows fallback guidance (ADR-017): system PHP required — the
+        # hermetic static PHP is a Linux ELF and cannot be used here.
+        err "On Windows install PHP ${B2B_PHP_MIN_VERSION}+ (extensions are bundled in the windows builds):"
+        err "En Windows instala PHP ${B2B_PHP_MIN_VERSION}+ (las extensiones vienen incluidas en los builds):"
+        err "  winget install PHP.PHP-8.4        (or: choco install php · scoop install php)"
+        err "  then open a NEW terminal and re-run: ./run doctor"
+        err "  luego abre una terminal NUEVA y ejecuta: ./run doctor"
+        err "Manual zip (no package manager): https://windows.php.net/download/"
+        err "Zip manual (sin gestor de paquetes): https://windows.php.net/download/"
+        die "Full diagnostics: ./run doctor / Diagnóstico completo: ./run doctor"
+    fi
     detect_distro
     case "$DISTRO_FAMILY" in
         arch)
@@ -191,10 +252,13 @@ resolve_php() {
 # resolve_composer — like resolve_php for Composer. IMPORTANT: Composer is a
 # PHP phar, so it is validated AND invoked through the already-resolved
 # "$PHP_BIN" — it must work on machines with no php on PATH at all.
-# Call resolve_php first.
+# Windows wrappers (composer.bat / composer.cmd / the extensionless sh shim)
+# already wrap PHP themselves, so they are validated and invoked DIRECTLY
+# (COMPOSER_BIN_MODE="direct"); phars keep the php-mediated mode. Call
+# resolve_php first.
 resolve_composer() {
     local mode="${1:-strict}" c
-    COMPOSER_BIN=""
+    COMPOSER_BIN=""; COMPOSER_BIN_MODE="php"
     if [ -z "${PHP_BIN:-}" ]; then
         if [ "$mode" = "report" ]; then return 0; fi
         die "resolve_php must run before resolve_composer / resolve_php debe ejecutarse antes de resolve_composer"
@@ -202,14 +266,18 @@ resolve_composer() {
     while IFS= read -r c; do
         [ -n "$c" ] || continue
         if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
-            COMPOSER_BIN="$c"
-            case "$c" in
-                "$B2B_ROOT/.tools/"*) COMPOSER_BIN_SOURCE="hermetic (.tools/)" ;;
-                "${B2B_COMPOSER:-__none__}") COMPOSER_BIN_SOURCE="override (B2B_COMPOSER)" ;;
-                *) COMPOSER_BIN_SOURCE="system (PATH)" ;;
-            esac
-            return 0
+            COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="php"
+        elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+            COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="direct"
+        else
+            continue
         fi
+        case "$c" in
+            "$B2B_ROOT/.tools/"*) COMPOSER_BIN_SOURCE="hermetic (.tools/)" ;;
+            "${B2B_COMPOSER:-__none__}") COMPOSER_BIN_SOURCE="override (B2B_COMPOSER)" ;;
+            *) COMPOSER_BIN_SOURCE="system (PATH)" ;;
+        esac
+        return 0
     done < <(composer_candidates)
     if [ "$mode" = "report" ]; then return 0; fi
     die "No usable Composer found — run ./run toolchain to provision one.
@@ -217,8 +285,39 @@ No se encontró Composer — ejecuta ./run toolchain para instalar uno."
 }
 
 # composer_cmd <args…> — the ONLY sanctioned way to invoke Composer (goes
-# through the resolved PHP so hermetic .tools/composer works everywhere).
-composer_cmd() { "$PHP_BIN" "$COMPOSER_BIN" "$@"; }
+# through the resolved PHP so hermetic .tools/composer works everywhere;
+# on Windows a .bat/.cmd wrapper is invoked directly — it wraps PHP itself).
+composer_cmd() {
+    if [ "${COMPOSER_BIN_MODE:-php}" = "direct" ]; then
+        "$COMPOSER_BIN" "$@"
+    else
+        "$PHP_BIN" "$COMPOSER_BIN" "$@"
+    fi
+}
+
+# --- Python resolution (model server) -------------------------------------------
+# python_resolve — the interpreter for the local model server. Linux/macOS
+# answer to `python3`; Windows installs usually expose `python` and/or the
+# `py` launcher instead. Sets PYTHON_BIN ("" when absent) + PYTHON_LABEL.
+python_resolve() {
+    PYTHON_BIN=""; PYTHON_LABEL=""
+    local c found
+    for c in python3 python; do
+        found="$(command -v "$c" 2>/dev/null || true)"
+        if [ -n "$found" ] && "$found" --version >/dev/null 2>&1; then
+            PYTHON_BIN="$found"; PYTHON_LABEL="$("$found" --version 2>&1)"
+            return 0
+        fi
+    done
+    if is_windows; then
+        # Last resort: the Windows `py` launcher (python.org default install).
+        if command -v py >/dev/null 2>&1 && py --version >/dev/null 2>&1; then
+            PYTHON_BIN="py"; PYTHON_LABEL="$(py --version 2>&1) (py launcher)"
+            return 0
+        fi
+    fi
+    return 0
+}
 
 # --- Laravel env helpers ---------------------------------------------------------
 env_file_has()   { [ -f "$B2B_ROOT/.env" ] && grep -qE "^${1}=" "$B2B_ROOT/.env"; }

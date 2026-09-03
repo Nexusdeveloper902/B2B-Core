@@ -1,5 +1,14 @@
 * text=auto eol=lf
 
+# Line-ending contract (ADR-017, TASK-008): the run suite is a bash suite, so
+# every shell file MUST stay LF (CRLF breaks bash: '\r' corrupts shebangs and
+# commands). Windows entry points MUST be CRLF (cmd.exe requirement) — they
+# are the ONLY deliberate exception to the repo-wide LF default above.
+*.sh text eol=lf
+run text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 *.blade.php diff=html
 *.css diff=css
 *.html diff=html

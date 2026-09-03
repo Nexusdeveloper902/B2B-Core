@@ -28,7 +28,11 @@ resolve_php report
 resolve_composer report
 printf '%b\n' "${C_BOLD}Presence Platform — status${C_RESET}"
 
-row "OS"      "${DISTRO_LABEL} (${DISTRO_FAMILY})"
+if is_windows; then
+    row "OS" "Windows (Git Bash fallback) · B2B_OS=windows"
+else
+    row "OS" "${DISTRO_LABEL} (${DISTRO_FAMILY}) · B2B_OS=${B2B_OS:-auto}"
+fi
 row "PHP"     "${PHP_BIN:-$(printf '%b' "${C_DIM}unresolved — ./run doctor${C_RESET}")}"
 [ -n "${PHP_BIN:-}" ] && row "PHP source" "${PHP_BIN_SOURCE} · $(php_version_string "$PHP_BIN")"
 row "Composer" "${COMPOSER_BIN:-$(printf '%b' "${C_DIM}unresolved — ./run toolchain${C_RESET}")}"

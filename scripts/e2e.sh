@@ -31,6 +31,9 @@ ensure_env_and_key
 PORT="${1:-8089}"
 BASE_URL="http://127.0.0.1:${PORT}"
 E2E_DB="database/e2e.sqlite"
+# Test image kept PROJECT-RELATIVE (not /tmp): native Windows curl.exe cannot
+# read msys /tmp paths, but every curl accepts a cwd-relative path (ADR-017).
+IMG="database/.e2e_img.png"
 PASS=0
 FAIL=0
 SERVER_PID=""
@@ -40,7 +43,7 @@ cleanup() {
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
-    rm -f "$E2E_DB"
+    rm -f "$E2E_DB" "$IMG"
 }
 trap cleanup EXIT
 
@@ -75,8 +78,9 @@ printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDEN
     $card["credential_uid"], $student["student_id"]);
 ')"
 
-# A test image (valid PNG).
-IMG="$(mktemp /tmp/e2e_img_XXXX).png"
+# A test image (valid PNG) — created project-relative so BOTH Linux curl and
+# native Windows curl.exe can open it (msys /tmp is invisible to curl.exe).
+rm -f "$IMG"
 "$PHP_BIN" -r 'file_put_contents($argv[1], base64_decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="));' "$IMG"
 
 say "== Arrancando servidor / Starting server (${BASE_URL}) =="

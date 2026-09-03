@@ -13,6 +13,12 @@
 # install and containers. This is the fallback path of ADR-010; every script
 # auto-detects .tools/php via the resolution chain.
 #
+# On WINDOWS (auto-detected, ADR-017) the static PHP is a Linux ELF and is
+# NEVER downloaded: the script provisions the cross-platform composer.phar
+# only and prints how to install a Windows PHP build instead (winget/choco/
+# php.net). Windows users need a system PHP — the zero-system hermetic path
+# is Linux-only by binary reality.
+#
 # Exit codes: 0 ok · 1 download/verification failure
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
@@ -36,6 +42,40 @@ TOOLS="$B2B_ROOT/.tools"
 
 # --- Preconditions --------------------------------------------------------------------
 command -v curl >/dev/null 2>&1 || die "curl is required to download the toolchain / se necesita curl"
+
+# --- Windows fallback path (ADR-017) --------------------------------------------------
+# composer.phar only — the static PHP build is a Linux ELF.
+if is_windows; then
+    log "Windows detected — provisioning Composer only / Windows detectado — solo se provisiona Composer"
+    warn "The hermetic static PHP is a Linux binary; Windows needs a real PHP install:"
+    warn "El PHP estático hermético es un binario de Linux; Windows necesita un PHP real:"
+    err "  winget install PHP.PHP-8.4     (or: choco install php · scoop install php)"
+    err "  zip manual / zip manual: https://windows.php.net/download/"
+    err "  then open a NEW terminal and re-run: ./run doctor"
+    err "  luego abre una terminal NUEVA y ejecuta: ./run doctor"
+    mkdir -p "$TOOLS"
+    if [ "$FORCE" -eq 1 ] || [ ! -f "$TOOLS/composer" ]; then
+        log "Downloading composer.phar …"
+        curl -fL --retry 3 --retry-delay 2 --connect-timeout 15 -o "$TOOLS/composer" "$COMPOSER_URL" \
+            || die "Composer download failed — check network / falló la descarga de Composer"
+    else
+        log "composer.phar already present (re-download with --force) / composer.phar ya presente (baja de nuevo con --force)"
+    fi
+    # Verify through any resolvable PHP (composer is a PHP phar).
+    resolve_php report
+    if [ -n "${PHP_BIN:-}" ]; then
+        "$PHP_BIN" "$TOOLS/composer" --version >/dev/null 2>&1 \
+            || die "Downloaded Composer failed verification / el Composer descargado falló la verificación"
+        ok "Provisioned: $("$PHP_BIN" "$TOOLS/composer" --version 2>/dev/null | head -n 1) — invoked via ${PHP_BIN}"
+    else
+        warn "Composer downloaded but NOT verified yet (no usable PHP on this machine)"
+        warn "Composer descargado pero aún SIN verificar (no hay PHP utilizable en esta máquina)"
+    fi
+    bi "Next: install PHP (guidance above), then: ./run setup" \
+       "Siguiente: instala PHP (guía arriba), luego: ./run setup"
+    exit 0
+fi
+
 command -v tar  >/dev/null 2>&1 || die "tar is required to extract PHP / se necesita tar"
 ARCH="$(uname -m)"
 [ "$ARCH" = "x86_64" ] || die "Prebuilt static PHP exists for x86_64 only (found ${ARCH}); use your distro's PHP + ./run doctor.

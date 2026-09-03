@@ -13,7 +13,8 @@
 # Env:    B2B_MODEL_PORT        # default 8501 (matches LOCAL_CLASSIFIER_URL)
 #
 # Then point the app at it: RECYCLING_CLASSIFIER_DRIVER=local in .env — see
-# docs/LOCAL_MODEL.md. Requires python3 (Arch: it is in the base system).
+# docs/LOCAL_MODEL.md. Python: python3 on Linux/macOS, python3 -> python
+# -> py launcher on Windows (auto-detected, ADR-017).
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,19 +30,24 @@ LOGFILE="$B2B_ROOT/storage/logs/model-server.log"
 PORT="${B2B_MODEL_PORT:-8501}"
 HEALTH_URL="http://127.0.0.1:${PORT}/healthz"
 
+# Windows venvs put binaries in .venv/Scripts (not .venv/bin) — selected by
+# the auto-detected OS class (ADR-017).
+if is_windows; then VENV_BIN="$VENV/Scripts"; else VENV_BIN="$VENV/bin"; fi
+
 model_running() { http_probe "$HEALTH_URL"; }
 
 ensure_venv() {
-    command -v python3 >/dev/null 2>&1 \
-        || die "python3 is required for the model server / se necesita python3 para el servidor de modelo"
+    python_resolve
+    [ -n "$PYTHON_BIN" ] \
+        || die "python is required for the model server / se necesita python para el servidor de modelo"
     if [ ! -d "$VENV" ]; then
-        log "Creating venv (one-time) / Creando venv (una sola vez)"
-        python3 -m venv "$VENV" || die "python3 -m venv failed / falló python3 -m venv"
+        log "Creating venv (one-time) with ${PYTHON_BIN} / Creando venv (una sola vez)"
+        "$PYTHON_BIN" -m venv "$VENV" || die "${PYTHON_BIN} -m venv failed / falló ${PYTHON_BIN} -m venv"
     fi
     # (Re)install deps when the venv is fresh or requirements.txt changed.
     if [ ! -f "$MARKER" ] || [ "$REQS" -nt "$MARKER" ]; then
         log "Installing Python dependencies / Instalando dependencias de Python"
-        "$VENV/bin/pip" install -q --disable-pip-version-check -r "$REQS" \
+        "$VENV_BIN/pip" install -q --disable-pip-version-check -r "$REQS" \
             || die "pip install failed — check network / falló pip install — revisa la red"
         touch "$MARKER"
     else
@@ -61,7 +67,7 @@ model_start() {
     # all three fds detached from this shell, then disown so the script can
     # never block in wait() for the daemon (TASK-003 finding: pipelines held
     # the script open when the daemon remained a shell child).
-    ( cd "$MODEL_DIR" && exec "$VENV/bin/uvicorn" server:app --host 127.0.0.1 --port "$PORT" \
+    ( cd "$MODEL_DIR" && exec "$VENV_BIN/uvicorn" server:app --host 127.0.0.1 --port "$PORT" \
         </dev/null >>"$LOGFILE" 2>&1 ) &
     disown
     printf '%s\n' "$!" >"$PIDFILE"
@@ -95,10 +101,22 @@ model_stop() {
         pkill -f 'uvicorn server:app' 2>/dev/null || true
         for _ in $(seq 1 10); do model_running || break; sleep 0.5; done
     fi
+    # Windows fallback: Git Bash has no pkill — translate the msys pid to a
+    # Windows pid via /proc/<pid>/winpid (msys /proc emulation) and kill the
+    # whole process tree with taskkill (// survives Git Bash path mangling).
+    if model_running && is_windows && [ -n "${pid:-}" ] && [ -r "/proc/${pid}/winpid" ]; then
+        local winpid=""
+        winpid="$(cat "/proc/${pid}/winpid" 2>/dev/null || true)"
+        if [ -n "$winpid" ]; then
+            taskkill //F //T //PID "$winpid" >/dev/null 2>&1 || true
+            for _ in $(seq 1 10); do model_running || break; sleep 0.5; done
+        fi
+    fi
     rm -f "$PIDFILE"
     if model_running; then
-        die "Model server is STILL running on port ${PORT} — kill it manually: pkill -f 'uvicorn server:app'
-El servidor de modelo SIGUE corriendo en el puerto ${PORT} — mátalo a mano: pkill -f 'uvicorn server:app'"
+        die "Model server is STILL running on port ${PORT} — kill it manually / mátalo a mano:
+  Linux:   pkill -f 'uvicorn server:app'
+  Windows: taskkill /F /T /IM uvicorn.exe"
     fi
     ok "Model server stopped (port ${PORT}) / Servidor de modelo detenido (puerto ${PORT})"
 }
@@ -122,7 +140,7 @@ case "${1:-}" in
     run)
         ensure_venv
         log "Foreground mode — Ctrl+C to stop / Modo primer plano — Ctrl+C para detener"
-        cd "$MODEL_DIR" && exec "$VENV/bin/uvicorn" server:app --host 127.0.0.1 --port "$PORT" ;;
+        cd "$MODEL_DIR" && exec "$VENV_BIN/uvicorn" server:app --host 127.0.0.1 --port "$PORT" ;;
     --help|-h|"") help_header "$0" ;;
     *) die "Unknown subcommand: $1 (start | stop | status | run) / Subcomando desconocido: $1" ;;
 esac

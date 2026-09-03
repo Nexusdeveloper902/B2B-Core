@@ -65,6 +65,11 @@ Pass --help to any command for its details / Pasa --help a cualquier comando:
 
 Full reference / Referencia completa:
   docs/SCRIPTS.md (English) · docs/SCRIPTS.es.md (Español)
+
+OS support / Soporte de SO (auto-detected / autodetectado):
+  Linux (Arch-first) · macOS · Windows fallback via Git Bash
+  (on Windows use ./run inside Git Bash, or run.cmd from cmd/PowerShell)
+  / En Windows usa ./run dentro de Git Bash, o run.cmd desde cmd/PowerShell
 USAGE
 }
 

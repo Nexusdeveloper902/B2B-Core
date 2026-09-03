@@ -10,9 +10,12 @@
 # Exit:    0 = everything green · 1 = something needs fixing (see output)
 #
 # What it checks / Qué revisa:
-#   1. OS + distro family (Arch/Debian/Fedora/…), bash, curl, git, python3
-#   2. Every PHP candidate (B2B_PHP, PATH php, .tools/php): version + modules
-#   3. Every Composer candidate
+#   1. OS class (Linux/macOS/Windows via B2B_OS) + distro family, bash, curl,
+#      git, python (python3 -> python -> py on Windows)
+#   2. Every PHP candidate (B2B_PHP, PATH php, .tools/php — the hermetic ELF
+#      is never probed on Windows): version + modules
+#   3. Every Composer candidate (on Windows also composer.bat/.cmd wrappers,
+#      validated directly since they wrap PHP themselves)
 #   4. Project state: .env, APP_KEY, vendor/, sqlite file, migrations table
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
@@ -32,7 +35,11 @@ fail()  { err "$*"; FAIL=$((FAIL + 1)); }
 
 log "Doctor — Presence Platform environment check / Revisión del entorno"
 detect_distro
-printf '%b\n' "  OS: $(uname -s) $(uname -m) · Distro: ${C_BOLD}${DISTRO_LABEL}${C_RESET} (${DISTRO_FAMILY} family)"
+if is_windows; then
+    printf '%b\n' "  OS: $(uname -s) $(uname -m) · ${C_BOLD}Windows (Git Bash fallback / respaldo de Git Bash)${C_RESET} · B2B_OS=windows"
+else
+    printf '%b\n' "  OS: $(uname -s) $(uname -m) · Distro: ${C_BOLD}${DISTRO_LABEL}${C_RESET} (${DISTRO_FAMILY} family) · B2B_OS=${B2B_OS}"
+fi
 
 # --- 1. Base tools -------------------------------------------------------------
 for tool in bash curl git; do
@@ -42,10 +49,12 @@ for tool in bash curl git; do
         fail "${tool}: NOT FOUND — needed by the run suite / no encontrado — lo necesita la suite"
     fi
 done
-if command -v python3 >/dev/null 2>&1; then
-    pass "python3: $(python3 --version 2>&1) — needed by ./run model / necesario para ./run model"
+# python for ./run model: python3 -> python -> py launcher (Windows)
+python_resolve
+if [ -n "$PYTHON_BIN" ]; then
+    pass "python: ${PYTHON_BIN} — ${PYTHON_LABEL} — needed by ./run model / necesario para ./run model"
 else
-    warn "python3: not found — only needed for the local model server / solo se necesita para el servidor de modelo local"
+    warn "python: not found — only needed for the local model server / no encontrado — solo se necesita para el servidor de modelo local"
 fi
 
 # --- 2. PHP candidates -----------------------------------------------------------
@@ -71,14 +80,22 @@ done < <(php_candidates)
 
 if [ "$PHP_FOUND" -eq 0 ]; then
     fail "No usable PHP / Ningún PHP utilizable"
-    detect_distro
-    if [ "$DISTRO_FAMILY" = "arch" ]; then
-        note "  ${C_BOLD}Arch remediation / Remediación en Arch:${C_RESET}"
-        note "    sudo pacman -S --needed php php-sqlite php-gd composer"
-        note "    sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|gd|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini"
+    if is_windows; then
+        note "  ${C_BOLD}Windows remediation / Remediación en Windows:${C_RESET}"
+        note "    winget install PHP.PHP-8.4      (or: choco install php · scoop install php)"
+        note "    zip manual / zip manual: https://windows.php.net/download/"
+        note "    ${C_DIM}then open a NEW terminal and re-run: ./run doctor / luego abre una terminal NUEVA y ejecuta: ./run doctor${C_RESET}"
+        note "    ${C_DIM}the hermetic ./run toolchain provides Composer only on Windows (the static PHP is a Linux binary)${C_RESET}"
+    else
+        detect_distro
+        if [ "$DISTRO_FAMILY" = "arch" ]; then
+            note "  ${C_BOLD}Arch remediation / Remediación en Arch:${C_RESET}"
+            note "    sudo pacman -S --needed php php-sqlite php-gd composer"
+            note "    sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|gd|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini"
+        fi
+        note "  ${C_BOLD}Or the zero-system hermetic toolchain / O el toolchain hermético sin dependencias:${C_RESET}"
+        note "    ./run toolchain"
     fi
-    note "  ${C_BOLD}Or the zero-system hermetic toolchain / O el toolchain hermético sin dependencias:${C_RESET}"
-    note "    ./run toolchain"
 fi
 
 # --- 3. Composer candidates --------------------------------------------------------
@@ -92,6 +109,9 @@ else
         [ -n "$c" ] || continue
         if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
             pass "$c → $("$PHP_BIN" "$c" --version 2>/dev/null | head -n 1) (via ${PHP_BIN})"
+            COMPOSER_FOUND=1
+        elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+            pass "$c → $("$c" --version 2>/dev/null | head -n 1) (direct — Windows wrapper / envoltorio de Windows)"
             COMPOSER_FOUND=1
         else
             note "  ${C_DIM}${c}: not usable / no utilizable${C_RESET}"
