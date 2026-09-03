@@ -200,3 +200,32 @@ reality updates:
   build sandbox are refused by region; the CI runner is the designated
   live verifier (differential auth evidence: fake key 401, real key
   geo-400, runner 200).
+
+---
+
+## RUN-2026-09-04-core-005 — appended project facts (docs pull + error taxonomy)
+
+This run pulled the actual Gemini API docs and made every LLM failure
+self-explaining. Repository reality updates:
+
+- **Error taxonomy per Google's documented contract** (ADR-016):
+  `GeminiClient` parses `{error: {code, message, status, details[].reason}}`
+  and maps to typed exceptions — region check runs FIRST (both key and
+  region failures are plain 400s; region errors carry no reason detail,
+  key errors carry `API_KEY_INVALID`). Distinct `blocked_reason` values
+  with bilingual actionable messages; raw cause logged to laravel.log.
+- **`./run llm-check`** is the designated LOCAL diagnosis tool: one bare
+  live call, Google's exact verdict for THIS machine, EN/ES guidance,
+  exit 0/1/2, no PHP needed. CI proves the config; llm-check proves the
+  environment — complementary truths (ADR-016).
+- **The old AIza key is still valid** (OBS-008 corrects TASK-006): an
+  invalid key returns 400 API_KEY_INVALID; the old key returns the
+  REGION refusal — it authenticates fine.
+- **Colombia is a supported Gemini region**; local region refusals
+  point at the egress path (VPN/proxy/ISP), not the country.
+- **generateContent is Legacy** in Google's own page metadata; the
+  Interactions API (`POST /v1beta/interactions`) is the strategic
+  endpoint — migrate only on sunset/404 (OBS-008).
+- **git core.fileMode=false strips +x from NEW scripts** at commit
+  time (OBS-009): always `git update-index --chmod=+x` for new
+  executables; ScriptSuiteTest is the CI net that catches it.
