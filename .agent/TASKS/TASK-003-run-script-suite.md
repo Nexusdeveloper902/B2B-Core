@@ -67,9 +67,68 @@ classic new-contributor dead end this task removes.
 
 ---
 
-## Commit — (appended during execution)
-
+## Commit — 3f8b465
 Date: 2026-09-03
 Branch: feature/TASK-003-run-script-suite
+Phase: A
 
-(Each phase appends its commit record below.)
+Summary: persistent memory for the run — this task record, ADR-009
+(run dispatcher), ADR-010 (Arch-first + hermetic fallback), ADR-011
+(idempotent self-diagnosing scripts), OBS-004 (laravel/boost deliberately
+not installed this run — zero app-code scope, protocol §1.4).
+
+## Commit — 1b9f835
+Date: 2026-09-03
+Phase: B–C
+
+Summary: `run` dispatcher (bash ≥ 4, central command→script map, help
+delegation) + `scripts/_lib/common.sh` (bilingual logging, distro detection,
+PHP/Composer resolution chain B2B_PHP → PATH → .tools, composer always
+executed via the resolved PHP, env/key helpers, help_header) + 10 new scripts
+(doctor, setup, serve, test, quality, status, reset, model-server,
+provision-toolchain, ci) + e2e.sh migrated to the shared resolution.
+
+Verification: bash -n clean × 13; doctor green on the run environment with
+explicit toolchain override; `run help`, `run status`, unknown-command exit 2.
+
+## Commit — 53cbb3b
+Date: 2026-09-03
+Phase: D
+
+Summary: docs/SCRIPTS.md + docs/SCRIPTS.es.md (full bilingual reference:
+commands, toolchain resolution, Arch section, hermetic mode, env vars,
+troubleshooting, file map) + README/README.es quick start rewritten around
+./run + scripts/local-model-server/README.md updated. Also: bootstrap/app.php
+Pint fix (pre-existing finding surfaced by the new quality gate) and
+shellcheck-clean fixes.
+
+Verification: `./run quality` fully green (bash -n, shellcheck
+--severity=warning, Pint 107 files, docs parity × 10 commands × 2 languages).
+
+## Commit — 2952534
+Date: 2026-09-03
+Phase: E–F
+
+Summary: tests/Unit/ScriptSuiteTest.php (20 tests: structure, exec bits,
+bash -n, help coverage, bilingual docs parity, gitignore, no-bare-php
+invariant, module list ↔ CI extensions cross-check, PHP floor ↔ matrix);
+ci.yml dogfoods the suite in every job + new scripts-lint / arch-smoke
+(archlinux:base container) / hermetic-smoke (no-PHP container) jobs; test.sh
+suite-casing fix; model-server daemonization fix (exec+disown+fd closure,
+authoritative pidfile, health-verified stop); FunctionRegistryTest midnight
+flakiness fix (travelTo).
+
+Verification (all in the run environment):
+- `./run test` → 108 passed, 1 skipped (live-LLM opt-in)
+- `./run e2e` → 22/22; also green with ONLY the hermetic .tools/ PHP
+- `./run quality` → green; `./run ci` → 3/3 stages green
+- `./run serve` smoke → /up 200, /login 200, bearer rejection
+- `./run setup` idempotent re-run; `./run reset --force`; `./run setup --ci`
+- `./run model start/status/stop` full lifecycle (1s start, verified stop)
+- `./run toolchain` → provisioned .tools/ (PHP 8.4.23 + Composer 2.10.3) in
+  12.6s; idempotent re-run no-op; `./run doctor` green with NO system PHP
+- FRESH CLONE (`git clone` → `./run setup` → `./run test` → `./run e2e` →
+  `./run doctor`): all green end-to-end
+
+Phase status: A ✓ B ✓ B2 ✓ B3 ✓ C ✓ D ✓ E ✓ F ✓ G (merge/push) below.
+

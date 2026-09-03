@@ -75,3 +75,31 @@ This run built the full TASK-002 MVP (Phases A–G). Repository reality updates:
   a real-HTTP e2e script (`scripts/e2e.sh`, 22 bilingual checks) + GitHub
   Actions CI (lint, matrix unit, integration, e2e, http-e2e, gitleaks, optional
   live-LLM smoke).
+
+---
+
+## RUN-2026-09-03-core-002 — appended project facts (run-script suite run)
+
+This run added the operations layer (TASK-003, ADR-009/010/011):
+
+- **`./run` is THE entry point** for operating the platform: 11 subcommands
+  (setup, serve, test, e2e, quality, doctor, status, reset, model, toolchain,
+  ci) delegating to standalone scripts in `scripts/` that share
+  `scripts/_lib/common.sh`. Quick start is now `./run setup && ./run serve`.
+- **No script calls a bare `php`** — every invocation goes through the
+  resolution chain B2B_PHP → PATH → `.tools/php` (ADR-010). Composer (a phar)
+  is likewise always executed via the resolved PHP, so the whole suite works
+  on machines with no php on PATH.
+- **Hermetic toolchain is a first-class path** (`./run toolchain`): static
+  PHP + Composer into gitignored `.tools/`; proven by CI on a no-PHP
+  container. The owner's future local runs can use either system PHP (Arch
+  remediation printed by doctor, machine-verified by CI's archlinux:base
+  job) or the hermetic path.
+- **Bilingual invariant extended to operations**: script output, --help text,
+  and docs/SCRIPTS.md + .es.md; ScriptSuiteTest fails the build if a command
+  loses its bilingual documentation.
+- **CI now dogfoods the suite** on every push, and `./run ci` mirrors the
+  pipeline locally.
+- Fixed pre-existing latent defects found while verifying: a
+  FunctionRegistryTest date-boundary flake (would fail any post-midnight CI
+  run) and a Pint style drift in bootstrap/app.php.
