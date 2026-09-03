@@ -344,24 +344,33 @@ jobs:
         run: ./run setup --ci
 
       - name: Probe the Gemini API directly (raw diagnostics)
-        # One bare generateContent call with the SAME key + model the app
-        # uses, plus the model list: surfaces the RAW Google error (invalid
-        # key / unknown model / quota) instead of the app's generic 503
-        # mapping. Response bodies never contain the key — safe to print.
+        # Diagnostics ONLY — a transient network timeout here must not
+        # fail the job (the live TEST below is the authoritative gate).
+        # One retry after 5s, then report whatever happened and continue.
         run: |
           model="$(grep '^GEMINI_MODEL=' .env | cut -d= -f2-)"
-          code="$(curl -s -o probe.json -w '%{http_code}' -m 30 \
-            "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent" \
+          url="https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent"
+          body='{"contents":[{"parts":[{"text":"Reply with exactly: OK"}]}]}'
+          code="$(curl -sS -o probe.json -w '%{http_code}' -m 30 "$url" \
             -H "x-goog-api-key: ${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d '{"contents":[{"parts":[{"text":"Reply with exactly: OK"}]}]}')"
+            -H 'Content-Type: application/json' \
+            -d "$body")" || code=000
+          if [ "$code" = "000" ]; then
+            echo "::warning::probe attempt 1 failed (timeout/network) — retrying once in 5s"
+            sleep 5
+            code="$(curl -sS -o probe.json -w '%{http_code}' -m 45 "$url" \
+              -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d "$body")" || code=000
+          fi
           echo "probe: HTTP ${code} — models/${model}:generateContent"
-          cat probe.json
+          [ -s probe.json ] && cat probe.json || echo '(no response body)'
           echo
           echo '--- flash-family models reachable with this key ---'
-          curl -s -m 30 "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" \
+          curl -sS -m 30 "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" \
             -H "x-goog-api-key: ${GEMINI_API_KEY}" \
-            | python3 -c "import json,sys; d=json.load(sys.stdin); [print(' ', m['name']) for m in d.get('models',[]) if 'flash' in m['name']]" || true
+            | python3 -c "import json,sys; d=json.load(sys.stdin); [print(' ', m['name']) for m in d.get('models',[]) if 'flash' in m['name']]" \
+            || echo '(model list unavailable)'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
