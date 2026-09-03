@@ -40,7 +40,8 @@ documentación y pruebas.
 
 La suite **`./run`** es lo único que debes recordar — un comando por
 operación, completamente documentada en [docs/SCRIPTS.es.md](docs/SCRIPTS.es.md) ·
-[docs/SCRIPTS.md](docs/SCRIPTS.md), Linux primero con **soporte para Arch**:
+[docs/SCRIPTS.md](docs/SCRIPTS.md), Linux primero con **soporte para Arch**
+y un respaldo de Windows que se detecta automáticamente:
 
 ```bash
 git clone https://github.com/Nexusdeveloper902/B2B-Core.git
@@ -56,6 +57,12 @@ imprime todas las credenciales demo bilingüe (EN/ES). ¿Aún no tienes un PHP
 utilizable? `./run doctor` imprime la solución exacta para tu distro, o
 `./run toolchain` provisiona un PHP+Composer hermético sin paquetes del
 sistema.
+
+**En Windows** (Git Bash) instala Git for Windows + PHP
+(`winget install PHP.PHP-8.4`) y los mismos comandos funcionan sin cambios;
+desde cmd/PowerShell usa `run.cmd setup` / `run.cmd serve` — delega a la
+misma suite (Windows corre como respaldo, autodetectado — ver la sección
+Windows de docs/SCRIPTS.es.md).
 
 El seeder imprime los inicios de sesión del panel, el `credential_uid` de
 cada tarjeta y la `api_key` Bearer de cada lector — cópialos directamente a
@@ -144,7 +151,8 @@ real**, un **escaneo de secretos** (gitleaks) y un trabajo opcional de
 **smoke LLM en vivo** — más tres trabajos que verifican continuamente la
 suite `./run` en sí: **scripts-lint** (sintaxis bash + shellcheck sobre todos
 los scripts), **arch-smoke** (la suite en un contenedor real
-`archlinux:base`) y **hermetic-smoke** (setup completo en un contenedor **sin
+`archlinux:base`), **windows-smoke** (la suite en windows-latest real vía
+Git Bash — el respaldo autodetectado) y **hermetic-smoke** (setup completo en un contenedor **sin
 ningún PHP**). Los trabajos de CI usan `./run setup --ci` y `./run e2e` en
 cada push.
 

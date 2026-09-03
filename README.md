@@ -38,7 +38,8 @@ messages (`Accept-Language`), seeder output, docs and tests.
 
 The **`./run` suite** is the only thing you need to remember — one command
 per operation, fully documented in [docs/SCRIPTS.md](docs/SCRIPTS.md) ·
-[docs/SCRIPTS.es.md](docs/SCRIPTS.es.md), Linux-first with **Arch support**:
+[docs/SCRIPTS.es.md](docs/SCRIPTS.es.md), Linux-first with **Arch support**
+and a Windows fallback that is auto-detected:
 
 ```bash
 git clone https://github.com/Nexusdeveloper902/B2B-Core.git
@@ -53,6 +54,12 @@ one), generates `APP_KEY`, then `php artisan migrate --seed` — the seeder
 prints all demo credentials bilingually (EN/ES). No usable PHP yet?
 `./run doctor` prints the exact fix for your distro, or `./run toolchain`
 provisions a hermetic PHP+Composer with zero system packages.
+
+**On Windows** (Git Bash) install Git for Windows + PHP
+(`winget install PHP.PHP-8.4`) and the same commands work unchanged; from
+cmd/PowerShell use `run.cmd setup` / `run.cmd serve` — it delegates to the
+same suite (Windows runs as a fallback, auto-detected — see the Windows
+section in docs/SCRIPTS.md).
 
 **Demo logins:** `admin@presence.test` / `teacher@presence.test` — password
 `password`.
@@ -135,7 +142,8 @@ default** (free-tier friendly); opt in with `RUN_LIVE_LLM_TESTS=1` plus a real
 **secrets scan** (gitleaks), an **optional live-LLM smoke job** — plus three
 jobs that continuously verify the `./run` suite itself: **scripts-lint**
 (bash syntax + shellcheck on every script), **arch-smoke** (the suite on a
-real `archlinux:base` container) and **hermetic-smoke** (the full setup in a
+real `archlinux:base` container), **windows-smoke** (the suite on real
+windows-latest via Git Bash — the auto-detected fallback) and **hermetic-smoke** (the full setup in a
 container with **no PHP at all**). CI jobs dogfood `./run setup --ci` and
 `./run e2e` on every push.
 

@@ -233,8 +233,16 @@ Composer sigue la misma cadena (`B2B_COMPOSER` → PATH → `.tools/composer`) y
 siempre se **ejecuta a través del PHP resuelto** (`php composer.phar …`), así
 que toda la suite funciona en máquinas sin `php` en el PATH.
 
+En Windows (autodetectado — ver la sección [Windows](#windows) abajo) la
+cadena conserva su orden pero adapta sus candidatos: el build estático
+`.tools/php` es un **ELF de Linux y nunca se sondea**, y Composer además
+sondea `composer.bat` / `composer.cmd` / `composer.phar` en el PATH, y a los
+envoltorios los ejecuta **directamente** (ellos mismos envuelven a PHP).
+
 | Variable | Por defecto | Usada por |
 |---|---|---|
+| `B2B_OS` | autodetectada | forzar la clase de SO (`linux` \| `macos` \| `windows`) |
+| `B2B_BASH` | — | solo `run.cmd`: forzar el Git Bash al que delegar |
 | `B2B_PHP` | — | forzar un binario de PHP |
 | `B2B_COMPOSER` | — | forzar un phar/binario de Composer |
 | `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run toolchain` |
@@ -275,11 +283,76 @@ El servidor del modelo local necesita `python3`, que es parte del sistema base
 de Arch (`python -m venv` funciona de fábrica — no hace falta ningún paquete
 extra).
 
+## Windows
+
+Windows es un **respaldo autodetectado**, nunca la plataforma prioritaria. La
+suite detecta el SO una vez al cargar — si `uname -s` dice
+`MINGW*/MSYS*/CYGWIN*` (Git Bash) ⇒ `B2B_OS=windows`; WSL reporta `Linux` y
+por eso usa la ruta Linux normal, incluido el toolchain hermético. No existe
+una segunda suite de scripts: el mismo `./run` corre en todo, con ramas de
+Windows protegidas por `is_windows` (ADR-017). Una variable `B2B_OS` explícita
+siempre sobrescribe la detección (así también simulan los tests Windows sobre
+Linux).
+
+**Qué necesitas (ruta Git Bash):**
+
+1. **Git for Windows** — provee Git Bash (bash 5, curl, GNU coretools):
+   <https://git-scm.com/download/win>
+2. **PHP 8.3+** (las extensiones requeridas vienen incluidas en los builds
+de Windows — sin malabares de extensiones como en Arch):
+   ```powershell
+   winget install PHP.PHP-8.4      # o: choco install php · scoop install php
+   ```
+   Zip manual: <https://windows.php.net/download/> — luego abre una terminal
+   **nueva** para que se refresque el PATH.
+3. Luego, dentro de Git Bash, todo es igual:
+   ```bash
+   ./run setup && ./run serve
+   ```
+
+**Desde cmd.exe / PowerShell**, usa el delegador liviano:
+
+```bat
+run.cmd setup
+run.cmd serve
+```
+
+`run.cmd` localiza Git Bash (rutas de instalación conocidas, luego PATH, o
+fuerza uno con `B2B_BASH=C:\ruta\a\bash.exe`) y reenvía cada argumento al
+**mismo** dispatcher de bash — él no enruta comandos (despacho de fuente
+única, ADR-009).
+
+**Cómo degrada el respaldo (ADR-017):**
+
+| Área | Linux (prioridad) | Windows (respaldo) |
+|---|---|---|
+| Candidatos de PHP | `B2B_PHP` → PATH → `.tools/php` (ELF estático) | `B2B_PHP` → PATH (`php.exe`); el ELF de Linux `.tools/php` **jamás se sondea** |
+| Composer | phar ejecutado vía el PHP resuelto | + sondeos de `composer.bat` / `composer.cmd` / `composer.phar` en PATH; los envoltorios corren **directos** (ellos envuelven a PHP) |
+| `./run toolchain` | PHP estático + composer.phar en `.tools/` | **solo composer.phar** — el PHP estático es binario de Linux; instala PHP vía winget/choco/php.net |
+| Venv del modelo | `.venv/bin/` | `.venv/Scripts/`; python se resuelve `python3` → `python` → lanzador `py` |
+| Respaldo de model stop | `pkill -f 'uvicorn server:app'` | `taskkill /F /T /PID <winpid>` (vía `/proc/<pid>/winpid` de Git Bash) |
+
+**Contrato de fines de línea:** `.gitattributes` fija `*.sh` + `run` a **LF**
+(el CRLF rompe bash) y `*.cmd`/`*.bat` a **CRLF** (cmd.exe lo exige), así un
+`core.autocrlf=true` global no puede corromper la suite al hacer checkout. Si
+bash se queja de `\r`, fuerza un checkout limpio:
+
+```bash
+git rm --cached -r . && git reset --hard
+```
+
+CI demuestra el respaldo en hardware real, de forma continua: el job
+`windows-smoke` (windows-latest, shell Git Bash) corre `./run setup --ci` →
+`./run doctor` → `./run quality` → `./run test` → `./run e2e` en cada push —
+el mismo patrón de demostración que `arch-smoke` y `hermetic-smoke`.
+
 ## Solución de problemas
 
 | Síntoma | Causa | Solución |
 |---|---|---|
-| `No usable PHP found …` | sin PHP / PHP viejo / faltan extensiones | lee la pista de tu distro, o `./run toolchain` |
+| `No usable PHP found …` | sin PHP / PHP viejo / faltan extensiones | lee la pista de tu distro, o `./run toolchain` (Linux) / winget (Windows) |
+| `bash: ./run: /usr/bin/env: bad interpreter` o errores de `\r` | CRLF entró en los shell files (zip manual / editor) | `git rm --cached -r . && git reset --hard` (.gitattributes fija LF) |
+| `run.cmd` dice "Git Bash not found" | Git for Windows sin instalar / fuera de PATH | instala <https://git-scm.com/download/win>, terminal nueva, reintenta |
 | `vendor/ missing — run ./run setup` | dependencias sin instalar | `./run setup` |
 | `APP_KEY: EMPTY` | .env creado pero clave sin generar | `./run setup` (solo rellena vacíos) |
 | `database/database.sqlite missing` | no hay archivo de BD | `./run setup` |
@@ -291,7 +364,8 @@ extra).
 ## Mapa de archivos
 
 ```
-run                              # el dispatcher (punto único de entrada)
+run                              # el dispatcher (punto único de entrada, bash)
+run.cmd                          # delegador liviano de Windows -> busca Git Bash -> ./run
 scripts/
 ├── _lib/common.sh               # librería: cadena de resolución, logging, detección de distro
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh

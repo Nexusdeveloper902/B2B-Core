@@ -229,8 +229,16 @@ Composer follows the same chain (`B2B_COMPOSER` → PATH → `.tools/composer`)
 and is always **executed through the resolved PHP** (`php composer.phar …`),
 so the whole suite works on machines with no `php` on PATH at all.
 
+On Windows (auto-detected — see the [Windows](#windows) section below) the
+chain keeps its order but adapts its candidates: the `.tools/php` static
+build is a **Linux ELF and is never probed**, and Composer additionally
+probes `composer.bat` / `composer.cmd` / `composer.phar` on PATH, running
+the wrappers **directly** (they wrap PHP themselves).
+
 | Env var | Default | Used by |
 |---|---|---|
+| `B2B_OS` | auto-detected | force the OS class (`linux` \| `macos` \| `windows`) |
+| `B2B_BASH` | — | `run.cmd` only: force the Git Bash to delegate to |
 | `B2B_PHP` | — | force a PHP binary |
 | `B2B_COMPOSER` | — | force a Composer phar/binary |
 | `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run toolchain` |
@@ -268,11 +276,76 @@ system at all, the hermetic path works on a bare Arch box with zero packages:
 The local model server needs `python3`, which is part of Arch's base system
 (`python -m venv` works out of the box — no extra package needed).
 
+## Windows
+
+Windows is an **auto-detected fallback**, never the priority platform. The
+suite detects the OS once at load time — `uname -s` says
+`MINGW*/MSYS*/CYGWIN*` (Git Bash) ⇒ `B2B_OS=windows`; WSL reports `Linux`
+and therefore uses the normal Linux path including the hermetic toolchain.
+There is no second script suite: the same `./run` runs everywhere, with
+Windows branches guarded by `is_windows` (ADR-017). An explicit `B2B_OS`
+env var always overrides detection (that is also how the tests simulate
+Windows on Linux).
+
+**What you need (Git Bash path):**
+
+1. **Git for Windows** — provides Git Bash (bash 5, curl, GNU coretools):
+   <https://git-scm.com/download/win>
+2. **PHP 8.3+** (the required extensions ship bundled in the Windows
+   builds — no extension juggling like Arch):
+   ```powershell
+   winget install PHP.PHP-8.4      # or: choco install php · scoop install php
+   ```
+   Manual zip: <https://windows.php.net/download/> — then open a **new**
+   terminal so PATH refreshes.
+3. Then, inside Git Bash, everything is the same:
+   ```bash
+   ./run setup && ./run serve
+   ```
+
+**From cmd.exe / PowerShell**, use the thin delegator:
+
+```bat
+run.cmd setup
+run.cmd serve
+```
+
+`run.cmd` locates Git Bash (well-known install paths, then PATH, or force
+one with `B2B_BASH=C:\path\to\bash.exe`) and forwards every argument to the
+**same** bash dispatcher — it routes no commands itself (single-source
+dispatch, ADR-009).
+
+**How the fallback degrades (ADR-017):**
+
+| Area | Linux (priority) | Windows (fallback) |
+|---|---|---|
+| PHP candidates | `B2B_PHP` → PATH → `.tools/php` (static ELF) | `B2B_PHP` → PATH (`php.exe`); the Linux ELF `.tools/php` is **never probed** |
+| Composer | phar executed via the resolved PHP | + `composer.bat` / `composer.cmd` / `composer.phar` PATH probes; wrappers run **directly** (they wrap PHP themselves) |
+| `./run toolchain` | static PHP + composer.phar into `.tools/` | **composer.phar only** — the static PHP is a Linux binary; install PHP via winget/choco/php.net |
+| Model-server venv | `.venv/bin/` | `.venv/Scripts/`; python resolved `python3` → `python` → `py` launcher |
+| Model stop fallback | `pkill -f 'uvicorn server:app'` | `taskkill /F /T /PID <winpid>` (via Git Bash's `/proc/<pid>/winpid`) |
+
+**Line-ending contract:** `.gitattributes` pins `*.sh` + `run` to **LF**
+(CRLF breaks bash) and `*.cmd`/`*.bat` to **CRLF** (cmd.exe requires it), so
+a global `core.autocrlf=true` cannot corrupt the suite at checkout. If bash
+ever complains about `\r`, force a clean re-checkout:
+
+```bash
+git rm --cached -r . && git reset --hard
+```
+
+CI proves the fallback on real hardware, continuously: the `windows-smoke`
+job (windows-latest, Git Bash shell) runs `./run setup --ci` → `./run doctor`
+→ `./run quality` → `./run test` → `./run e2e` on every push — the same
+prove-it pattern as `arch-smoke` and `hermetic-smoke`.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `No usable PHP found …` | no PHP / old PHP / missing extensions | read the printed distro hint, or `./run toolchain` |
+| `No usable PHP found …` | no PHP / old PHP / missing extensions | read the printed distro hint, or `./run toolchain` (Linux) / winget (Windows) |
+| `bash: ./run: /usr/bin/env: bad interpreter` or `\r` errors | CRLF crept into the shell files (manual zip / editor) | `git rm --cached -r . && git reset --hard` (.gitattributes pins LF) |
+| `run.cmd` says "Git Bash not found" | Git for Windows not installed / not on PATH | install <https://git-scm.com/download/win>, new terminal, retry |
 | `vendor/ missing — run ./run setup` | dependencies not installed | `./run setup` |
 | `APP_KEY: EMPTY` | .env created but key not generated | `./run setup` (only fills empties) |
 | `database/database.sqlite missing` | no DB file | `./run setup` |
@@ -284,9 +357,10 @@ The local model server needs `python3`, which is part of Arch's base system
 ## File map
 
 ```
-run                              # the dispatcher (single entry point)
+run                              # the dispatcher (single entry point, bash)
+run.cmd                          # Windows thin delegator -> finds Git Bash -> ./run
 scripts/
-├── _lib/common.sh               # shared lib: resolution chain, logging, distro detect
+├── _lib/common.sh               # shared lib: resolution chain, OS detect, logging
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh
 ├── doctor.sh · status.sh · reset.sh
 ├── model-server.sh              # local classifier lifecycle
