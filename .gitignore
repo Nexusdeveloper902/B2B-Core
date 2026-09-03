@@ -25,3 +25,8 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# ./run suite (TASK-003): hermetic toolchain, model-server state
+/.tools
+/.model-server.pid
+/scripts/local-model-server/.venv

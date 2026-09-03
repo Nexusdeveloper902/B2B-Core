@@ -8,8 +8,25 @@
 #
 # Output is bilingual (EN/ES). Exits non-zero if ANY check fails.
 #
-# Usage:  bash scripts/e2e.sh [port]
+# Usage:  ./run e2e [port]   |   bash scripts/e2e.sh [port]
+# Never touches the dev database — uses database/e2e.sqlite exclusively.
+#
+# Part of the ./run suite (ADR-009): resolves PHP via scripts/_lib/common.sh
+# (B2B_PHP -> PATH -> .tools/php), so it works with no system PHP at all.
 set -euo pipefail
+
+SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${SOURCE_DIR}/_lib/common.sh"
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    help_header "$0"
+    exit 0
+fi
+
+resolve_php
+[ -d "$B2B_ROOT/vendor" ] || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
+ensure_env_and_key
 
 PORT="${1:-8089}"
 BASE_URL="http://127.0.0.1:${PORT}"
@@ -44,10 +61,10 @@ export DB_DATABASE="$E2E_DB"
 # Deterministic blocked-state for Phase E: run the e2e server WITHOUT a
 # Gemini key regardless of what the developer's .env contains.
 export GEMINI_API_KEY=""
-php artisan migrate --seed --force >/dev/null
+"$PHP_BIN" artisan migrate --seed --force >/dev/null
 
 # Extract demo credentials from the throwaway DB (seed printed them too).
-eval "$(php -r '
+eval "$("$PHP_BIN" -r '
 $pdo = new PDO("sqlite:database/e2e.sqlite");
 $classroom = $pdo->query("SELECT api_key, id FROM readers WHERE type = \"classroom\"")->fetch(PDO::FETCH_ASSOC);
 $recycling = $pdo->query("SELECT api_key FROM readers WHERE type = \"recycling\"")->fetch(PDO::FETCH_ASSOC);
@@ -60,12 +77,12 @@ printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDEN
 
 # A test image (valid PNG).
 IMG="$(mktemp /tmp/e2e_img_XXXX).png"
-php -r 'file_put_contents($argv[1], base64_decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="));' "$IMG"
+"$PHP_BIN" -r 'file_put_contents($argv[1], base64_decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="));' "$IMG"
 
 say "== Arrancando servidor / Starting server (${BASE_URL}) =="
 # --no-reload passes the full host environment through (DB_DATABASE etc.),
 # so the server uses the throwaway e2e database instead of .env's.
-php artisan serve --host=127.0.0.1 --port="$PORT" --no-reload >/dev/null 2>&1 &
+"$PHP_BIN" artisan serve --host=127.0.0.1 --port="$PORT" --no-reload >/dev/null 2>&1 &
 SERVER_PID=$!
 
 for i in $(seq 1 30); do
@@ -114,7 +131,7 @@ R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/recycling/classify" \
     -F "event_id=$REC_EVENT_ID" -F "image=@${IMG}")
 check "Classify awards points / Clasificar otorga puntos" "$R" '"status":"ok"'
 MATERIAL=$(grep -oE '"material_class":"[a-z]+"' <<<"$R" | head -1 | sed 's/.*:"//;s/"$//')
-EXPECTED_POINTS=$(php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo (int) config("recycling.points.". $argv[1]);' "$MATERIAL")
+EXPECTED_POINTS=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo (int) config("recycling.points.". $argv[1]);' "$MATERIAL")
 check "Points match the config table / Puntos según config ($MATERIAL=$EXPECTED_POINTS)" "$R" "\"points_awarded\":${EXPECTED_POINTS}"
 
 R2=$(curl -s -X POST "$BASE_URL/api/v1/recycling/classify" \
@@ -124,7 +141,7 @@ check "Idempotent: no double award / Idempotente: sin doble otorgo" "$R2" '"alre
 
 # ---------------------------------------------------------------------------
 say "== Fase B — cambiar modo del lector (admin) / reader relabeling =="
-PAT=$(php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $u=App\Models\User::where("email","admin@presence.test")->first(); echo $u->createToken("e2e")->plainTextToken;')
+PAT=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $u=App\Models\User::where("email","admin@presence.test")->first(); echo $u->createToken("e2e")->plainTextToken;')
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/readers/$CLASSROOM_ID/mode" \
     -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
@@ -144,7 +161,7 @@ check "Guest cannot relabel (401) / Invitado no puede reetiquetar" "$R" '401'
 # ---------------------------------------------------------------------------
 say "== Fase D — canje / redemption =="
 # Give the demo student exactly 25 points for deterministic assertions.
-php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); App\Models\PointsLedger::create(["student_id"=>$argv[1],"delta"=>25,"reason"=>"e2e_seed"]);' "$STUDENT_ID"
+"$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); App\Models\PointsLedger::create(["student_id"=>$argv[1],"delta"=>25,"reason"=>"e2e_seed"]);' "$STUDENT_ID"
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/students/$STUDENT_ID/redeem" \
     -H "Authorization: Bearer $PAT" -H "Accept: application/json" \

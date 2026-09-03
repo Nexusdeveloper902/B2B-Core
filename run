@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# run — the single entry point for operating the Presence Platform.
+# run — el punto único de entrada para operar la Presence Platform.
+#
+# Replaces the ~10-step manual flow (composer install, cp .env, key:generate,
+# touch db, migrate --seed, serve, artisan test, pint, e2e.sh, venv+uvicorn)
+# with one memorable command per operation. Every subcommand delegates to a
+# standalone, documented script under scripts/ (ADR-009).
+#
+# Usage:   ./run <command> [args]        (./run help = full list)
+# Example: ./run setup && ./run serve
+#
+# This dispatcher intentionally resolves NO toolchain: `./run help` and
+# `./run doctor` must work on a machine with no PHP installed at all.
+# ---------------------------------------------------------------------------
+set -Eeuo pipefail
+
+[ "${BASH_VERSINFO[0]:-0}" -ge 4 ] || {
+    echo "fatal: bash >= 4 required (found ${BASH_VERSION:-unknown})" >&2
+    exit 1
+}
+
+B2B_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+cd -- "$B2B_ROOT" || exit 1
+# shellcheck disable=SC1091  # shared library (path is fixed relative to repo)
+source "$B2B_ROOT/scripts/_lib/common.sh"
+
+usage() {
+    cat <<'USAGE'
+Presence Platform — run suite / suite de ejecución
+
+Usage / Uso: ./run <command> [args]
+
+Commands / Comandos:
+  setup      One-command bootstrap: deps + .env + key + database + demo data
+             / Arranque en un comando: dependencias + .env + clave + BD + datos
+  serve      Start the dev server (preflight-checked) / Inicia el servidor de desarrollo
+  test       Test pyramid: unit | feature | e2e | all (default all)
+             / Pirámide de pruebas: unit | feature | e2e | all (por defecto all)
+  e2e        Real-HTTP end-to-end checks against a throwaway database
+             / Pruebas end-to-end reales por HTTP sobre una BD desechable
+  quality    Lint gate: Pint + shell syntax + bilingual docs parity
+             / Control de calidad: Pint + sintaxis shell + paridad de docs
+  doctor     Diagnose OS, PHP, Composer, Python, project state (Arch-aware)
+             / Diagnóstico de SO, PHP, Composer, Python y estado del proyecto
+  status     App state at a glance: env, database, servers, classifier driver
+             / Estado de la app: entorno, base de datos, servidores, clasificador
+  reset      Fresh database + reseed demo data (asks unless --force)
+             / Base de datos nueva + datos demo (pregunta salvo --force)
+  model      Local model server: start | stop | status | run
+             / Servidor del modelo local: start | stop | status | run
+  toolchain  Provision hermetic PHP + Composer into .tools/ (no root, no system pkgs)
+             / Provisiona PHP + Composer herméticos en .tools/ (sin root ni paquetes)
+  ci         Everything CI runs, locally: quality -> test all -> e2e
+             / Todo lo que corre CI, localmente: quality -> test all -> e2e
+  help       This message / Este mensaje
+
+Pass --help to any command for its details / Pasa --help a cualquier comando:
+  ./run setup --help
+
+Full reference / Referencia completa:
+  docs/SCRIPTS.md (English) · docs/SCRIPTS.es.md (Español)
+USAGE
+}
+
+[ $# -ge 1 ] || { usage; exit 1; }
+
+# Central command -> script mapping (single source of truth for dispatch
+# AND for `run help <command>` delegation).
+script_for() {
+    case "$1" in
+        setup)     printf '%s\n' "$B2B_ROOT/scripts/setup.sh" ;;
+        serve)     printf '%s\n' "$B2B_ROOT/scripts/serve.sh" ;;
+        test)      printf '%s\n' "$B2B_ROOT/scripts/test.sh" ;;
+        e2e)       printf '%s\n' "$B2B_ROOT/scripts/e2e.sh" ;;
+        quality)   printf '%s\n' "$B2B_ROOT/scripts/quality.sh" ;;
+        doctor)    printf '%s\n' "$B2B_ROOT/scripts/doctor.sh" ;;
+        status)    printf '%s\n' "$B2B_ROOT/scripts/status.sh" ;;
+        reset)     printf '%s\n' "$B2B_ROOT/scripts/reset.sh" ;;
+        model|model-server) printf '%s\n' "$B2B_ROOT/scripts/model-server.sh" ;;
+        toolchain) printf '%s\n' "$B2B_ROOT/scripts/provision-toolchain.sh" ;;
+        ci)        printf '%s\n' "$B2B_ROOT/scripts/ci.sh" ;;
+        *)         return 1 ;;
+    esac
+}
+
+CMD="$1"; shift || true
+case "$CMD" in
+    help|--help|-h)
+        if [ $# -ge 1 ] && [ "$1" != "--help" ]; then
+            TARGET="$(script_for "$1")" || { err "Unknown command: $1 / Comando desconocido: $1"; exit 2; }
+            exec bash "$TARGET" --help
+        fi
+        usage
+        ;;
+    *)
+        TARGET="$(script_for "$CMD")" || {
+            err "Unknown command: ${CMD} / Comando desconocido: ${CMD}"
+            usage >&2
+            exit 2
+        }
+        exec bash "$TARGET" "$@"
+        ;;
+esac
