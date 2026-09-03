@@ -103,3 +103,42 @@ This run added the operations layer (TASK-003, ADR-009/010/011):
 - Fixed pre-existing latent defects found while verifying: a
   FunctionRegistryTest date-boundary flake (would fail any post-midnight CI
   run) and a Pint style drift in bootstrap/app.php.
+
+## RUN-2026-09-03-core-003 — appended project facts (CI activation run)
+
+This run made the GitHub Actions pipeline REAL (TASK-004, ADR-012):
+
+- **The Actions tab was empty because the workflow never compiled**: the
+  first ci.yml had (1) a colon+space inside an unquoted job display name —
+  a YAML syntax error — and (2) `secrets` context in a job-level `if` —
+  illegal per GitHub's context-availability table. GitHub registers
+  uncompilable workflows under their file path with NO triggers: zero
+  runs, zero errors, anywhere a human would look (OBS-005).
+- **`workflows-lint` (actionlint) is now the first CI job** — it rejects
+  exactly that defect class (YAML syntax, expression semantics, context
+  availability, shellcheck of run blocks). Workflow files are linted
+  artifacts like PHP (Pint) and bash (shellcheck).
+- **Secret-dependent jobs use the canonical gate pattern** (ADR-012):
+  `llm-gate` reads GEMINI_API_KEY in job `env` (where `secrets` IS legal)
+  and emits a boolean output; `live-llm-smoke` gates on
+  `needs.llm-gate.outputs.enabled`. The key is stored ONLY as a GitHub
+  Actions repo secret (libsodium sealed box via REST) — the live smoke
+  passes from runners with a single flash call.
+- **Current Arch packaging truth (machine-verified against extra/php
+  8.5.10-1, php-sqlite, php-gd)**: sqlite3/pdo_sqlite live in the separate
+  `php-sqlite` package; gd in `php-gd`; the ini ships curl+zip
+  pre-enabled. `./run doctor` prints the complete remediation; the sed
+  form is backreference-free and `printf %b`-safe (the old
+  `extension=\1` form double-prefixed into `extension=extension=X`, which
+  made PHP abort ini parsing — and silently dropped `extension=zip`).
+- **PHP_REQUIRED_MODULES is now 17 modules** (iconv + gd added: the
+  composer lock requires ext-iconv; the test suite requires ext-gd).
+- **PHP 8.3 legs were dropped from CI** (the lock requires >= 8.4.1);
+  8.4 is pinned for standard jobs, 8.5.10 is exercised by arch-smoke, and
+  the static PHP 8.4.23 by hermetic-smoke.
+- **Trigger reality (OBS-006)**: pushes from the build sandbox emit no
+  GitHub events — automation dispatches via REST `workflow_dispatch`;
+  `on: push` (all branches) + `pull_request` are configured for normal
+  machines.
+- CI is green: 12/12 jobs on b0fd17d (run 33705375607); README badge live
+  ("CI - passing").
