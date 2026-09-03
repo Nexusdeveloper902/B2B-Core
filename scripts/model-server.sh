@@ -57,13 +57,25 @@ model_start() {
     ensure_venv
     mkdir -p "$B2B_ROOT/storage/logs"
     log "Starting uvicorn on 127.0.0.1:${PORT} (log: storage/logs/model-server.log)"
-    ( cd "$MODEL_DIR" && nohup "$VENV/bin/uvicorn" server:app --host 127.0.0.1 --port "$PORT" \
-        >>"$LOGFILE" 2>&1 & printf '%s\n' "$!" >"$PIDFILE" )
+    # Daemonize: one backgrounded unit that EXECs uvicorn (pid stays valid),
+    # all three fds detached from this shell, then disown so the script can
+    # never block in wait() for the daemon (TASK-003 finding: pipelines held
+    # the script open when the daemon remained a shell child).
+    ( cd "$MODEL_DIR" && exec "$VENV/bin/uvicorn" server:app --host 127.0.0.1 --port "$PORT" \
+        </dev/null >>"$LOGFILE" 2>&1 ) &
+    disown
+    printf '%s\n' "$!" >"$PIDFILE"
     if ! wait_for_http "$HEALTH_URL" 20 "model server / servidor de modelo"; then
         err "Last log lines / Últimas líneas del log:"
         tail -n 15 "$LOGFILE" >&2 || true
         rm -f "$PIDFILE"
         die "Model server failed to become healthy / El servidor de modelo no arrancó bien"
+    fi
+    # The launcher pid and the serving pid can differ (exec chain), so once
+    # healthy, record the AUTHORITATIVE pid found via pgrep when available.
+    if command -v pgrep >/dev/null 2>&1; then
+        real_pid="$(pgrep -f 'uvicorn server:app' | head -n 1 || true)"
+        if [ -n "$real_pid" ]; then printf '%s\n' "$real_pid" >"$PIDFILE"; fi
     fi
     ok "Model server healthy at ${HEALTH_URL} / Servidor de modelo sano en ${HEALTH_URL}"
     bi "Activate it: set RECYCLING_CLASSIFIER_DRIVER=local in .env (docs/LOCAL_MODEL.md)" \
@@ -73,20 +85,21 @@ model_start() {
 model_stop() {
     local pid=""
     [ -f "$PIDFILE" ] && pid="$(cat "$PIDFILE" 2>/dev/null || true)"
-    if [ -z "$pid" ] && command -v pgrep >/dev/null 2>&1; then
-        pid="$(pgrep -f 'uvicorn server:app' | head -n 1 || true)"
-    fi
-    if [ -z "$pid" ] && ! model_running; then
-        ok "Model server is not running / El servidor de modelo no está corriendo"
-        rm -f "$PIDFILE"
-        exit 0
-    fi
     if [ -n "$pid" ]; then
         kill "$pid" 2>/dev/null || true
-        for _ in $(seq 1 10); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
-        kill -0 "$pid" 2>/dev/null && { kill -9 "$pid" 2>/dev/null || true; warn "Had to SIGKILL ${pid} / Fue necesario SIGKILL ${pid}"; }
+    fi
+    # Verify the ACTUAL shutdown via the health endpoint — the pidfile pid
+    # may be a stale launcher pid (exec chains orphan the real server).
+    for _ in $(seq 1 10); do model_running || break; sleep 0.5; done
+    if model_running && command -v pkill >/dev/null 2>&1; then
+        pkill -f 'uvicorn server:app' 2>/dev/null || true
+        for _ in $(seq 1 10); do model_running || break; sleep 0.5; done
     fi
     rm -f "$PIDFILE"
+    if model_running; then
+        die "Model server is STILL running on port ${PORT} — kill it manually: pkill -f 'uvicorn server:app'
+El servidor de modelo SIGUE corriendo en el puerto ${PORT} — mátalo a mano: pkill -f 'uvicorn server:app'"
+    fi
     ok "Model server stopped (port ${PORT}) / Servidor de modelo detenido (puerto ${PORT})"
 }
 

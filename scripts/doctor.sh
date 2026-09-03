@@ -75,7 +75,7 @@ if [ "$PHP_FOUND" -eq 0 ]; then
     if [ "$DISTRO_FAMILY" = "arch" ]; then
         note "  ${C_BOLD}Arch remediation / Remediación en Arch:${C_RESET}"
         note "    sudo pacman -S --needed php composer"
-        note "    sudo sed -ri 's/^;(extension=(curl|fileinfo|mbstring|pdo_sqlite|sqlite3|zip))$/extension=\\1/' /etc/php/php.ini"
+        note "    sudo sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\\1/' /etc/php/php.ini"
     fi
     note "  ${C_BOLD}Or the zero-system hermetic toolchain / O el toolchain hermético sin dependencias:${C_RESET}"
     note "    ./run toolchain"

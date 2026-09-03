@@ -228,7 +228,7 @@ this and prints the exact fix:
 ```bash
 sudo pacman -S --needed php composer
 # Enable the extensions the platform needs (as printed by ./run doctor):
-sudo sed -ri 's/^;(extension=(curl|fileinfo|mbstring|pdo_sqlite|sqlite3|zip))$/extension=\1/' /etc/php/php.ini
+sudo sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\1/' /etc/php/php.ini
 ./run doctor   # verify → all green
 ./run setup && ./run serve
 ```

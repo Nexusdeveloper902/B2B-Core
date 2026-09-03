@@ -8,6 +8,7 @@ use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Services\NlQuery\FunctionRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -24,9 +25,19 @@ class FunctionRegistryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Freeze time at mid-day so the "N minutes ago" fixtures always land
+        // on the SAME calendar date the queries filter by. Without this the
+        // suite flakes when run shortly after midnight (TASK-003 finding).
+        $this->travelTo(Carbon::parse('2026-09-01 12:00:00'));
         $this->registry = app(FunctionRegistry::class);
         $this->seedDemo();
         $this->generateEvents();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->travelBack();
+        parent::tearDown();
     }
 
     #[Test]

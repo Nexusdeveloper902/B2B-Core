@@ -31,9 +31,16 @@ resolve_php
 [ -d "$B2B_ROOT/vendor" ] || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
 ensure_env_and_key
 
+# phpunit suite names are capitalized; the suite arg is lowercase-friendly.
+case "$SUITE" in
+    unit)    TESTSUITE="Unit" ;;
+    feature) TESTSUITE="Feature" ;;
+    e2e)     TESTSUITE="E2E" ;;
+esac
+
 if [ "$SUITE" = "all" ]; then
     log "Running the full test pyramid / Ejecutando la pirámide completa de pruebas"
     exec "$PHP_BIN" artisan test "$@"
 fi
-log "Running testsuite: ${SUITE} / Ejecutando testsuite: ${SUITE}"
-exec "$PHP_BIN" artisan test --testsuite="$SUITE" "$@"
+log "Running testsuite: ${TESTSUITE} / Ejecutando testsuite: ${TESTSUITE}"
+exec "$PHP_BIN" artisan test --testsuite="$TESTSUITE" "$@"

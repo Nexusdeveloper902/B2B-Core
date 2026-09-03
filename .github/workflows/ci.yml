@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint:
-    name: Lint (Pint)
+    name: Lint (quality gate: Pint + bash + docs parity)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +21,40 @@ jobs:
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
-      - name: Run Pint (code style)
-        run: vendor/bin/pint --test
+      - name: Ensure shellcheck is present
+        run: command -v shellcheck || (sudo apt-get update -y && sudo apt-get install -y shellcheck)
+
+      - name: Quality gate (Pint + bash -n + shellcheck + docs parity)
+        run: ./run quality
+
+  scripts-lint:
+    name: Scripts lint (bash -n + shellcheck, no PHP needed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure shellcheck is present
+        run: command -v shellcheck || (sudo apt-get update -y && sudo apt-get install -y shellcheck)
+
+      - name: bash syntax check (dispatcher + library + scripts)
+        run: |
+          bash -n run
+          bash -n scripts/_lib/common.sh
+          for f in scripts/*.sh; do bash -n "$f"; done
+
+      - name: shellcheck — warnings must be zero
+        run: shellcheck --severity=warning -x run scripts/_lib/common.sh scripts/*.sh
+
+      - name: Dispatcher smoke (help=0, doctor=0-or-1, unknown command=2)
+        run: |
+          ./run help
+          # doctor may legitimately report an unsuitable runner (exit 1),
+          # but it must never crash with any other exit code:
+          ./run doctor || [ "$?" -eq 1 ]
+          ./run definitely-not-a-command >/dev/null 2>&1; [ "$?" -eq 2 ]
 
   unit:
     name: Unit tests
@@ -55,16 +84,11 @@ jobs:
           key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-${{ matrix.php }}-
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
       - name: Run unit tests
-        run: php artisan test --testsuite=Unit
+        run: ./run test unit
 
   integration:
     name: Integration tests (API + Web)
@@ -83,16 +107,22 @@ jobs:
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-${{ matrix.php }}-
+
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
       - name: Run feature tests
-        run: php artisan test --testsuite=Feature
+        run: ./run test feature
 
   e2e:
     name: E2E tests (full journeys)
@@ -107,19 +137,14 @@ jobs:
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
       - name: Run E2E tests
-        run: php artisan test --testsuite=E2E
+        run: ./run test e2e
 
   http-e2e:
-    name: Real-HTTP E2E (serve + curl)
+    name: Real-HTTP E2E (serve + curl, via ./run e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,11 +156,75 @@ jobs:
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
-      - name: Run the real-HTTP end-to-end script
-        run: bash scripts/e2e.sh
+      - name: Run the real-HTTP end-to-end suite
+        run: ./run e2e
+
+  arch-smoke:
+    name: Arch Linux smoke (real archlinux:base container)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base
+    steps:
+      - name: Install base toolchain (git+node for checkout, php, composer)
+        run: pacman -Syu --noconfirm archlinux-keyring git nodejs php composer
+
+      - uses: actions/checkout@v4
+
+      - name: Enable required PHP extensions (the exact remediation ./run doctor prints)
+        run: |
+          sed -ri 's/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/extension=\1/' /etc/php/php.ini
+
+      - name: Doctor must be fully green after the documented remediation
+        run: ./run doctor
+
+      - name: Setup (CI mode) through the run suite
+        run: ./run setup --ci
+
+      - name: Quality gate (Pint + bash syntax + docs parity)
+        run: |
+          pacman -S --noconfirm shellcheck || true
+          ./run quality
+
+      - name: Full test pyramid on Arch
+        run: ./run test
+
+  hermetic-smoke:
+    name: Hermetic toolchain smoke (container with NO PHP)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+    env:
+      HOME: /root
+    steps:
+      - name: Install bare minimum (git, curl — deliberately NO PHP, NO node)
+        run: |
+          apt-get update -y
+          apt-get install -y --no-install-recommends git curl ca-certificates
+
+      - name: Clone without JS actions (no node in this container)
+        run: |
+          git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" .
+
+      - name: Prove there is no PHP on this machine
+        run: '! command -v php'
+
+      - name: Provision the hermetic toolchain into .tools/
+        run: ./run toolchain
+
+      - name: Doctor must be green purely via the hermetic toolchain
+        run: ./run doctor
+
+      - name: Full setup with the static PHP
+        run: ./run setup
+
+      - name: Unit tests on the static PHP
+        run: ./run test unit
+
+      - name: Real-HTTP e2e on the static PHP
+        run: ./run e2e
 
   secrets-scan:
     name: Secret scanning (gitleaks)
@@ -167,16 +256,13 @@ jobs:
           extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
           coverage: none
 
-      - name: Install dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
 
-      - name: Prepare environment
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
+      - name: Provide the Gemini key
+        run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
 
       - name: Run the live NL-query smoke test (single light call)
-        run: php artisan test --filter=NlQueryApiTest --live-llm
+        run: ./run test feature --filter=NlQueryApiTest --live-llm
         env:
           RUN_LIVE_LLM_TESTS: '1'
