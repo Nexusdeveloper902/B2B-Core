@@ -192,3 +192,12 @@ Verification:
 ## Remaining work
 
 - Merge to main + push + CI verification (in progress).
+
+## Merge record
+
+- Merged to main: fast-forward, feature/TASK-005-core-platform-ui-passover
+  (tip ee419ee) → main. No conflicts (main had not moved).
+- Verification on main: 108 tests passed (1916 assertions); every
+  dashboard route rendered with custom fonts confirmed loaded; GitHub
+  Actions push runs 33708087179 + 33708087625 on ee419ee: success.
+- Status: COMPLETED.

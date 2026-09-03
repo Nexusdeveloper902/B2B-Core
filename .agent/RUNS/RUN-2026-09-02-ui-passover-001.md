@@ -136,3 +136,16 @@ commit ecde2d5. No writes of any kind to that repository.
 - If the marketplace palette changes, mirror the values in
   public/css/tokens.css manually (see
   .agent/ARCHITECTURE/value-matched-design-tokens.md).
+
+## Addendum — final verification (merge + CI)
+
+- Merged: fast-forward main → ee419ee (feature branch contained all
+  9 TASK-005 commits).
+- Verified ON MAIN: ./run test → 108 passed, 1 skipped (1916
+  assertions); all dashboard routes rendered via headless browser;
+  document.fonts.check true for Space Grotesk / IBM Plex Sans / Mono.
+- Pushed main + feature branch (transient credential helper; PAT never
+  stored; full-diff secret scan = 0 matches).
+- GitHub Actions: push runs 33708087179 + 33708087625 on ee419ee both
+  completed with `success` (push triggers confirmed live, OBS-006).
+- Result upgraded from "COMPLETED (pending CI check)" to COMPLETED.
