@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Presence Platform — Core Platform design tokens
+   Single source of truth for the UI passover (TASK-005).
+
+   Values are value-matched 1:1 from the marketplace storefront
+   (B2B-Marketplace @ ecde2d5, "The Event Ledger", marketplace ADR-002)
+   — see .agent/DECISIONS/ADR-013-design-tokens-value-matched.md.
+   Whoever changes one side's tokens MUST update the other.
+   ========================================================================== */
+
+:root {
+    /* ---- palette ---- */
+    --paper:     #F3F4F0;  /* cool porcelain page ground */
+    --surface:   #FFFFFF;  /* content surfaces (tables, panels, fields) */
+    --ink:       #101D18;  /* deep green-black text + emphasis rules */
+    --pine:      #0A5C38;  /* primary brand green: CTAs, links, rules */
+    --pine-dark: #07422A;  /* CTA hover */
+    --go:        #1D9E5F;  /* signal green — sparing: live dots, success */
+    --steel:     #53615A;  /* secondary text */
+    --line:      #D7DCD5;  /* hairline rules and borders */
+    --wash:      #E9EEE9;  /* tinted alternating ground */
+    --alert:     #B3261E;  /* errors only (functional) */
+
+    /* literal supporting values (from marketplace app.css) */
+    --copy:        #37453F;   /* body copy on paper */
+    --line-strong: #CBD5CC;   /* hairlines on wash */
+    --row-line:    #EEF1EC;   /* ledger table row rules */
+    --field-line:  #97A29A;   /* input borders */
+    --row-flash:   #DCEDE2;   /* freshly-written row flash */
+    --alert-line:  #E5C0BC;   /* error border */
+    --alert-bg:    #FBEFEE;   /* error ground */
+    --ok-bg:       #E9F7EF;   /* success ground (green family) */
+
+    /* text + rules on ink ground */
+    --on-ink:        #E8F0EA;
+    --on-ink-mute:   #AEBAB2;
+    --on-ink-dim:    #98A8A0;
+    --on-ink-legal:  #97A69D;
+    --on-ink-line:   #263430;
+
+    /* ---- type ---- */
+    --font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+    --font-body:    'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+
+    /* ---- rhythm / shape ---- */
+    --radius: 2px;                       /* buttons + inputs only */
+    --shell: 1120px;                     /* content column */
+    --pad-inline: clamp(20px, 5vw, 40px);
+    --section-pad: clamp(40px, 6vw, 64px);
+
+    /* ---- motion ---- */
+    --ease: 0.15s ease;
+}
