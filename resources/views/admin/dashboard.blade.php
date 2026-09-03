@@ -5,103 +5,89 @@
 @section('content')
 <div class="page-head">
     <h1>{{ __('app.admin_dashboard') }}</h1>
+    <p class="page-meta"><span>{{ __('app.school_today') }}</span></p>
 </div>
 
-{{-- School-wide stats today --}}
-<section class="stat-grid">
-    <div class="stat-card">
-        <span class="stat-value">{{ $attendanceToday }}</span>
-        <span class="stat-label">{{ __('app.attendance_count') }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-value">{{ $paeBreakfastToday }}</span>
-        <span class="stat-label">{{ __('app.pae_breakfast') }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-value">{{ $paeLunchToday }}</span>
-        <span class="stat-label">{{ __('app.pae_lunch') }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-value">{{ $recyclingToday['items'] }}</span>
-        <span class="stat-label">{{ __('app.recycling_items') }}</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-value">{{ $recyclingToday['points'] }}</span>
-        <span class="stat-label">{{ __('app.recycling_points') }}</span>
-    </div>
+{{-- School-wide stats today: ruled spec strip, values in pine --}}
+<section class="stat-strip" aria-label="{{ __('app.school_today') }}">
+    <x-stat :label="__('app.attendance_count')">{{ $attendanceToday }}</x-stat>
+    <x-stat :label="__('app.pae_breakfast')">{{ $paeBreakfastToday }}</x-stat>
+    <x-stat :label="__('app.pae_lunch')">{{ $paeLunchToday }}</x-stat>
+    <x-stat :label="__('app.recycling_items')">{{ $recyclingToday['items'] }}</x-stat>
+    <x-stat :label="__('app.recycling_points')">{{ $recyclingToday['points'] }}</x-stat>
 </section>
 
-<section class="two-col">
+<section class="grid-2">
     {{-- Reader list + mode control --}}
-    <div class="card">
-        <h2>{{ __('app.readers') }}</h2>
-
-        <table class="table">
-            <thead>
-            <tr>
-                <th>{{ __('app.reader') }}</th>
-                <th>{{ __('app.reader_type') }}</th>
-                <th>{{ __('app.active_mode') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            @foreach($readers as $reader)
+    <x-panel :label="__('app.readers')" rule>
+        <div class="ledger-wrap">
+            <table class="ledger-table">
+                <thead>
                 <tr>
-                    <td>{{ $reader->label }}</td>
-                    <td><code>{{ $reader->type->value }}</code></td>
-                    <td>
-                        <form class="mode-form" data-reader="{{ $reader->id }}">
-                            <select name="active_event_type" class="mode-select" id="mode-{{ $reader->id }}">
-                                @foreach(\App\Enums\EventType::cases() as $eventType)
-                                    <option value="{{ $eventType->value }}"
-                                            @selected($reader->active_event_type === $eventType->value)>
-                                        {{ $eventType->value }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <button type="submit" class="btn btn-small"
-                                    data-endpoint="{{ '/api/v1/admin/readers/'.$reader->id.'/mode' }}">
-                                {{ __('app.change_mode') }}
-                            </button>
-                        </form>
-                    </td>
+                    <th scope="col">{{ __('app.reader') }}</th>
+                    <th scope="col">{{ __('app.reader_type') }}</th>
+                    <th scope="col">{{ __('app.active_mode') }}</th>
                 </tr>
-            @endforeach
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                @forelse($readers as $reader)
+                    <tr>
+                        <td>{{ $reader->label }}</td>
+                        <td><code>{{ $reader->type->value }}</code></td>
+                        <td>
+                            <form class="mode-form tool-form" data-reader="{{ $reader->id }}">
+                                <select name="active_event_type" class="mode-select bare-select"
+                                        id="mode-{{ $reader->id }}" aria-label="{{ __('app.active_mode') }}">
+                                    @foreach(\App\Enums\EventType::cases() as $eventType)
+                                        <option value="{{ $eventType->value }}"
+                                                @selected($reader->active_event_type === $eventType->value)>
+                                            {{ $eventType->value }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-quiet btn-small"
+                                        data-endpoint="{{ '/api/v1/admin/readers/'.$reader->id.'/mode' }}">
+                                    {{ __('app.change_mode') }}
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="3" class="muted">—</td></tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </x-panel>
 
     {{-- NL query box --}}
-    <div class="card">
-        <h2>{{ __('app.nl_query') }}</h2>
-
+    <x-panel :label="__('app.nl_query')" rule>
         @unless($nlQueryConfigured)
-            <p class="flash flash-warn">{{ __('app.nl_query_not_configured') }}</p>
+            <div class="notice notice-warn" role="alert">{{ __('app.nl_query_not_configured') }}</div>
         @endunless
 
-        <form id="nl-query-form">
-            <input type="text" id="nl-question" placeholder="{{ __('app.nl_query_placeholder') }}"
-                   autocomplete="off">
+        <form id="nl-query-form" class="tool-form">
+            <input type="text" class="bare-input" id="nl-question"
+                   placeholder="{{ __('app.nl_query_placeholder') }}" autocomplete="off"
+                   aria-label="{{ __('app.nl_query') }}">
             <button type="submit" class="btn btn-primary">{{ __('app.ask') }}</button>
         </form>
 
-        <div id="nl-answer" class="nl-answer hidden"></div>
-    </div>
+        <div id="nl-answer" class="nl-answer hidden" aria-live="polite"></div>
+    </x-panel>
 </section>
 
-<section class="two-col">
+<section class="grid-2">
     {{-- Redemption desk --}}
-    <div class="card">
-        <h2>{{ __('app.redemption') }}</h2>
-
-        <form id="redeem-form">
-            <select id="redeem-student" required>
+    <x-panel :label="__('app.redemption')">
+        <form id="redeem-form" class="tool-form">
+            <select id="redeem-student" class="bare-select" required aria-label="{{ __('app.student') }}">
                 @foreach($students as $student)
                     <option value="{{ $student->id }}">{{ $student->name }}</option>
                 @endforeach
             </select>
 
-            <select id="redeem-reward" required>
+            <select id="redeem-reward" class="bare-select" required aria-label="{{ __('app.reward') }}">
                 @foreach($rewards as $reward)
                     <option value="{{ $reward->id }}">{{ $reward->name }} ({{ $reward->point_cost }} pts)</option>
                 @endforeach
@@ -109,23 +95,24 @@
 
             <button type="submit" class="btn btn-primary">{{ __('app.redeem') }}</button>
         </form>
-        <div id="redeem-result" class="nl-answer hidden"></div>
-    </div>
+        <div id="redeem-result" class="nl-answer hidden" aria-live="polite"></div>
+    </x-panel>
 
     {{-- Students quick links (parent view entry) --}}
-    <div class="card">
-        <h2>{{ __('app.students') }}</h2>
-        <ul class="student-links">
-            @foreach($students as $student)
-                <li>
-                    <a href="{{ route('parent.timeline', $student) }}">{{ $student->name }}</a>
-                    <span class="muted">
-                        {{ $student->schoolClass?->name }} · {{ $student->pae_enrolled ? 'PAE ✓' : '—' }}
-                    </span>
-                </li>
-            @endforeach
-        </ul>
-    </div>
+    <x-panel :label="__('app.students')">
+        @if($students->isEmpty())
+            <x-empty>{{ __('app.no_students') }}</x-empty>
+        @else
+            <ul class="ruled">
+                @foreach($students as $student)
+                    <li>
+                        <a href="{{ route('parent.timeline', $student) }}">{{ $student->name }}</a>
+                        <span class="meta">{{ $student->schoolClass?->name }} · {{ $student->pae_enrolled ? 'PAE ✓' : '—' }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </x-panel>
 </section>
 
 <script>
