@@ -193,8 +193,17 @@ Callable functions: `get_attendance_count(date, class_id?)`,
 }
 ```
 
-`503` — **honest blocker** when no `GEMINI_API_KEY` is configured (or the
-service/rate limit fails):
+`503` — **honest blocker** — each refusal class has its own actionable
+`blocked_reason` (per Google's documented error contract):
+
+| `blocked_reason` | Meaning | Fix |
+|---|---|---|
+| `missing_llm_credential` | No `GEMINI_API_KEY` in `.env` | Add the key, then `./run llm-check` |
+| `llm_invalid_key` | Google rejected the key (400 `API_KEY_INVALID` / 401 / 403) | Create a fresh key in AI Studio, update `.env` |
+| `llm_region_unsupported` | "User location is not supported" — the key is valid; Google refuses the region | Run `./run llm-check` from this machine; see Google's Available regions page |
+| `llm_model_not_found` | `GEMINI_MODEL` unknown for this account/API (404) | Use the default `gemini-3.1-flash-lite` |
+| `llm_rate_limited` | Quota exhausted (429) | Retry later |
+| `llm_unavailable` | Transport/server error | Retry; see `storage/logs/laravel.log` for the raw cause |
 
 ```json
 {
@@ -203,6 +212,10 @@ service/rate limit fails):
   "message": "Natural-language query is not configured: no GEMINI_API_KEY set (blocked, not failed)."
 }
 ```
+
+Run `./run llm-check` on the machine making the calls — it performs one
+bare live request with the same key + model and prints Google's exact
+verdict with bilingual fix guidance.
 
 ---
 

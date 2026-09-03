@@ -37,6 +37,7 @@ comando siempre se te imprime — y normalmente es `./run doctor`.
 | `./run status` | adivinar | Estado de la app: toolchain, .env, BD, servidores, clasificador |
 | `./run reset` | `migrate:fresh --seed` | BD nueva + datos demo (pregunta primero) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Servidor del modelo local: start/stop/status/run |
+| `./run llm-check` | leer un «no disponible» genérico | Una llamada en vivo a Gemini — veredicto exacto para ESTA máquina |
 | `./run toolchain` | instalar PHP a mano | PHP+Composer herméticos estáticos en `.tools/` |
 | `./run ci` | leer ci.yml | Todo lo que corre CI, localmente y en orden |
 
@@ -170,6 +171,25 @@ dependencias se reinstalan automáticamente solo cuando cambia
 `requirements.txt`. Log: `storage/logs/model-server.log`; PID:
 `.model-server.pid` (ignorado por git). Variable: `B2B_MODEL_PORT` (por defecto
 8501, coincide con `LOCAL_CLASSIFIER_URL`).
+
+## `llm-check`
+
+```bash
+./run llm-check    # una llamada directa en vivo a la API de Gemini + veredicto
+```
+
+Autodiagnóstico de conectividad para la consulta en lenguaje natural.
+Realiza UNA llamada `generateContent` con la MISMA clave y modelo que usa
+la app y reporta el veredicto exacto de Google — clave válida/inválida,
+región soportada, modelo existente, cuota — con orientación bilingüe para
+corregirlo. No requiere PHP (bash + curl). Códigos de salida: `0`
+funciona · `1` fallo diagnosticado · `2` clave sin configurar.
+
+Ejecuta esto cuando las consultas NL respondan `blocked`: la app mapea
+cada rechazo a un `blocked_reason` distinto (`llm_invalid_key`,
+`llm_region_unsupported`, `llm_model_not_found`, `llm_rate_limited`) y
+`llm-check` te dice cuál aplica EN ESTA MÁQUINA y cómo arreglarlo (clave
+nueva en `.env`, otra red, modelo por defecto, o esperar).
 
 ## `toolchain`
 

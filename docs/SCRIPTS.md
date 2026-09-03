@@ -37,6 +37,7 @@ command to run is always printed for you — and it's usually `./run doctor`.
 | `./run status` | guessing | App state: toolchain, .env, DB, servers, classifier |
 | `./run reset` | `migrate:fresh --seed` | Fresh DB + demo data (asks first) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Local model server: start/stop/status/run |
+| `./run llm-check` | reading a generic "unavailable" | One live Gemini call — exact verdict for THIS machine |
 | `./run toolchain` | manual PHP installation | Hermetic static PHP+Composer into `.tools/` |
 | `./run ci` | reading ci.yml | Everything CI runs, locally, in order |
 
@@ -167,6 +168,25 @@ Manages the local classifier sidecar (`scripts/local-model-server/`, see
 dependencies reinstall automatically only when `requirements.txt` changes.
 Log: `storage/logs/model-server.log`; PID: `.model-server.pid` (gitignored).
 Env: `B2B_MODEL_PORT` (default 8501, matching `LOCAL_CLASSIFIER_URL`).
+
+## `llm-check`
+
+```bash
+./run llm-check    # one bare live call to the Gemini API + exact verdict
+```
+
+Self-diagnosing connectivity check for the NL-query feature. Makes ONE
+bare `generateContent` call with the SAME key and model the app uses and
+reports Google's exact verdict — key valid/invalid, region supported,
+model found, quota — with bilingual fix guidance. No PHP needed (pure
+bash + curl). Exit codes: `0` works · `1` diagnosed failure · `2` key
+not configured.
+
+Run this whenever NL queries report `blocked`: the app maps every
+refusal to a distinct `blocked_reason` (`llm_invalid_key`,
+`llm_region_unsupported`, `llm_model_not_found`, `llm_rate_limited`),
+and `llm-check` tells you which one applies ON THIS MACHINE and how to
+fix it (new key in `.env`, another network, default model, or wait).
 
 ## `toolchain`
 

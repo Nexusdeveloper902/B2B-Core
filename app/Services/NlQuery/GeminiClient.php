@@ -58,12 +58,8 @@ class GeminiClient
             throw NlQueryException::transportFailure($e->getMessage());
         }
 
-        if ($response->status() === 429) {
-            throw NlQueryException::rateLimited();
-        }
-
         if ($response->failed()) {
-            throw NlQueryException::transportFailure("HTTP {$response->status()}: ".substr((string) $response->body(), 0, 300));
+            throw $this->mapApiFailure($response);
         }
 
         $blocked = $response->json('candidates.0.finishReason');
@@ -92,5 +88,59 @@ class GeminiClient
         // unchanged on the next round — dropping them breaks multi-turn
         // function calling with a 400.
         return ['text' => $text, 'function_call' => $functionCall, 'parts' => (array) $parts];
+    }
+
+    /**
+     * Map a failed HTTP response onto a TYPED exception using Google's
+     * documented error contract: {code, message, status (gRPC
+     * SCREAMING_CASE), details[{reason, ...}]} — see
+     * ai.google.dev/gemini-api/docs/generate-content/api-errors.
+     *
+     * Typed = actionable: an invalid key, an unsupported region, a bad
+     * model name and a quota hit each get their own exception so the
+     * controller can tell the user what to actually DO (previously they
+     * all collapsed into one misleading "service unavailable").
+     */
+    private function mapApiFailure($response): NlQueryException
+    {
+        $code = (int) $response->status();
+        $status = (string) $response->json('error.status', '');
+        $message = (string) $response->json('error.message', '');
+        $reason = '';
+        foreach ((array) $response->json('error.details', []) as $detail) {
+            if (isset($detail['reason']) && is_string($detail['reason'])) {
+                $reason = $detail['reason'];
+                break;
+            }
+        }
+
+        $summary = "HTTP {$code}".($reason !== '' ? " [{$reason}]" : '').($status !== '' ? " {$status}" : '')
+            .': '.($message !== '' ? $message : substr((string) $response->body(), 0, 200));
+
+        // Order matters: the region refusal and the invalid-key rejection
+        // are BOTH plain 400s — the message/reason is what distinguishes
+        // them (region errors carry no ErrorInfo reason; key errors do).
+        if (str_contains($message, 'User location is not supported')
+            || $reason === 'USER_LOCATION_UNSUPPORTED'
+            || ($status === 'FAILED_PRECONDITION' && str_contains($message, 'location'))) {
+            return NlQueryException::regionUnsupported($summary);
+        }
+
+        if ($reason === 'API_KEY_INVALID'
+            || $code === 401 || $code === 403
+            || $status === 'UNAUTHENTICATED' || $status === 'PERMISSION_DENIED'
+            || str_contains($message, 'API key not valid')) {
+            return NlQueryException::invalidKey($summary);
+        }
+
+        if ($code === 429 || $status === 'RESOURCE_EXHAUSTED') {
+            return NlQueryException::rateLimited();
+        }
+
+        if ($code === 404 || $status === 'NOT_FOUND') {
+            return NlQueryException::modelNotFound($summary);
+        }
+
+        return NlQueryException::transportFailure($summary);
     }
 }

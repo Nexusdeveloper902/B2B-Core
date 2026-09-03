@@ -193,8 +193,18 @@ Funciones disponibles: `get_attendance_count(date, class_id?)`,
 }
 ```
 
-`503` — **bloqueo honesto** cuando no hay `GEMINI_API_KEY` configurada (o el
-servicio/limite de cuota falla):
+`503` — **bloqueo honesto** — cada clase de rechazo tiene su propio
+`blocked_reason` accionable (según el contrato de errores documentado de
+Google):
+
+| `blocked_reason` | Significado | Corrección |
+|---|---|---|
+| `missing_llm_credential` | No hay `GEMINI_API_KEY` en `.env` | Añade la clave y ejecuta `./run llm-check` |
+| `llm_invalid_key` | Google rechazó la clave (400 `API_KEY_INVALID` / 401 / 403) | Crea una clave nueva en AI Studio y actualiza `.env` |
+| `llm_region_unsupported` | «User location is not supported» — la clave SÍ es válida; Google rechaza la región | Ejecuta `./run llm-check` desde esta máquina; consulta la página de regiones soportadas de Google |
+| `llm_model_not_found` | `GEMINI_MODEL` desconocido para esta cuenta/API (404) | Usa el valor por defecto `gemini-3.1-flash-lite` |
+| `llm_rate_limited` | Cuota agotada (429) | Reintenta más tarde |
+| `llm_unavailable` | Error de transporte/servidor | Reintenta; el detalle está en `storage/logs/laravel.log` |
 
 ```json
 {
@@ -203,6 +213,10 @@ servicio/limite de cuota falla):
   "message": "La consulta en lenguaje natural no está configurada: falta GEMINI_API_KEY (bloqueada, no fallida)."
 }
 ```
+
+Ejecuta `./run llm-check` en la máquina que hace las llamadas — realiza una
+petición directa en vivo con la misma clave + modelo e imprime el veredicto
+exacto de Google con orientación bilingüe.
 
 ---
 

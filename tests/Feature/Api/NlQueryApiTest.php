@@ -3,7 +3,9 @@
 namespace Tests\Feature\Api;
 
 use App\Models\User;
+use App\Services\NlQuery\Exceptions\NlQueryException;
 use App\Services\NlQuery\GeminiClient;
+use App\Services\NlQuery\NlQueryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -36,6 +38,60 @@ class NlQueryApiTest extends TestCase
                 'status' => 'blocked',
                 'blocked_reason' => 'missing_llm_credential',
             ]);
+    }
+
+    #[Test]
+    public function an_invalid_key_reports_its_own_actionable_blocker(): void
+    {
+        // TASK-007: every failure class gets a DISTINCT reason + message,
+        // so the owner sees "your key was rejected" instead of a generic
+        // "service unavailable" that hides the actual cause.
+        $this->app->instance(GeminiClient::class, new class('stale-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        {
+            public function generate(array $contents, ?array $tools = null): array
+            {
+                throw NlQueryException::invalidKey(
+                    'HTTP 400 [API_KEY_INVALID] INVALID_ARGUMENT: API key not valid. Please pass a valid API key.'
+                );
+            }
+        });
+        $this->app->forgetInstance(NlQueryService::class);
+
+        $response = $this->actingAs($this->user('admin'))
+            ->postJson('/api/v1/nl-query', [
+                'question' => 'How many kids were late this week?',
+            ]);
+
+        $json = $response->assertStatus(503)->json();
+        $this->assertSame('blocked', $json['status']);
+        $this->assertSame('llm_invalid_key', $json['blocked_reason']);
+        // The message must be actionable: point at ./run llm-check.
+        $this->assertStringContainsString('llm-check', (string) $json['message']);
+    }
+
+    #[Test]
+    public function a_region_refusal_reports_its_own_actionable_blocker(): void
+    {
+        $this->app->instance(GeminiClient::class, new class('valid-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        {
+            public function generate(array $contents, ?array $tools = null): array
+            {
+                throw NlQueryException::regionUnsupported(
+                    'HTTP 400 FAILED_PRECONDITION: User location is not supported for the API use.'
+                );
+            }
+        });
+        $this->app->forgetInstance(NlQueryService::class);
+
+        $response = $this->actingAs($this->user('admin'))
+            ->postJson('/api/v1/nl-query', [
+                'question' => 'How many kids were late this week?',
+            ]);
+
+        $json = $response->assertStatus(503)->json();
+        $this->assertSame('llm_region_unsupported', $json['blocked_reason']);
+        // Honest semantics: the refusal is about the region, not the key.
+        $this->assertStringContainsString('valid', (string) $json['message']);
     }
 
     #[Test]

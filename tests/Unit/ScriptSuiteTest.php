@@ -26,6 +26,7 @@ class ScriptSuiteTest extends TestCase
         'status' => 'scripts/status.sh',
         'reset' => 'scripts/reset.sh',
         'model' => 'scripts/model-server.sh',
+        'llm-check' => 'scripts/llm-check.sh',
         'toolchain' => 'scripts/provision-toolchain.sh',
         'ci' => 'scripts/ci.sh',
     ];

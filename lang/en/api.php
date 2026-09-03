@@ -25,6 +25,9 @@ return [
 
     // NL query endpoint
     'nlq_not_configured' => 'Natural-language query is not configured: no GEMINI_API_KEY set (blocked, not failed).',
+    'nlq_invalid_key' => 'Google rejected the configured GEMINI_API_KEY (invalid or revoked). Create a fresh key in Google AI Studio, put it in .env, and verify with: ./run llm-check',
+    'nlq_region_unsupported' => 'Google refuses Gemini API calls from this network or region ("User location is not supported"). The key itself is valid — run ./run llm-check from this machine and see the Gemini API "Available regions" page.',
+    'nlq_model_not_found' => 'The configured GEMINI_MODEL was not found for this account or API version. Use the default (gemini-3.1-flash-lite) and verify with: ./run llm-check',
     'nlq_rate_limited' => 'The language model quota is exhausted, please retry later.',
     'nlq_unavailable' => 'The language model service is unavailable, please retry later.',
 

@@ -44,6 +44,9 @@ class NlQueryController extends Controller
     {
         $reason = match (true) {
             str_starts_with($e->getMessage(), 'nl_query.not_configured') => 'missing_llm_credential',
+            str_starts_with($e->getMessage(), 'nl_query.invalid_key') => 'llm_invalid_key',
+            str_starts_with($e->getMessage(), 'nl_query.region_unsupported') => 'llm_region_unsupported',
+            str_starts_with($e->getMessage(), 'nl_query.model_not_found') => 'llm_model_not_found',
             str_starts_with($e->getMessage(), 'nl_query.rate_limited') => 'llm_rate_limited',
             default => 'llm_unavailable',
         };
@@ -58,6 +61,9 @@ class NlQueryController extends Controller
 
         $message = match ($reason) {
             'missing_llm_credential' => __('api.nlq_not_configured'),
+            'llm_invalid_key' => __('api.nlq_invalid_key'),
+            'llm_region_unsupported' => __('api.nlq_region_unsupported'),
+            'llm_model_not_found' => __('api.nlq_model_not_found'),
             'llm_rate_limited' => __('api.nlq_rate_limited'),
             default => __('api.nlq_unavailable'),
         };
