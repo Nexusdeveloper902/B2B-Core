@@ -84,6 +84,12 @@ class NlQueryApiTest extends TestCase
                 'question' => 'How many students attended class today, '.now()->toDateString().'?',
             ]);
 
+        // Surface the honest blocker payload when the live call is refused
+        // (raw Google error remains visible in the CI probe step).
+        if ($response->status() !== 200) {
+            fwrite(STDERR, "\n[live-smoke] blocked payload: ".json_encode($response->json())."\n");
+        }
+
         $json = $response->assertOk()->json();
 
         $this->assertSame('ok', $json['status']);
