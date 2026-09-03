@@ -375,10 +375,16 @@ jobs:
         # and must fail loudly, not hide behind a green job.
         run: |
           set -o pipefail
-          ./run test feature --filter=NlQueryApiTest 2>&1 | tee live-smoke.log
+          status=0
+          ./run test feature --filter=NlQueryApiTest 2>&1 | tee live-smoke.log || status=$?
           if grep -q 'skipped' live-smoke.log; then
             echo "::error::Live-LLM smoke SKIPPED although GEMINI_API_KEY is configured — the key never reached the test (wiring bug, see TASK-006)."
             exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo '--- laravel.log tail (blocked NL queries carry the raw cause) ---'
+            tail -n 30 storage/logs/laravel.log 2>/dev/null || true
+            exit "$status"
           fi
         env:
           RUN_LIVE_LLM_TESTS: '1'

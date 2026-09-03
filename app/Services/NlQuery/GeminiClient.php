@@ -29,8 +29,8 @@ class GeminiClient
      * One round-trip to the Gemini API.
      *
      * @param  array<int, mixed>  $contents  the full conversation contents (may include prior function calls/responses)
-     * @param  array<int, mixed>|null  $tools  function declarations
-     * @return array{text: ?string, function_call: ?array{name: string, args: array<string, mixed>}}
+     * @param  array<int, mixed>|null  $tools  function declarations (lowercase OpenAPI types)
+     * @return array{text: ?string, function_call: ?array{name: string, args: array<string, mixed>}, parts: array<int, mixed>}
      *
      * @throws NlQueryException
      */
@@ -87,6 +87,10 @@ class GeminiClient
             }
         }
 
-        return ['text' => $text, 'function_call' => $functionCall];
+        // 'parts' carries the model turn VERBATIM (including any
+        // thoughtSignature parts). Gemini 3.x requires echoing those back
+        // unchanged on the next round — dropping them breaks multi-turn
+        // function calling with a 400.
+        return ['text' => $text, 'function_call' => $functionCall, 'parts' => (array) $parts];
     }
 }

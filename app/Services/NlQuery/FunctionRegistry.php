@@ -13,6 +13,10 @@ use App\Services\AttendanceService;
  *
  * Every function is independently callable (and independently tested)
  * without any LLM involvement.
+ *
+ * Wire format: LOWERCASE OpenAPI-style types ("object"/"string"/
+ * "integer"). Gemini 3.x models reject the legacy uppercase proto enum
+ * ("OBJECT"/"STRING"/...) — FunctionRegistryTest locks this contract.
  */
 class FunctionRegistry
 {
@@ -32,10 +36,10 @@ class FunctionRegistry
                 'name' => 'get_attendance_count',
                 'description' => 'Count of distinct students who tapped in for class attendance on a given date. Optionally scoped to one class.',
                 'parameters' => [
-                    'type' => 'OBJECT',
+                    'type' => 'object',
                     'properties' => [
-                        'date' => ['type' => 'STRING', 'description' => 'Date in YYYY-MM-DD format.'],
-                        'class_id' => ['type' => 'INTEGER', 'description' => 'Optional class ID to scope the count.'],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the count.'],
                     ],
                     'required' => ['date'],
                 ],
@@ -44,10 +48,10 @@ class FunctionRegistry
                 'name' => 'get_pae_count',
                 'description' => 'Count of distinct students who attended the school feeding program (PAE) for a given meal on a given date.',
                 'parameters' => [
-                    'type' => 'OBJECT',
+                    'type' => 'object',
                     'properties' => [
-                        'meal' => ['type' => 'STRING', 'description' => "The meal: 'breakfast' or 'lunch'."],
-                        'date' => ['type' => 'STRING', 'description' => 'Date in YYYY-MM-DD format.'],
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
                     ],
                     'required' => ['meal', 'date'],
                 ],
@@ -56,10 +60,10 @@ class FunctionRegistry
                 'name' => 'get_recycling_totals',
                 'description' => 'Recycling totals (items deposited and points awarded) for an inclusive date range.',
                 'parameters' => [
-                    'type' => 'OBJECT',
+                    'type' => 'object',
                     'properties' => [
-                        'date_from' => ['type' => 'STRING', 'description' => 'Start date in YYYY-MM-DD format (inclusive).'],
-                        'date_to' => ['type' => 'STRING', 'description' => 'End date in YYYY-MM-DD format (inclusive).'],
+                        'date_from' => ['type' => 'string', 'description' => 'Start date in YYYY-MM-DD format (inclusive).'],
+                        'date_to' => ['type' => 'string', 'description' => 'End date in YYYY-MM-DD format (inclusive).'],
                     ],
                     'required' => ['date_from', 'date_to'],
                 ],
@@ -68,9 +72,9 @@ class FunctionRegistry
                 'name' => 'get_student_timeline',
                 'description' => 'Chronological list of all presence events (attendance, feeding program, recycling deposits) for one student.',
                 'parameters' => [
-                    'type' => 'OBJECT',
+                    'type' => 'object',
                     'properties' => [
-                        'student_id' => ['type' => 'INTEGER', 'description' => 'The student ID.'],
+                        'student_id' => ['type' => 'integer', 'description' => 'The student ID.'],
                     ],
                     'required' => ['student_id'],
                 ],

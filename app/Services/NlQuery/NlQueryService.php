@@ -73,11 +73,17 @@ class NlQueryService
             // Execute locally — the single source of numbers is the backend.
             $functionResult = $this->registry->execute($call['name'], $call['args']);
 
-            // Continue the conversation with the function response.
-            $contents[] = ['role' => 'model', 'parts' => [['functionCall' => [
+            // Echo the model turn VERBATIM when raw parts are available
+            // (Gemini 3.x thoughtSignature contract). The fallback builds
+            // the same turn from the parsed call — keeps mocked tests and
+            // hand-rolled clients working identically.
+            $modelParts = $result['parts'] ?? [['functionCall' => [
                 'name' => $call['name'],
                 'args' => $call['args'],
-            ]]]];
+            ]]];
+            $contents[] = ['role' => 'model', 'parts' => $modelParts];
+
+            // Continue the conversation with the function response.
             $contents[] = ['role' => 'user', 'parts' => [['functionResponse' => [
                 'name' => $call['name'],
                 'response' => ['result' => $functionResult],

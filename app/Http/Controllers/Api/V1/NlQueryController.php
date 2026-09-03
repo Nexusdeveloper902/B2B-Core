@@ -7,6 +7,7 @@ use App\Http\Requests\NlQueryRequest;
 use App\Services\NlQuery\Exceptions\NlQueryException;
 use App\Services\NlQuery\NlQueryService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Phase E — natural-language query interface (admin-only).
@@ -46,6 +47,14 @@ class NlQueryController extends Controller
             str_starts_with($e->getMessage(), 'nl_query.rate_limited') => 'llm_rate_limited',
             default => 'llm_unavailable',
         };
+
+        // Ops visibility: the exact underlying cause (including the raw
+        // HTTP status/body excerpt from GeminiClient) lands in the log —
+        // never in the API response (no internals leak to clients).
+        Log::warning('NL query blocked', [
+            'reason' => $reason,
+            'detail' => $e->getMessage(),
+        ]);
 
         $message = match ($reason) {
             'missing_llm_credential' => __('api.nlq_not_configured'),

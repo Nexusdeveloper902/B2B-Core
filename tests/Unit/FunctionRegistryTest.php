@@ -62,6 +62,32 @@ class FunctionRegistryTest extends TestCase
     }
 
     #[Test]
+    public function wire_format_is_lowercase_openapi_types(): void
+    {
+        // Gemini 3.x models REJECT the legacy uppercase proto enum
+        // (OBJECT/STRING/INTEGER) — this contract locked by TASK-006
+        // after the live smoke surfaced a 400 on the tools schema.
+        $allowed = ['object', 'string', 'integer', 'number', 'boolean', 'array'];
+
+        $types = [];
+        foreach ($this->registry->declarations() as $declaration) {
+            $types[] = $declaration['parameters']['type'];
+            foreach ($declaration['parameters']['properties'] as $property) {
+                $types[] = $property['type'];
+            }
+        }
+
+        $this->assertNotEmpty($types);
+        foreach ($types as $type) {
+            $this->assertContains(
+                $type,
+                $allowed,
+                "Schema type [{$type}] must be a lowercase OpenAPI type — Gemini 3.x rejects the uppercase proto enum."
+            );
+        }
+    }
+
+    #[Test]
     public function attendance_count_counts_distinct_students(): void
     {
         // Maria + Carlos tapped in; Maria tapped twice (dedup expected).
