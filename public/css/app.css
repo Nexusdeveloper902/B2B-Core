@@ -478,12 +478,12 @@ code {
 @media (max-width: 940px) {
     .topbar-in { gap: 14px; min-height: 64px; }
     .topnav { order: 3; width: 100%; margin-left: 0; padding-bottom: 12px; gap: 18px; }
+    .topnav a, .linklike { padding: 12px 0; }  /* comfortable touch targets */
     .topbar-tools { margin-left: auto; }
     .grid-2 { grid-template-columns: 1fr; }
     .stat-strip { grid-template-columns: repeat(2, 1fr); border-top: none; }
     .stat { border-top: 2px solid var(--ink); border-right: 1px solid var(--line); }
     .stat:nth-child(2n) { border-right: none; }
-    .stat:nth-child(-n+2) { border-top: 2px solid var(--ink); }
     .timeline-head { grid-template-columns: 1fr; }
     .timeline-stat { border-right: none; border-bottom: 1px solid var(--line); }
     .timeline-stat:last-child { border-bottom: none; }
@@ -491,10 +491,15 @@ code {
 
 @media (max-width: 620px) {
     body { font-size: 15px; }
+    .topbar-in { gap: 10px; }
+    .topbar-tools { gap: 12px; }
+    .topbar-user { max-width: 38vw; font-size: 13px; }
     .stat-strip { grid-template-columns: 1fr; }
     .stat { border-right: none; border-top: 1px solid var(--line); }
     .stat:first-child { border-top: none; }
-    .ledger-table th, .ledger-table td { padding: 8px; }
+    /* Ledger tables keep their column structure on phones: the wrapper
+       scrolls horizontally instead of crushing columns into slivers. */
+    .ledger-table { min-width: 540px; }
     .btn-block { width: 100%; }
     .tool-form .btn { flex: 1 1 100%; }
     .footer-in { flex-direction: column; align-items: flex-start; gap: 18px; }
