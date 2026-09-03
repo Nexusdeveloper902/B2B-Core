@@ -1,42 +1,36 @@
-# OBS-006 — Pushes from the build sandbox emit no GitHub events (push/PR triggers inert; workflow_dispatch works)
+# OBS-006 — GitHub event warm-up: early pushes triggered nothing; later pushes DO trigger
 
 ## Date
-2026-09-03
+2026-09-03 (updated same day after further evidence)
 
-## Observation
-While activating CI (TASK-004), pushes to `Nexusdeveloper902/B2B-Core` made
-from this build environment land correctly (refs update, `pushed_at` moves,
-commits verifiable via the REST API) but produce **zero GitHub events**:
+## Observation timeline (all UTC)
+- Pushes at 2026-09-02T22:34Z and 2026-09-03T00:45Z (workflow file still
+  uncompilable, OBS-005): refs updated, `pushed_at` moved, but **zero
+  PushEvents and zero runs**.
+- Pushes at 01:2x–01:5xZ (workflow already valid, runs existing): still no
+  push-triggered runs; a PR opened via REST at 01:34Z produced PR events
+  in the events feed but **no `pull_request` run**.
+- Push of e47fafe at **01:56:34Z: a run with `event: push` WAS created** —
+  then auto-cancelled by the concurrency group (`CI-refs/heads/main`,
+  `cancel-in-progress: true`) because a manual dispatch landed seconds
+  later on the same ref.
 
-- `GET /repos/{o}/{r}/events` → empty (no PushEvent), even minutes after a push
-- `GET /users/{owner}/events` → no events for this repo either
-- `on: push` never triggers a run for these pushes
-- a PR opened via the REST API (`pull_request` event) also produced **no run**
+## Interpretation (updated)
+The event/trigger pipeline for this repository needed a warm-up period —
+most plausibly it only fully registered the (newly valid) workflow's
+triggers some time after the first successful run. What looked like
+permanent event suppression during diagnosis was transient: **push
+triggering works now**. `workflow_dispatch` via REST was and remains a
+guaranteed automation path. Cancelled runs sharing the concurrency group
+are deduplication by design, not failures.
 
-Meanwhile, event-independent paths work perfectly:
-
-- `workflow_dispatch` via `POST /actions/workflows/{file}/dispatches` → 204,
-  runs execute normally (this is how runs 1–4 in TASK-004 were created)
-- everything else on the repo (contents, blobs, commits, jobs, logs) behaves
-  normally over the REST API
-
-## Interpretation
-The webhook/event pipeline for pushes originating from this sandbox (and the
-API-created PR event) does not fire, while direct API actions do. Earlier
-PushEvents exist on the owner account (2026-09-02, other repos), so ordinary
-pushes from a normal machine DO emit events.
-
-## Practical consequences
-1. **CI automation from this environment must use `workflow_dispatch`** (REST
-   dispatch on the default branch), not "push and wait".
-2. **The owner pushing from their own machine should trigger CI normally**
-   (`on: push` is configured with no branch filter). If pushes from the
-   owner's machine ever do NOT trigger runs, revisit this observation —
-   that would indicate an account-level event suppression instead.
-3. The empty Actions tab seen by the owner was NOT caused by this — it was
-   the uncompilable workflow file (OBS-005). Both defects were found while
-   diagnosing the same symptom.
-
-## Workaround used
-`POST /repos/Nexusdeveloper902/B2B-Core/actions/workflows/ci.yml/dispatches`
-with `{"ref": "main"}` after each push that must be validated.
+## Practical guidance
+1. Automation from the build environment: dispatch via REST works
+   unconditionally; pushes also work as of 01:56Z (verify per-repo if it
+   matters).
+2. Rapid successive triggers on the same ref: expect the older in-flight
+   run to be cancelled (concurrency, ADR-012 hardening) — this is
+   intentional feedback-latency optimization, not flakiness.
+3. If push triggers ever appear dead again on a fresh repo, check OBS-005
+   first (uncompilable workflows produce zero runs with zero errors) —
+   the two observations look identical from the Actions tab.
