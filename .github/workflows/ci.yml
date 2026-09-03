@@ -2,15 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
 
+# Least privilege: every job only needs to read the repository.
+permissions:
+  contents: read
+
+# Superseded runs on the same ref are cancelled — fast feedback, no wasted
+# runner minutes on a repo that receives rapid successive pushes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint:
-    name: Lint (quality gate: Pint + bash + docs parity)
+  workflows-lint:
+    name: Workflows lint (actionlint)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install actionlint (with shellcheck integration)
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash -o /tmp/download-actionlint.bash
+          bash /tmp/download-actionlint.bash
+          echo "$PWD" >> "$GITHUB_PATH"
+
+      - name: Lint workflow files (YAML, expressions, context availability)
+        run: actionlint -color
+
+      - name: Job summary
+        run: |
+          echo "### Workflows lint" >> "$GITHUB_STEP_SUMMARY"
+          echo "actionlint validated .github/workflows/*.yml: YAML syntax, expression contexts, shellcheck of run blocks." >> "$GITHUB_STEP_SUMMARY"
+          echo "This job exists because an invalid expression (secrets context in a job-level if) silently disabled CI — see ADR-012." >> "$GITHUB_STEP_SUMMARY"
+
+  lint:
+    name: "Lint (quality gate: Pint + bash + docs parity)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +65,7 @@ jobs:
   scripts-lint:
     name: Scripts lint (bash -n + shellcheck, no PHP needed)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -53,12 +86,15 @@ jobs:
           ./run help
           # doctor may legitimately report an unsuitable runner (exit 1),
           # but it must never crash with any other exit code:
-          ./run doctor || [ "$?" -eq 1 ]
-          ./run definitely-not-a-command >/dev/null 2>&1; [ "$?" -eq 2 ]
+          rc=0; ./run doctor || rc=$?
+          [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]
+          rc=0; ./run definitely-not-a-command >/dev/null 2>&1 || rc=$?
+          [ "$rc" -eq 2 ]
 
   unit:
-    name: Unit tests
+    name: Unit tests (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +111,7 @@ jobs:
 
       - name: Get composer cache directory
         id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -91,8 +127,9 @@ jobs:
         run: ./run test unit
 
   integration:
-    name: Integration tests (API + Web)
+    name: Integration tests (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -109,7 +146,7 @@ jobs:
 
       - name: Get composer cache directory
         id: composer-cache
-        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -127,6 +164,7 @@ jobs:
   e2e:
     name: E2E tests (full journeys)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -146,6 +184,7 @@ jobs:
   http-e2e:
     name: Real-HTTP E2E (serve + curl, via ./run e2e)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -165,13 +204,18 @@ jobs:
   arch-smoke:
     name: Arch Linux smoke (real archlinux:base container)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     container:
       image: archlinux:base
+    env:
+      HOME: /root
     steps:
-      - name: Install base toolchain (git+node for checkout, php, composer)
-        run: pacman -Syu --noconfirm archlinux-keyring git nodejs php composer
+      - name: Install base toolchain (git + php + composer; no node needed)
+        run: pacman -Syu --noconfirm archlinux-keyring git php composer
 
-      - uses: actions/checkout@v4
+      - name: Clone without JS actions (keeps this job node-free)
+        run: |
+          git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" .
 
       - name: Enable required PHP extensions (the exact remediation ./run doctor prints)
         run: |
@@ -194,6 +238,7 @@ jobs:
   hermetic-smoke:
     name: Hermetic toolchain smoke (container with NO PHP)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     container:
       image: ubuntu:24.04
     env:
@@ -229,6 +274,7 @@ jobs:
   secrets-scan:
     name: Secret scanning (gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -239,13 +285,37 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  llm-gate:
+    name: Live-LLM gate (skip detection)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      # secrets context IS allowed in job-level env (unlike job-level if —
+      # see ADR-012; that distinction silently killed this workflow before).
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
+    steps:
+      - name: Detect whether the Gemini key is configured
+        id: gate
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GEMINI_API_KEY secret is not configured — live-LLM smoke will be skipped by design (free-tier friendly)."
+          fi
+
   live-llm-smoke:
     name: Optional live-LLM smoke (Gemini flash)
+    # needs context IS allowed in job-level if; this is the canonical gate
+    # pattern (ADR-012). Runs only when the repo owner configures the
+    # GEMINI_API_KEY secret — never blocks CI otherwise.
+    needs: llm-gate
+    if: needs.llm-gate.outputs.enabled == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     continue-on-error: true
-    # Only runs when the repo owner configures the GEMINI_API_KEY secret —
-    # never blocks CI otherwise (free-tier friendly, one light call).
-    if: ${{ secrets.GEMINI_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
