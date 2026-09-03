@@ -106,6 +106,16 @@ Documentación completa de endpoints: [docs/API.es.md](docs/API.es.md) ·
 
 Cambio de idioma: `EN·ES` en la barra de navegación (por sesión).
 
+### Sistema de diseño — "The Event Ledger"
+
+Los paneles comparten una sola identidad visual con la tienda del marketplace:
+fondo porcelana, reglas finas, datos tabulares en monoespaciada, acentos
+verde pino, radios de 2px en controles, fuentes autohospedadas Space Grotesk /
+IBM Plex. Los tokens viven en `public/css/tokens.css` (fuente de verdad) y se
+replican por valor desde el repositorio del marketplace — ver
+`.agent/DECISIONS/ADR-013-design-tokens-value-matched.md` y
+`.agent/DECISIONS/ADR-014-shared-layout-components.md`.
+
 ## Pruebas
 
 ```bash

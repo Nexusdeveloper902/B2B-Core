@@ -98,6 +98,16 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 
 Language switch: `EN·ES` in the navbar (session-based).
 
+### Design system — "The Event Ledger"
+
+The dashboards share one visual identity with the marketplace storefront:
+porcelain-paper ground, hairline rules, tabular data set in mono, pine-green
+accents, sharp 2px control radii, self-hosted Space Grotesk / IBM Plex fonts.
+Tokens live in `public/css/tokens.css` (source of truth) and are
+value-matched to the marketplace repo — see
+`.agent/DECISIONS/ADR-013-design-tokens-value-matched.md` and
+`.agent/DECISIONS/ADR-014-shared-layout-components.md`.
+
 ## Testing
 
 ```bash

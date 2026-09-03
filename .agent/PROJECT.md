@@ -142,3 +142,28 @@ This run made the GitHub Actions pipeline REAL (TASK-004, ADR-012):
   machines.
 - CI is green: 12/12 jobs on b0fd17d (run 33705375607); README badge live
   ("CI - passing").
+
+## TASK-005 — UI passover facts (RUN-2026-09-02-ui-passover-001)
+
+- **The UI is now "The Event Ledger"**: paper #F3F4F0 ground, pine
+  #0A5C38 accents, ink #101D18 text, hairline rules, mono ledger data,
+  2px control radii, self-hosted Space Grotesk + IBM Plex Sans/Mono.
+  Tokens live in `public/css/tokens.css` — value-matched 1:1 from the
+  marketplace repo @ ecde2d5 (ADR-013; cross-repo consistency contract
+  in ARCHITECTURE/value-matched-design-tokens.md).
+- **One shared layout**: every page extends `layouts.app` (topbar with
+  wordmark/tap mark, role-aware nav, EN/ES langswitch, ink footer).
+  Repeated elements are anonymous components: `panel`, `stat`, `stamp`,
+  `empty`, `field` (ADR-014).
+- **Load-bearing JS contract**: the admin dashboard's inline script
+  rewrites `className` on answer boxes (`nl-answer` +
+  `answer-ok`/`answer-error`, `.hidden`) and queries fixed element
+  ids — restyling must preserve those names.
+- **`resources/css/app.css` is dead scaffold** (Laravel Tailwind
+  default, never built — the app has no build step). Removal is
+  recorded as follow-up work.
+- **Mobile tables scroll, never crush**: `.ledger-table` min-width
+  540px inside `.ledger-wrap` (overflow-x). Page-level overflow is
+  zero at 390px (DOM-verified).
+- **A11y floor**: skip link, `:focus-visible` outlines, WCAG contrast
+  audited 22/22 pairs, `prefers-reduced-motion` honored.
