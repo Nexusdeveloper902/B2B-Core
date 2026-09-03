@@ -59,7 +59,7 @@ detect_distro() {
         *arch*|*cachyos*|*endeavour*|*manjaro*|*garuda*) DISTRO_FAMILY="arch" ;;
         *debian*|*ubuntu*|*mint*|*pop*)                  DISTRO_FAMILY="debian" ;;
         *fedora*|*rhel*|*rocky*|*almalinux*|*centos*)    DISTRO_FAMILY="fedora" ;;
-        *suse*|*opensuse*)                               DISTRO_FAMILY="suse" ;;
+        *suse*)                                          DISTRO_FAMILY="suse" ;;
     esac
 }
 

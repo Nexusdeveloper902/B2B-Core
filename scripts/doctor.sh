@@ -116,7 +116,7 @@ else
     fail ".env: missing — run ./run setup / falta — ejecuta ./run setup"
 fi
 if [ -d "$B2B_ROOT/vendor" ]; then
-    pass "vendor/: present ($(ls "$B2B_ROOT/vendor" | wc -l | tr -d ' ') top-level packages)"
+    pass "vendor/: present ($(find "$B2B_ROOT/vendor" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ') top-level packages)"
 else
     fail "vendor/: missing — run ./run setup / falta — ejecuta ./run setup"
 fi

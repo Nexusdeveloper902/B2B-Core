@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\ResolveReaderToken;
+use App\Http\Middleware\SetApiLocale;
+use App\Http\Middleware\SetWebLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,18 +25,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // Dashboard UI locale: session-based (EN / ES language switcher).
         // Appended so it runs AFTER StartSession.
         $middleware->web(append: [
-            \App\Http\Middleware\SetWebLocale::class,
+            SetWebLocale::class,
         ]);
 
         // API locale: resolve per-request from the Accept-Language header
         // (device-facing messages are localized English / Spanish).
         $middleware->api(prepend: [
-            \App\Http\Middleware\SetApiLocale::class,
+            SetApiLocale::class,
         ]);
 
         $middleware->alias([
-            'reader.auth' => \App\Http\Middleware\ResolveReaderToken::class,
-            'role' => \App\Http\Middleware\EnsureRole::class,
+            'reader.auth' => ResolveReaderToken::class,
+            'role' => EnsureRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -25,7 +25,7 @@ fi
 # --- 1. bash syntax ----------------------------------------------------------------
 log "1/4 bash syntax (bash -n) / sintaxis bash (bash -n)"
 # `run` + the shared library + every top-level script in scripts/
-SYNTAX_TARGETS=("$B2B_ROOT/run" "$SOURCE_DIR/common.sh")
+SYNTAX_TARGETS=("$B2B_ROOT/run" "$SOURCE_DIR/_lib/common.sh")
 while IFS= read -r f; do SYNTAX_TARGETS+=("$f"); done < <(find "$B2B_ROOT/scripts" -maxdepth 1 -name '*.sh' | sort)
 for f in "${SYNTAX_TARGETS[@]}"; do
     bash -n "$f" || die "Syntax error in ${f} / Error de sintaxis en ${f}"
@@ -35,8 +35,13 @@ ok "${#SYNTAX_TARGETS[@]} files pass bash -n / archivos pasan bash -n"
 # --- 2. shellcheck (optional locally, required in CI) ----------------------------------
 log "2/4 shellcheck"
 if command -v shellcheck >/dev/null 2>&1; then
-    # shellcheck disable=SC2068  # word-splitting is intentional for arg lists
-    shellcheck -x "${SYNTAX_TARGETS[@]}" && ok "shellcheck clean" || die "shellcheck findings above (fix them) / hallazgos arriba (corrigelos)"
+    # Gate: zero WARNINGS. Remaining infos are intentional (php -r payloads
+    # must live in single quotes so bash never expands $argv PHP vars).
+    if shellcheck --severity=warning -x "${SYNTAX_TARGETS[@]}"; then
+        ok "shellcheck clean (severity >= warning) / shellcheck limpio"
+    else
+        die "shellcheck findings above (fix them) / hallazgos arriba (corrigelos)"
+    fi
 else
     warn "shellcheck not installed — skipped locally (CI enforces it) / no instalado — omitido (CI lo exige)"
 fi
@@ -45,8 +50,11 @@ fi
 log "3/4 Laravel Pint (code style)"
 resolve_php
 [ -d "$B2B_ROOT/vendor" ] || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
-"$PHP_BIN" "$B2B_ROOT/vendor/bin/pint" --test && ok "Pint clean / Pint limpio" \
-    || die "Pint found style issues — run: ./run quality and fix, or vendor/bin/pint (dirty) / Pint encontró problemas de estilo"
+if "$PHP_BIN" "$B2B_ROOT/vendor/bin/pint" --test; then
+    ok "Pint clean / Pint limpio"
+else
+    die "Pint found style issues — run: vendor/bin/pint (dirty mode applies fixes), then re-run / Pint encontró problemas de estilo — vendor/bin/pint aplica fixes, reintenta"
+fi
 
 # --- 4. Bilingual docs parity ---------------------------------------------------------------
 log "4/4 docs parity (EN/ES) / paridad de documentación (EN/ES)"
@@ -65,7 +73,7 @@ if [ "${#COMMANDS[@]}" -lt 10 ]; then
 fi
 for cmd in "${COMMANDS[@]}"; do
     [ "$cmd" = "help" ] && continue
-    if grep -qE "^### \`${cmd}\`" "$DOC_EN" && grep -qE "^### \`${cmd}\`" "$DOC_ES"; then
+    if grep -qE "^## \`${cmd}\`" "$DOC_EN" && grep -qE "^## \`${cmd}\`" "$DOC_ES"; then
         ok "documented (EN+ES): ${cmd}"
     else
         fail_msg="command '${cmd}' is missing a '### \`${cmd}\`' section in"

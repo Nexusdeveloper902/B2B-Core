@@ -100,7 +100,6 @@ R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
 check "Tap creates an event / El tap crea un evento" "$R" '"status":"ok"'
 check "Tap returns event_type / El tap devuelve event_type" "$R" '"event_type":"CLASS_ATTENDANCE"'
 check "Tap includes student first name / Incluye nombre del estudiante" "$R" '"student_first_name"'
-EVENT_ID=$(grep -oE '"event_id":[0-9]+' <<<"$R" | head -1 | grep -oE '[0-9]+')
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
     -H "Authorization: Bearer nope-invalid-key" -H "Accept: application/json" \

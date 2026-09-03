@@ -36,24 +36,23 @@ messages (`Accept-Language`), seeder output, docs and tests.
 
 ## Quick start
 
-Requirements: PHP 8.3+ (with `sqlite3`, `pdo_sqlite`, `mbstring`, `curl`,
-`zip`), Composer.
+The **`./run` suite** is the only thing you need to remember — one command
+per operation, fully documented in [docs/SCRIPTS.md](docs/SCRIPTS.md) ·
+[docs/SCRIPTS.es.md](docs/SCRIPTS.es.md), Linux-first with **Arch support**:
 
 ```bash
 git clone https://github.com/Nexusdeveloper902/B2B-Core.git
 cd B2B-Core
-composer install
-cp .env.example .env          # then set APP_KEY + optional keys below
-php artisan key:generate
-touch database/database.sqlite
-php artisan migrate --seed    # the seeder PRINTS all demo credentials 🖨️
-php artisan serve             # → http://localhost:8000
+./run setup     # deps + .env + APP_KEY + database + demo data — prints credentials 🖨️
+./run serve     # → http://127.0.0.1:8000  (health: /up)
 ```
 
-The seeder prints (in English AND Spanish): the dashboard logins, every
-card's `credential_uid`, and every reader's Bearer `api_key` — copy them
-straight into [docs/postman_collection.json](docs/postman_collection.json)
-variables or curl.
+`./run setup` is idempotent and safe to re-run at any time; under the hood it
+performs `composer install`, creates `.env` (never overwriting an existing
+one), generates `APP_KEY`, then `php artisan migrate --seed` — the seeder
+prints all demo credentials bilingually (EN/ES). No usable PHP yet?
+`./run doctor` prints the exact fix for your distro, or `./run toolchain`
+provisions a hermetic PHP+Composer with zero system packages.
 
 **Demo logins:** `admin@presence.test` / `teacher@presence.test` — password
 `password`.
@@ -102,27 +101,31 @@ Language switch: `EN·ES` in the navbar (session-based).
 ## Testing
 
 ```bash
-php artisan test                    # everything (unit + feature + E2E)
-php artisan test --testsuite=Unit   # services, classifiers, NL orchestration
-php artisan test --testsuite=Feature# API + web integration tests
-php artisan test --testsuite=E2E    # complete bilingual platform journeys
+./run test                     # everything (unit + feature + E2E)
+./run test unit                # services, classifiers, NL orchestration
+./run test feature             # API + web integration tests
+./run test e2e                 # complete bilingual platform journeys
 
-vendor/bin/pint                     # code style (Laravel Pint)
-
-bash scripts/e2e.sh                 # REAL HTTP end-to-end: boots the server,
-                                    # seeds, and exercises the whole flow with curl
+./run quality                  # Pint + bash syntax + shellcheck + docs parity
+./run e2e                      # REAL HTTP end-to-end: boots the server,
+                               # seeds a throwaway DB, exercises the whole flow
+./run ci                       # everything CI runs, locally, in order
 ```
 
-Live LLM smoke tests are **skipped by default** (free-tier friendly); opt in
-with `RUN_LIVE_LLM_TESTS=1` plus a real `GEMINI_API_KEY`.
+Each command accepts `--help`. Live LLM smoke tests are **skipped by
+default** (free-tier friendly); opt in with `RUN_LIVE_LLM_TESTS=1` plus a real
+`GEMINI_API_KEY`.
 
 ## CI
 
 `.github/workflows/ci.yml` runs on every push/PR: **lint** (Pint),
-**unit**, **integration** (feature), **E2E**, a **real-HTTP e2e** job
-(`scripts/e2e.sh` against `php artisan serve`), a **secrets scan**
-(gitleaks), and an **optional live-LLM smoke job** that only runs when a
-`GEMINI_API_KEY` secret is configured.
+**unit**, **integration** (feature), **E2E**, a **real-HTTP e2e** job, a
+**secrets scan** (gitleaks), an **optional live-LLM smoke job** — plus three
+jobs that continuously verify the `./run` suite itself: **scripts-lint**
+(bash syntax + shellcheck on every script), **arch-smoke** (the suite on a
+real `archlinux:base` container) and **hermetic-smoke** (the full setup in a
+container with **no PHP at all**). CI jobs dogfood `./run setup --ci` and
+`./run e2e` on every push.
 
 ## Architecture in one paragraph
 
@@ -148,8 +151,8 @@ app/
 ├── Models/                               # Eloquent (events = PresenceEvent)
 └── Services/                             # Tap, Points, Attendance, Recycling, NlQuery
 database/migrations/ + seeders/DemoSeeder.php   # schema + bilingual credential printing
-docs/                                     # API.md/.es.md, LOCAL_MODEL.md/.es.md, Postman
-scripts/e2e.sh                            # real-HTTP end-to-end runner
+docs/                                     # API, LOCAL_MODEL, SCRIPTS (.md/.es.md), Postman
+run + scripts/ + scripts/_lib/common.sh   # the ./run suite (one command per operation)
 scripts/local-model-server/               # reference local classifier sidecar (FastAPI)
 tests/{Unit,Feature,E2E}/                 # the test pyramid
 .agent/                                   # persistent project memory (append-only)

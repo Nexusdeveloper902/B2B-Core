@@ -38,24 +38,29 @@ documentación y pruebas.
 
 ## Inicio rápido
 
-Requisitos: PHP 8.3+ (con `sqlite3`, `pdo_sqlite`, `mbstring`, `curl`,
-`zip`), Composer.
+La suite **`./run`** es lo único que debes recordar — un comando por
+operación, completamente documentada en [docs/SCRIPTS.es.md](docs/SCRIPTS.es.md) ·
+[docs/SCRIPTS.md](docs/SCRIPTS.md), Linux primero con **soporte para Arch**:
 
 ```bash
 git clone https://github.com/Nexusdeveloper902/B2B-Core.git
 cd B2B-Core
-composer install
-cp .env.example .env          # luego define APP_KEY + claves opcionales
-php artisan key:generate
-touch database/database.sqlite
-php artisan migrate --seed    # el seeder IMPRIME todas las credenciales 🖨️
-php artisan serve             # → http://localhost:8000
+./run setup     # dependencias + .env + APP_KEY + BD + datos demo — imprime credenciales 🖨️
+./run serve     # → http://127.0.0.1:8000  (salud: /up)
 ```
 
-El seeder imprime (en inglés Y español): los inicios de sesión del panel, el
-`credential_uid` de cada tarjeta y la `api_key` Bearer de cada lector —
-cópialos directamente a las variables de
-[docs/postman_collection.json](docs/postman_collection.json) o a curl.
+`./run setup` es idempotente y se puede re-ejecutar en cualquier momento;
+bajo el capó hace `composer install`, crea `.env` (nunca sobrescribe uno
+existente), genera `APP_KEY` y luego `php artisan migrate --seed` — el seeder
+imprime todas las credenciales demo bilingüe (EN/ES). ¿Aún no tienes un PHP
+utilizable? `./run doctor` imprime la solución exacta para tu distro, o
+`./run toolchain` provisiona un PHP+Composer hermético sin paquetes del
+sistema.
+
+El seeder imprime los inicios de sesión del panel, el `credential_uid` de
+cada tarjeta y la `api_key` Bearer de cada lector — cópialos directamente a
+las variables de [docs/postman_collection.json](docs/postman_collection.json)
+o a curl.
 
 **Inicios de sesión demo:** `admin@presence.test` /
 `teacher@presence.test` — contraseña `password`.
@@ -104,28 +109,32 @@ Cambio de idioma: `EN·ES` en la barra de navegación (por sesión).
 ## Pruebas
 
 ```bash
-php artisan test                    # todo (unit + feature + E2E)
-php artisan test --testsuite=Unit   # servicios, clasificadores, orquestación NL
-php artisan test --testsuite=Feature# pruebas de integración API + web
-php artisan test --testsuite=E2E    # recorridos completos bilingües de la plataforma
+./run test                     # todo (unit + feature + E2E)
+./run test unit                # servicios, clasificadores, orquestación NL
+./run test feature             # pruebas de integración API + web
+./run test e2e                 # recorridos completos bilingües de la plataforma
 
-vendor/bin/pint                     # estilo de código (Laravel Pint)
-
-bash scripts/e2e.sh                 # E2E con HTTP REAL: arranca el servidor,
-                                    # siembra y ejercita todo el flujo con curl
+./run quality                  # Pint + sintaxis bash + shellcheck + paridad de docs
+./run e2e                      # E2E con HTTP REAL: arranca el servidor,
+                               # siembra una BD desechable y ejercita todo el flujo
+./run ci                       # todo lo que corre CI, localmente y en orden
 ```
 
-Las pruebas LLM en vivo se **omiten por defecto** (amigables con el nivel
-gratuito); actívalas con `RUN_LIVE_LLM_TESTS=1` más una `GEMINI_API_KEY`
-real.
+Cada comando acepta `--help`. Las pruebas LLM en vivo se **omiten por
+defecto** (amigables con el nivel gratuito); actívalas con
+`RUN_LIVE_LLM_TESTS=1` más una `GEMINI_API_KEY` real.
 
 ## CI
 
 `.github/workflows/ci.yml` se ejecuta en cada push/PR: **lint** (Pint),
 **unit**, **integración** (feature), **E2E**, un trabajo e2e de **HTTP
-real** (`scripts/e2e.sh` contra `php artisan serve`), un **escaneo de
-secretos** (gitleaks) y un trabajo opcional de **smoke LLM en vivo** que
-solo corre cuando el secreto `GEMINI_API_KEY` está configurado.
+real**, un **escaneo de secretos** (gitleaks) y un trabajo opcional de
+**smoke LLM en vivo** — más tres trabajos que verifican continuamente la
+suite `./run` en sí: **scripts-lint** (sintaxis bash + shellcheck sobre todos
+los scripts), **arch-smoke** (la suite en un contenedor real
+`archlinux:base`) y **hermetic-smoke** (setup completo en un contenedor **sin
+ningún PHP**). Los trabajos de CI usan `./run setup --ci` y `./run e2e` en
+cada push.
 
 ## Arquitectura en un párrafo
 
@@ -151,8 +160,8 @@ app/
 ├── Models/                               # Eloquent (events = PresenceEvent)
 └── Services/                             # Tap, Points, Attendance, Recycling, NlQuery
 database/migrations/ + seeders/DemoSeeder.php   # esquema + impresión bilingüe de credenciales
-docs/                                     # API.md/.es.md, LOCAL_MODEL.md/.es.md, Postman
-scripts/e2e.sh                            # runner end-to-end con HTTP real
+docs/                                     # API, LOCAL_MODEL, SCRIPTS (.md/.es.md), Postman
+run + scripts/ + scripts/_lib/common.sh   # la suite ./run (un comando por operación)
 scripts/local-model-server/               # sidecar de referencia del clasificador local (FastAPI)
 tests/{Unit,Feature,E2E}/                 # la pirámide de pruebas
 .agent/                                   # memoria persistente del proyecto (solo-agregación)
