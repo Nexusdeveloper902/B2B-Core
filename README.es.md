@@ -68,7 +68,8 @@ o a curl.
 ### Configuración opcional (¡nunca commitear claves reales!)
 
 ```dotenv
-GEMINI_API_KEY=               # habilita consultas NL en vivo (solo modelos flash)
+GEMINI_API_KEY=               # habilita consultas NL en vivo (familia flash,
+                             # por defecto gemini-3.1-flash-lite)
 RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | gemini
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
 ATTENDANCE_LATE_CUTOFF=08:15  # corte de "tarde" del panel del profesor

@@ -8,8 +8,9 @@ use App\Services\Recycling\ClassificationException;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Optional cloud vision fallback using the Gemini API (flash models only —
- * free-tier friendly). Disabled unless a GEMINI_API_KEY is configured.
+ * Optional cloud vision fallback using the Gemini API (flash-family
+ * models only — free-tier friendly). Disabled unless a GEMINI_API_KEY
+ * is configured.
  *
  * Like every driver, this class is only ever reached through the
  * MaterialClassifier contract — controllers never know which driver ran.
@@ -20,7 +21,7 @@ class GeminiClassifier implements MaterialClassifier
 
     public function __construct(
         private readonly ?string $apiKey,
-        private readonly string $model = 'gemini-2.5-flash',
+        private readonly string $model = 'gemini-3.1-flash-lite',
         private readonly float $timeout = 15.0,
     ) {}
 

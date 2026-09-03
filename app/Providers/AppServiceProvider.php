@@ -21,13 +21,13 @@ class AppServiceProvider extends ServiceProvider
         // change (ADR-003/ADR-007). Tests swap this binding with a fake.
         $this->app->bind(MaterialClassifier::class, fn () => ClassifierFactory::make());
 
-        // NL-query wiring (Phase E). Gemini flash models only, per the
+        // NL-query wiring (Phase E). Gemini flash-family models only, per the
         // free-tier constraint; the live call is entirely skipped when no
         // API key is configured (ADR-005/ADR-006).
         $this->app->singleton(GeminiClient::class, function () {
             return new GeminiClient(
                 config('recycling.nl_query.api_key'),
-                (string) config('recycling.nl_query.model', 'gemini-2.5-flash'),
+                (string) config('recycling.nl_query.model', 'gemini-3.1-flash-lite'),
                 (float) config('recycling.nl_query.timeout', 20),
             );
         });

@@ -319,7 +319,7 @@ jobs:
           fi
 
   live-llm-smoke:
-    name: Optional live-LLM smoke (Gemini flash)
+    name: Optional live-LLM smoke (Gemini flash-lite)
     # needs context IS allowed in job-level if; this is the canonical gate
     # pattern (ADR-012). Runs only when the repo owner configures the
     # GEMINI_API_KEY secret — never blocks CI otherwise.

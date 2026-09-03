@@ -11,7 +11,8 @@ Laravel nunca llama a un modelo directamente: depende de la interfaz
 ```dotenv
 # stub   → pseudo-clasificador determinista (por defecto; para dev/CI/demos)
 # local  → TU servicio local de inferencia   ← driver de producción previsto
-# gemini → respaldo opcional en la nube (modelos flash, requiere GEMINI_API_KEY)
+# gemini → respaldo opcional en la nube (familia flash, por defecto
+#          gemini-3.1-flash-lite, requiere GEMINI_API_KEY)
 RECYCLING_CLASSIFIER_DRIVER=local
 
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict

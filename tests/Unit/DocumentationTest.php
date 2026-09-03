@@ -87,6 +87,7 @@ class DocumentationTest extends TestCase
     {
         $patterns = [
             'Gemini API key (AIza…)' => '/AIza[0-9A-Za-z_\-]{35}/',
+            'Gemini API key (AQ…)' => '/AQ\.[0-9A-Za-z_\-]{20,}/',
             'GitHub classic PAT (ghp_…)' => '/gh[pousr]_[0-9A-Za-z]{36,}/',
         ];
 

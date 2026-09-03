@@ -10,7 +10,8 @@ implementation is chosen by **one .env variable**:
 ```dotenv
 # stub   → deterministic pseudo-classifier (default; for dev/CI/demos)
 # local  → YOUR local model-inference service   ← intended production driver
-# gemini → optional cloud fallback (flash models, needs GEMINI_API_KEY)
+# gemini → optional cloud fallback (flash-family, default gemini-3.1-flash-lite,
+#          needs GEMINI_API_KEY)
 RECYCLING_CLASSIFIER_DRIVER=local
 
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict

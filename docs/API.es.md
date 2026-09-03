@@ -172,7 +172,8 @@ registrado; el saldo siempre es `SUM(delta)`, nunca un contador mutable.
 **Petición**: `{"question": "¿Cuántos niños llegaron tarde esta semana?"}`
 
 Flujo: la pregunta + un conjunto fijo de esquemas de funciones va al modelo
-flash de Gemini → el modelo **selecciona una función** → el backend ejecuta la
+flash-lite de Gemini (por defecto `gemini-3.1-flash-lite`) → el modelo
+**selecciona una función** → el backend ejecuta la
 **consulta Eloquent real** → el resultado vuelve al modelo → el modelo redacta
 la respuesta final. El LLM nunca calcula ni fabrica cifras.
 

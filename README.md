@@ -60,7 +60,8 @@ provisions a hermetic PHP+Composer with zero system packages.
 ### Optional configuration (never commit real keys!)
 
 ```dotenv
-GEMINI_API_KEY=               # enables live NL queries (flash models only)
+GEMINI_API_KEY=               # enables live NL queries (flash-family models,
+                             # default gemini-3.1-flash-lite)
 RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | gemini
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
 ATTENDANCE_LATE_CUTOFF=08:15  # teacher-dashboard "late" cutoff

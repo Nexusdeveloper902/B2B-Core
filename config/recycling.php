@@ -44,7 +44,7 @@ return [
 
         'gemini' => [
             'api_key' => env('GEMINI_API_KEY'),
-            'model' => env('GEMINI_VISION_MODEL', 'gemini-2.5-flash'),
+            'model' => env('GEMINI_VISION_MODEL', 'gemini-3.1-flash-lite'),
             'timeout' => (float) env('GEMINI_TIMEOUT', 15),
         ],
     ],
@@ -52,12 +52,13 @@ return [
     /*
      | Natural-language query interface (Phase E).
      | Uses the Gemini API with function-calling. Free-tier friendly:
-     | gemini-*-flash models only, and the live call is skipped entirely
-     | when no API key is configured (endpoint then reports the blocker).
+     | flash-family models only (default: gemini-3.1-flash-lite), and
+     | the live call is skipped entirely when no API key is configured
+     | (endpoint then reports the blocker).
      */
     'nl_query' => [
         'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
         'timeout' => (float) env('GEMINI_TIMEOUT', 20),
     ],
 ];

@@ -171,8 +171,9 @@ the balance is always `SUM(delta)`, never a mutable counter.
 
 **Request**: `{"question": "How many kids were late this week?"}`
 
-Flow: the question + a fixed set of function schemas goes to the Gemini flash
-model → the model **selects a function** → the backend executes the **real
+Flow: the question + a fixed set of function schemas goes to the Gemini
+flash-lite model (default `gemini-3.1-flash-lite`) → the model **selects a
+function** → the backend executes the **real
 Eloquent query** → the result returns to the model → the model phrases the
 final answer. The LLM never computes or fabricates numbers.
 
