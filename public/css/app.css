@@ -383,7 +383,9 @@ code {
 .notice-warn { background: var(--wash); border-color: var(--line-strong); color: var(--ink); }
 .notice-warn strong { color: var(--pine-dark); }
 
-.answer {
+/* JS-facing answer boxes: the admin dashboard script rewrites className to
+   'nl-answer' + 'answer-ok'/'answer-error', so these selectors are load-bearing. */
+.nl-answer {
     margin-top: 14px;
     padding: 14px 16px;
     font-size: 14.5px;

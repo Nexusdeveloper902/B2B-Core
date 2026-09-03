@@ -21,6 +21,13 @@ return [
     'welcome' => 'Welcome, :name',
     'back' => 'Back',
 
+    // Shell / chrome (TASK-005 UI passover)
+    'skip_to_content' => 'Skip to content',
+    'primary_nav' => 'Primary',
+    'footer_note' => 'Core operations console — attendance, PAE meals and recycling rewards for the school day.',
+    'demo_credentials' => 'Demo credentials (seeded)',
+    'env' => 'Environment',
+
     // Login
     'login_title' => 'Sign in to the Presence Platform',
     'login_hint' => 'Demo users (from the seeder): admin@presence.test / teacher@presence.test — password "password".',
