@@ -52,7 +52,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Bootstrap via the run suite
@@ -107,7 +107,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Get composer cache directory
@@ -139,7 +139,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Get composer cache directory
@@ -170,7 +170,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Bootstrap via the run suite
@@ -190,7 +190,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Bootstrap via the run suite
@@ -217,13 +217,14 @@ jobs:
       - name: Clone without JS actions (keeps this job node-free)
         run: |
           git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" .
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Enable required PHP extensions (the exact remediation ./run doctor prints)
         # '/pattern/s/^;//' needs no backreference — immune to the double-prefix
         # and printf-%b escaping bugs that produced 'extension=extension=X' lines
         # (which made PHP abort ini parsing and silently drop extension=zip).
         run: |
-          sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
+          sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
 
       - name: PHP diagnostics (always visible — modules, ini, load warnings)
         run: |
@@ -262,6 +263,7 @@ jobs:
       - name: Clone without JS actions (no node in this container)
         run: |
           git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" .
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Prove there is no PHP on this machine
         run: '! command -v php'
@@ -333,7 +335,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv
           coverage: none
 
       - name: Bootstrap via the run suite

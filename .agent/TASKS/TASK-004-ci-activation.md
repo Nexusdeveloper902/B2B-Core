@@ -70,5 +70,21 @@ API before any fix:
 - A: diagnosis from GitHub API evidence; task record, ADR-012, OBS-005
 - B: workflow fix (gate pattern + actionlint job + hardening)
 - C: local validation (actionlint, YAML sanity, `./run quality`)
-- D: push to main → run appears → iterate until green
-- E: run record, ledger, state snapshot, PROJECT.md facts
+- D: push → dispatch → **run 1 (33703136356): 14 jobs, 8 pass** → log-driven
+  repair of all six failures (gitleaks false positive, PHP 8.3 matrix,
+  `--live-llm` phantom flag, Arch php-sqlite split, step ordering) →
+  **run 2 (33704172723): 9/12 pass** → diagnostics revealed the real Arch
+  killer: a double-prefix sed bug (`extension=\1` where the group already
+  contains `extension=`) that corrupted php.ini and aborted parsing before
+  `extension=zip`; plus the `printf %b` SOH bug that corrupted the printed
+  remediation itself → rewritten backreference-free, verified against the
+  real Arch php.ini → guard test updated → **run 4 (33704624303) on 83fb374**
+- E: run record, ledger, state snapshot, PROJECT.md facts, OBS-006
+  (sandbox pushes emit no GitHub events → dispatch is the automation trigger)
+
+## Outcome evidence
+- Workflow name registered as "CI" (was: file path); dispatch returns 204
+  (was: 422); Actions tab populated with real runs; README badge live.
+- `GEMINI_API_KEY` configured as a repo secret — the optional live-LLM
+  smoke job (single flash call, `continue-on-error`) **passed on run 2**
+  from GitHub's US runners (the sandbox geo-block does not apply there).

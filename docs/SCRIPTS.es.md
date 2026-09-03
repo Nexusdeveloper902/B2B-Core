@@ -236,7 +236,7 @@ requisitos de extensiones de Laravel hasta arreglar ambas cosas.
 sudo pacman -S --needed php php-sqlite composer
 # Habilita las extensiones que la plataforma necesita (como imprime ./run doctor —
 # esta forma no usa retro-referencias de sed, así que es segura al copiar y pegar):
-sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
+sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
 ./run setup && ./run doctor   # verifica → todo en verde
 ./run serve
 ```

@@ -69,7 +69,7 @@ detect_distro() {
 # CI extension list (drift fails the build).
 B2B_PHP_MIN_VERSION="8.3"
 PHP_REQUIRED_MODULES=(
-    ctype curl dom fileinfo libxml mbstring openssl
+    ctype curl dom fileinfo iconv libxml mbstring openssl
     pdo_sqlite session sqlite3 tokenizer xml xmlwriter zip
 )
 
@@ -171,7 +171,7 @@ resolve_php() {
             err "On Arch install PHP and enable extensions:"
             err "En Arch instala PHP y habilita las extensiones:"
             err "  sudo pacman -S --needed php php-sqlite composer"
-            err "  sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini"
+            err "  sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini"
             ;;
         debian)
             err "On Debian/Ubuntu: sudo apt-get install php-cli php-sqlite3 php-curl php-mbstring php-xml php-zip"

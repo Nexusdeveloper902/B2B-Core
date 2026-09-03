@@ -231,7 +231,7 @@ a fresh install fails Laravel's extension requirements until both are fixed.
 sudo pacman -S --needed php php-sqlite composer
 # Enable the extensions the platform needs (as printed by ./run doctor —
 # the form below uses no sed backreference, so it is copy-paste safe):
-sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
+sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
 ./run setup && ./run doctor   # verify → all green
 ./run serve
 ```
