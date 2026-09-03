@@ -229,3 +229,47 @@ self-explaining. Repository reality updates:
 - **git core.fileMode=false strips +x from NEW scripts** at commit
   time (OBS-009): always `git update-index --chmod=+x` for new
   executables; ScriptSuiteTest is the CI net that catches it.
+
+---
+
+## RUN-2026-09-04-core-006 — appended project facts (Windows fallback run)
+
+This run added Windows as an auto-detected fallback for the ./run suite.
+Repository reality updates:
+
+- **The suite is one codebase across OSes** (ADR-017): `common.sh`
+  resolves `B2B_OS` once at source time (uname MINGW/MSYS/CYGWIN =>
+  windows; WSL => linux and uses the normal path incl. hermetic .tools);
+  an explicit `B2B_OS` env var overrides detection — that is the test
+  seam and the power-user escape hatch.
+- **Windows candidate set**: `.tools/php` (Linux ELF) is NEVER probed on
+  windows; Composer probes `composer` → `composer.bat` → `composer.cmd`
+  → `composer.phar` → `.tools/composer`, with wrappers validated AND
+  invoked direct-only (OBS-010: php-mediated validation false-positives
+  on .bat/.cmd text).
+- **`./run toolchain` on windows = composer.phar only**; PHP comes from
+  winget/choco/scoop/php.net (guidance printed by resolve_php, doctor,
+  and toolchain itself). The zero-system hermetic PHP path is
+  Linux-only by binary reality.
+- **`run.cmd`** is the cmd/PowerShell entry: finds Git Bash (B2B_BASH
+  override → well-known paths → PATH) and forwards to the same bash
+  dispatcher — no command routing in it (single-source dispatch,
+  ADR-009).
+- **`.gitattributes` line-ending contract**: `*.sh` + `run` LF,
+  `*.cmd`/`*.bat` CRLF (merged with the skeleton's `* text=auto eol=lf`
+  + diff/export rules — a wholesale Write initially clobbered them;
+  caught via git status and restored).
+- **CI is 13 jobs now**: windows-smoke (windows-latest, Git Bash) is
+  non-optional and runs setup --ci → doctor → choco shellcheck →
+  quality → test → e2e. Proven green on the first dispatch
+  (33815966369) and after the OBS-010 fix (33816386157); tip-of-main
+  push run 33816810463 green.
+- **Windows e2e truths**: native curl.exe cannot read msys /tmp paths
+  (the e2e test image is project-relative); Git Bash has no pgrep/pkill
+  (taskkill //F //T //PID via /proc/<pid>/winpid is the fallback);
+  Windows venvs put binaries in `.venv/Scripts/`.
+- **ScriptSuiteTest is 31 tests** (10 Windows contracts: source +
+  behavioral B2B_OS=windows simulations + linux counter-test locking
+  .tools probing). On windows runners 5 skips are by-design OS-guards.
+- **Green logs of NEW platforms deserve forensics too**: the OBS-010
+  false-positive was found in a SUCCESSFUL windows job's log.
