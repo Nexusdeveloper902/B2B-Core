@@ -327,7 +327,9 @@ jobs:
     if: needs.llm-gate.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    continue-on-error: true
+    # No continue-on-error: once a key is configured it must PROVE itself.
+    # The old design masked a dead key behind a green job (the live test
+    # silently skipped for weeks — TASK-006).
     steps:
       - uses: actions/checkout@v4
 
@@ -341,13 +343,21 @@ jobs:
       - name: Bootstrap via the run suite
         run: ./run setup --ci
 
-      - name: Provide the Gemini key
-        run: echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-
       - name: Run the live NL-query smoke test (single light call)
-        # No --live-llm flag: the live test is gated by the RUN_LIVE_LLM_TESTS
-        # env var + GEMINI_API_KEY (see scripts/test.sh header and
-        # NlQueryApiTest); artisan test rejects unknown options.
-        run: ./run test feature --filter=NlQueryApiTest
+        # The key MUST arrive as a real process env var (step env below).
+        # phpunit.xml pins GEMINI_API_KEY="" with force=false, so phpunit
+        # only applies it when the var is absent; a process env var wins.
+        # (Appending the key to .env NEVER worked: immutable dotenv keeps
+        # the phpunit-level empty value — the TASK-006 lesson.)
+        # Skip-detection: a skip while a key is configured is a wiring bug
+        # and must fail loudly, not hide behind a green job.
+        run: |
+          set -o pipefail
+          ./run test feature --filter=NlQueryApiTest 2>&1 | tee live-smoke.log
+          if grep -q 'skipped' live-smoke.log; then
+            echo "::error::Live-LLM smoke SKIPPED although GEMINI_API_KEY is configured — the key never reached the test (wiring bug, see TASK-006)."
+            exit 1
+          fi
         env:
           RUN_LIVE_LLM_TESTS: '1'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
