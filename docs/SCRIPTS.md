@@ -228,10 +228,10 @@ a fresh install fails Laravel's extension requirements until both are fixed.
 `./run doctor` detects this and prints the exact fix:
 
 ```bash
-sudo pacman -S --needed php php-sqlite composer
+sudo pacman -S --needed php php-sqlite php-gd composer
 # Enable the extensions the platform needs (as printed by ./run doctor —
 # the form below uses no sed backreference, so it is copy-paste safe):
-sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
+sudo sed -ri '/^;(extension=(ctype|curl|dom|fileinfo|gd|iconv|libxml|mbstring|openssl|pdo_sqlite|session|sqlite3|tokenizer|xml|xmlwriter|zip))$/s/^;//' /etc/php/php.ini
 ./run setup && ./run doctor   # verify → all green
 ./run serve
 ```
