@@ -265,13 +265,28 @@ resolve_composer() {
     fi
     while IFS= read -r c; do
         [ -n "$c" ] || continue
-        if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
-            COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="php"
-        elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
-            COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="direct"
-        else
-            continue
-        fi
+        case "$c" in
+            *.bat|*.cmd)
+                # NEVER php-validate a .bat/.cmd: PHP happily "executes" plain
+                # cmd text (exit 0, output = the file's first lines) — a false
+                # positive found on the real windows runner (TASK-008). They
+                # are Windows wrappers: validate AND invoke them DIRECTLY.
+                if is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+                    COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="direct"
+                else
+                    continue
+                fi
+                ;;
+            *)
+                if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
+                    COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="php"
+                elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+                    COMPOSER_BIN="$c"; COMPOSER_BIN_MODE="direct"
+                else
+                    continue
+                fi
+                ;;
+        esac
         case "$c" in
             "$B2B_ROOT/.tools/"*) COMPOSER_BIN_SOURCE="hermetic (.tools/)" ;;
             "${B2B_COMPOSER:-__none__}") COMPOSER_BIN_SOURCE="override (B2B_COMPOSER)" ;;

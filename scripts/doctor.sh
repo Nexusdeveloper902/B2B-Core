@@ -107,15 +107,29 @@ if [ -z "${PHP_BIN:-}" ]; then
 else
     while IFS= read -r c; do
         [ -n "$c" ] || continue
-        if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
-            pass "$c → $("$PHP_BIN" "$c" --version 2>/dev/null | head -n 1) (via ${PHP_BIN})"
-            COMPOSER_FOUND=1
-        elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
-            pass "$c → $("$c" --version 2>/dev/null | head -n 1) (direct — Windows wrapper / envoltorio de Windows)"
-            COMPOSER_FOUND=1
-        else
-            note "  ${C_DIM}${c}: not usable / no utilizable${C_RESET}"
-        fi
+        case "$c" in
+            *.bat|*.cmd)
+                # Direct-only validation (PHP false-positives on cmd text —
+                # TASK-008 finding from the real windows runner).
+                if is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+                    pass "$c → $("$c" --version 2>/dev/null | head -n 1) (direct — Windows wrapper / envoltorio de Windows)"
+                    COMPOSER_FOUND=1
+                else
+                    note "  ${C_DIM}${c}: not usable / no utilizable${C_RESET}"
+                fi
+                ;;
+            *)
+                if [ -f "$c" ] && "$PHP_BIN" "$c" --version >/dev/null 2>&1; then
+                    pass "$c → $("$PHP_BIN" "$c" --version 2>/dev/null | head -n 1) (via ${PHP_BIN})"
+                    COMPOSER_FOUND=1
+                elif is_windows && [ -f "$c" ] && "$c" --version >/dev/null 2>&1; then
+                    pass "$c → $("$c" --version 2>/dev/null | head -n 1) (direct — Windows wrapper / envoltorio de Windows)"
+                    COMPOSER_FOUND=1
+                else
+                    note "  ${C_DIM}${c}: not usable / no utilizable${C_RESET}"
+                fi
+                ;;
+        esac
     done < <(composer_candidates)
 fi
 if [ "$COMPOSER_FOUND" -eq 0 ]; then
