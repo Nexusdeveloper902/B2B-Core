@@ -283,6 +283,54 @@ jobs:
       - name: Real-HTTP e2e on the static PHP
         run: ./run e2e
 
+  windows-smoke:
+    # Windows is an auto-detected FALLBACK (ADR-017): same ./run suite, Git
+    # Bash shell. This job proves the fallback on real Windows hardware —
+    # the same prove-it pattern as arch-smoke / hermetic-smoke.
+    name: "Windows smoke (Git Bash fallback, real windows-latest)"
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: sqlite3, pdo_sqlite, mbstring, curl, zip, fileinfo, iconv, gd
+          coverage: none
+
+      - name: Bootstrap via the run suite (Git Bash auto-detected as windows)
+        run: ./run setup --ci
+
+      - name: Doctor must be green on the windows fallback path
+        run: ./run doctor
+
+      - name: Install shellcheck for the full quality gate
+        shell: pwsh
+        run: choco install -y shellcheck
+
+      - name: Quality gate (Pint + bash syntax + shellcheck + docs parity)
+        run: ./run quality
+
+      - name: Full test pyramid on Windows
+        run: ./run test
+
+      - name: Real-HTTP e2e on Windows
+        run: ./run e2e
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Windows smoke (Git Bash fallback)"
+            echo "Proved the auto-detected Windows fallback path end-to-end: setup -> doctor -> quality -> test -> e2e on windows-latest."
+            echo "Windows needs a system PHP (winget/choco/php.net) — the Linux ELF hermetic toolchain is Composer-only there (ADR-017)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   secrets-scan:
     name: Secret scanning (gitleaks)
     runs-on: ubuntu-latest
