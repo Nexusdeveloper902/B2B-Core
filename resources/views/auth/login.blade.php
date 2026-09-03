@@ -3,27 +3,41 @@
 @section('title', __('app.login'))
 
 @section('content')
-<div class="card auth-card">
-    <h1>{{ __('app.login_title') }}</h1>
+<div class="auth-wrap">
+    <section class="panel panel-rule">
+        <p class="panel-label"><span class="dot" aria-hidden="true"></span>{{ __('app.app_name') }}</p>
+        <h1>{{ __('app.login_title') }}</h1>
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
+        <form method="POST" action="{{ route('login') }}">
+            @csrf
 
-        <label for="email">{{ __('app.email') }}</label>
-        <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
-               autocomplete="email" placeholder="admin@presence.test">
+            <x-field :label="__('app.email')" for="email">
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                       autocomplete="email" placeholder="admin@presence.test">
+                @error('email')
+                    <p class="field-error">{{ $message }}</p>
+                @enderror
+            </x-field>
 
-        <label for="password">{{ __('app.password') }}</label>
-        <input id="password" type="password" name="password" required autocomplete="current-password"
-               placeholder="password">
+            <x-field :label="__('app.password')" for="password">
+                <input id="password" type="password" name="password" required autocomplete="current-password"
+                       placeholder="password">
+                @error('password')
+                    <p class="field-error">{{ $message }}</p>
+                @enderror
+            </x-field>
 
-        @error('email')
-            <p class="field-error">{{ $message }}</p>
-        @enderror
+            <button type="submit" class="btn btn-primary btn-block">{{ __('app.login') }}</button>
+        </form>
+    </section>
 
-        <button type="submit" class="btn btn-primary btn-block">{{ __('app.login') }}</button>
-    </form>
-
-    <p class="hint">{{ __('app.login_hint') }}</p>
+    <div class="auth-aside">
+        <dl>
+            <dt>{{ __('app.demo_credentials') }}</dt>
+            <dd>admin@presence.test</dd>
+            <dd>teacher@presence.test</dd>
+            <dd>{{ __('app.password') }}: password</dd>
+        </dl>
+    </div>
 </div>
 @endsection
