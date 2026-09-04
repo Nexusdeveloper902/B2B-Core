@@ -6,6 +6,7 @@ use App\Contracts\MaterialClassifier;
 use App\Services\NlQuery\FunctionRegistry;
 use App\Services\NlQuery\GeminiClient;
 use App\Services\NlQuery\NlQueryService;
+use App\Services\PairingService;
 use App\Services\Recycling\ClassifierFactory;
 use Illuminate\Support\ServiceProvider;
 
@@ -36,6 +37,14 @@ class AppServiceProvider extends ServiceProvider
             return new NlQueryService(
                 $app->make(GeminiClient::class),
                 $app->make(FunctionRegistry::class),
+            );
+        });
+
+        // TASK-010 — card pairing window (seconds) is configuration, not
+        // code: ADR-020 documents the 45 s default choice.
+        $this->app->singleton(PairingService::class, function () {
+            return new PairingService(
+                (int) config('presence.pairing_window_seconds', 45),
             );
         });
     }
