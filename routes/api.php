@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ArmPairingController;
+use App\Http\Controllers\Api\V1\CardPairingController;
 use App\Http\Controllers\Api\V1\NlQueryController;
 use App\Http\Controllers\Api\V1\ReaderModeController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
@@ -31,6 +33,12 @@ Route::prefix('v1')->group(function () {
         // Phase C — classification + points earn (multipart: event_id, image).
         Route::post('/recycling/classify', [RecyclingClassificationController::class, 'store'])
             ->name('api.v1.recycling.classify');
+
+        // TASK-010 (firmware TASK-001 Phase E1) — device side of card
+        // pairing: pair a freshly scanned card with the pending pairing
+        // armed from the dashboard. Same Bearer reader identity as tap.
+        Route::post('/admin/cards/pair', [CardPairingController::class, 'store'])
+            ->name('api.v1.cards.pair');
     });
 
     /*
@@ -48,6 +56,12 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/admin/readers/{reader}/mode', [ReaderModeController::class, 'update'])
         ->middleware(['auth:sanctum', 'role:admin']);
+
+    // TASK-010 (firmware TASK-001 Phase E1) — dashboard side of card
+    // pairing: arm a short-lived pending pairing for a student.
+    Route::post('/admin/students/{student}/arm-pairing', [ArmPairingController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.students.arm-pairing');
 
     // Phase D — redemption (admin or teacher; desk interaction).
     Route::post('/students/{student}/redeem', [RedemptionController::class, 'store'])
