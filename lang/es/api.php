@@ -23,6 +23,10 @@ return [
     // Endpoint de canje
     'insufficient_points' => 'Puntos insuficientes: faltan :shortfall',
 
+    // Endpoint de emparejamiento de tarjetas (TASK-010)
+    'pairing_no_active_session' => 'No hay ninguna sesión de emparejamiento activa',
+    'pairing_card_already_paired' => 'La tarjeta ya está emparejada',
+
     // Endpoint de consulta en lenguaje natural
     'nlq_not_configured' => 'La consulta en lenguaje natural no está configurada: falta GEMINI_API_KEY (bloqueada, no fallida).',
     'nlq_invalid_key' => 'Google rechazó el GEMINI_API_KEY configurado (inválido o revocado). Crea una clave nueva en Google AI Studio, ponla en .env y verifica con: ./run llm-check',

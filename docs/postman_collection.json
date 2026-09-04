@@ -5,19 +5,57 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8000" },
-    { "key": "classroom_reader_key", "value": "PASTE_FROM_SEEDER_OUTPUT" },
-    { "key": "recycling_reader_key", "value": "PASTE_FROM_SEEDER_OUTPUT" },
-    { "key": "credential_uid", "value": "PASTE_FROM_SEEDER_OUTPUT" },
-    { "key": "student_id", "value": "1" },
-    { "key": "reward_id", "value": "3" },
-    { "key": "reader_id", "value": "1" },
-    { "key": "event_id", "value": "1" },
-    { "key": "admin_pat", "value": "OPTIONAL_PERSONAL_ACCESS_TOKEN" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "classroom_reader_key",
+      "value": "PASTE_FROM_SEEDER_OUTPUT"
+    },
+    {
+      "key": "recycling_reader_key",
+      "value": "PASTE_FROM_SEEDER_OUTPUT"
+    },
+    {
+      "key": "credential_uid",
+      "value": "PASTE_FROM_SEEDER_OUTPUT"
+    },
+    {
+      "key": "student_id",
+      "value": "1"
+    },
+    {
+      "key": "reward_id",
+      "value": "3"
+    },
+    {
+      "key": "reader_id",
+      "value": "1"
+    },
+    {
+      "key": "event_id",
+      "value": "1"
+    },
+    {
+      "key": "admin_pat",
+      "value": "OPTIONAL_PERSONAL_ACCESS_TOKEN"
+    },
+    {
+      "key": "new_credential_uid",
+      "value": "NEWCARD000001",
+      "description": "A fresh card UID to pair / Un UID de tarjeta nueva para emparejar"
+    }
   ],
   "auth": {
     "type": "bearer",
-    "bearer": [{ "key": "token", "value": "{{classroom_reader_key}}", "type": "string" }]
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{classroom_reader_key}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
@@ -25,9 +63,18 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{classroom_reader_key}}" },
-          { "key": "Accept", "value": "application/json" },
-          { "key": "Accept-Language", "value": "en" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{classroom_reader_key}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -35,8 +82,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/events/tap",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "events", "tap"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "events",
+            "tap"
+          ]
         },
         "description": "Phase B — the core presence loop.\n\nSend the card's credential_uid; the reader is identified by its Bearer key (never trust a client-supplied reader ID).\n\nResponse 200: { status, event_id, event_type, student_first_name, next_step }\nResponse 401: invalid/missing Bearer token.\nResponse 404: card not recognized / not active.\n\nTip: set Accept-Language: es to receive Spanish messages."
       }
@@ -46,8 +100,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{recycling_reader_key}}" },
-          { "key": "Accept", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{recycling_reader_key}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -55,8 +115,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/events/tap",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "events", "tap"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "events",
+            "tap"
+          ]
         },
         "description": "A recycling tap only logs the event; points are awarded AFTER classification. next_step = \"awaiting_classification\" — take event_id for the classify call."
       }
@@ -66,13 +133,23 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{recycling_reader_key}}" },
-          { "key": "Accept", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{recycling_reader_key}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "formdata",
           "formdata": [
-            { "key": "event_id", "value": "{{event_id}}", "type": "text" },
+            {
+              "key": "event_id",
+              "value": "{{event_id}}",
+              "type": "text"
+            },
             {
               "key": "image",
               "type": "file",
@@ -82,8 +159,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/recycling/classify",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "recycling", "classify"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "recycling",
+            "classify"
+          ]
         },
         "description": "Phase C — multipart: event_id + image file (any test image works for the contract). Idempotent: re-submitting the same event_id does NOT double-award points.\n\nResponse 200: { status, already_classified, material_class, confidence, points_awarded, new_balance }\nPoints table (config/recycling.php): plastic=10, paper=5, metal=15, glass=8, other=0."
       }
@@ -93,9 +177,18 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
-          { "key": "Accept", "value": "application/json" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -103,8 +196,17 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/admin/readers/{{reader_id}}/mode",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "admin", "readers", "{{reader_id}}", "mode"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "readers",
+            "{{reader_id}}",
+            "mode"
+          ]
         },
         "description": "Phase B — relabel a reader (CLASS_ATTENDANCE / PAE_BREAKFAST / PAE_LUNCH / RECYCLING_DEPOSIT / ENTRY). Admin-only (403 for teachers, 401 for guests). PUT works too."
       }
@@ -114,9 +216,18 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
-          { "key": "Accept", "value": "application/json" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -124,8 +235,16 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/students/{{student_id}}/redeem",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "students", "{{student_id}}", "redeem"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "students",
+            "{{student_id}}",
+            "redeem"
+          ]
         },
         "description": "Phase D — the spend half of the loop. Admin or teacher.\n\nResponse 200: { status, student_id, reward, new_balance, ledger_id }\nResponse 422: insufficient points, includes current_balance + shortfall."
       }
@@ -135,9 +254,18 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
-          { "key": "Accept", "value": "application/json" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -145,8 +273,16 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/students/{{student_id}}/redeem",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "students", "{{student_id}}", "redeem"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "students",
+            "{{student_id}}",
+            "redeem"
+          ]
         },
         "description": "Redeem the 50-point 'Canteen discount voucher' with a low balance to see the clean 422 + shortfall."
       }
@@ -156,9 +292,18 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{admin_pat}}" },
-          { "key": "Accept", "value": "application/json" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -166,10 +311,101 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/nl-query",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "nl-query"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "nl-query"
+          ]
         },
         "description": "Phase E — Gemini function-calling; the LLM only SELECTS functions, the backend computes the real answer.\n\nResponse 200: { status, answer, functions_called }\nResponse 503: { status: 'blocked', blocked_reason } when no GEMINI_API_KEY is configured (honest blocker, not a fake answer)."
+      }
+    },
+    {
+      "name": "08 Admin — Arm card pairing / Armar emparejamiento",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/students/{{student_id}}/arm-pairing",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "students",
+            "{{student_id}}",
+            "arm-pairing"
+          ]
+        },
+        "description": "TASK-010 — step 1 of card pairing: arm a short-lived pending pairing (45 s window) for a student. Admin session or personal access token.\n\nResponse 200: { status, student_id, expires_at }\nResponse 401/403: guest / non-admin.\nResponse 404: unknown student.\n\nTip: set Accept-Language: es to receive Spanish messages."
+      }
+    },
+    {
+      "name": "09 Device — Pair card / Emparejar tarjeta",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{classroom_reader_key}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"credential_uid\": \"{{new_credential_uid}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/cards/pair",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "cards",
+            "pair"
+          ]
+        },
+        "description": "TASK-010 — step 2 of card pairing: submit a freshly scanned card UID. Auth is the READER Bearer key (same as the tap endpoint), not a user token.\n\nResponse 200: { status, paired_student_name, student_id } — the card works immediately for taps.\nResponse 409: no pairing session active (none armed / expired / consumed).\nResponse 422: card already paired (never reassigned).\nResponse 401: missing/invalid reader key.\n\nTip: set Accept-Language: es to receive Spanish messages."
       }
     },
     {
@@ -179,8 +415,12 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/up",
-          "host": ["{{base_url}}"],
-          "path": ["up"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "up"
+          ]
         },
         "description": "Laravel health check endpoint."
       }

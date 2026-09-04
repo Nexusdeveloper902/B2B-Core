@@ -44,6 +44,15 @@ return [
     ],
 
     /*
+     | TASK-010 — card pairing window. How long an armed pending pairing
+     | stays active before the next card scan can consume it (seconds).
+     | 45 s default: long enough for the operator to walk to the reader
+     | and tap a fresh card; short enough to not leave stray open
+     | sessions. ADR-020.
+     */
+    'pairing_window_seconds' => env('PAIRING_WINDOW_SECONDS', 45),
+
+    /*
      | A tap that happens after this local time counts as "late" on the
      | teacher dashboard. Simple constant cutoff by design — not a full
      | policy engine. Format: "HH:MM" (24h, school local time).

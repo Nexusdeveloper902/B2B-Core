@@ -23,6 +23,10 @@ return [
     // Redemption endpoint
     'insufficient_points' => 'Insufficient points: :shortfall more needed',
 
+    // Card pairing endpoint (TASK-010)
+    'pairing_no_active_session' => 'No pairing session active',
+    'pairing_card_already_paired' => 'Card already paired',
+
     // NL query endpoint
     'nlq_not_configured' => 'Natural-language query is not configured: no GEMINI_API_KEY set (blocked, not failed).',
     'nlq_invalid_key' => 'Google rejected the configured GEMINI_API_KEY (invalid or revoked). Create a fresh key in Google AI Studio, put it in .env, and verify with: ./run llm-check',

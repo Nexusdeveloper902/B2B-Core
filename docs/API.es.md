@@ -14,8 +14,8 @@ URL base (desarrollo local): `http://localhost:8000`
 
 | Endpoints | Auth | Notas |
 |---|---|---|
-| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Roles admin/teacher aplicados por endpoint. |
+| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
+| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Roles admin/teacher aplicados por endpoint. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
 `Accept-Language: es` para español (p. ej. `{"message": "Tarjeta no reconocida"}`);
@@ -164,6 +164,76 @@ Canje en mostrador. **Requiere rol admin o teacher.**
 
 El `points_ledger` es de solo-agregación: cada ganancia (+) y gasto (−) queda
 registrado; el saldo siempre es `SUM(delta)`, nunca un contador mutable.
+
+---
+
+## POST /api/v1/admin/students/{id}/arm-pairing — armar un emparejamiento (TASK-010, solo admin)
+
+Primer paso del flujo de emparejamiento en dos pasos (ADR-020): arma un
+**emparejamiento pendiente** de corta duración para un estudiante. La
+siguiente tarjeta **nueva** que se lea en cualquier lector dentro de la
+ventana queda vinculada a ese estudiante (lado del dispositivo, abajo).
+
+La ventana es de **45 segundos** por defecto (`PAIRING_WINDOW_SECONDS`,
+ver `config/presence.php`) — suficiente para caminar al lector, lo
+suficientemente corta para no dejar sesiones abiertas huérfanas. Si se
+arman dos estudiantes a la vez, gana el emparejamiento armado **más
+reciente** (el flujo de escritorio es secuencial por naturaleza). Armar de
+nuevo simplemente crea un emparejamiento más nuevo.
+
+**Petición**: cuerpo JSON vacío — el estudiante viene en la URL.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "student_id": 3,
+  "expires_at": "2026-09-05T14:02:31+00:00"
+}
+```
+
+`401`/`403` — invitado / no admin (un profesor no puede armar). `404` — estudiante desconocido.
+
+## POST /api/v1/admin/cards/pair — emparejar una tarjeta leída (TASK-010, lado del dispositivo)
+
+Segundo paso: el lector (cualquier lector — la ruta vive bajo `/admin/` por
+descubribilidad, pero la autenticación es la **clave Bearer del lector**,
+exactamente como el endpoint de tap) envía el UID de una tarjeta recién
+leída. El emparejamiento pendiente más reciente no consumido y no caducado
+se consume y la tarjeta queda vinculada a su estudiante.
+
+**Petición** (JSON):
+
+```json
+{ "credential_uid": "A1B2C3D4E5" }
+```
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "paired_student_name": "Maria González",
+  "student_id": 3
+}
+```
+
+`409 Conflict` — no hay sesión de emparejamiento activa (ninguna armada,
+caducada o ya consumida):
+`{"status":"error","message":"No pairing session active"}`.
+
+`422` — el `credential_uid` ya está vinculado a una fila existente de
+`cards` (cualquier estado — una tarjeta de reemplazo es una credencial
+NUEVA; jamás se reasignan tarjetas existentes):
+`{"status":"error","message":"Card already paired"}`. El emparejamiento
+pendiente **sigue armado** para que el operador pueda leer de inmediato
+otra tarjeta nueva.
+
+`401` — clave Bearer del lector faltante o inválida. El emparejamiento es
+de un solo uso: tras un emparejamiento exitoso, la siguiente lectura
+recibe el 409. La tarjeta recién emparejada funciona de inmediato para los
+toques en el endpoint de tap.
 
 ---
 
