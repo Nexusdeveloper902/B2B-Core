@@ -22,7 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Install actionlint (with shellcheck integration)
         run: |
@@ -46,7 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -69,7 +75,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Ensure shellcheck is present
         run: command -v shellcheck || (sudo apt-get update -y && sudo apt-get install -y shellcheck)
@@ -101,7 +110,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -115,7 +127,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-8.4-${{ hashFiles('composer.lock') }}
@@ -133,7 +145,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -147,7 +162,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-8.4-${{ hashFiles('composer.lock') }}
@@ -164,7 +179,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -184,7 +202,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -294,7 +315,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -336,12 +360,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        # v3 = node24 runtime; "no changes to inputs, outputs, or behavior"
+        # (release notes) — we pass only GITHUB_TOKEN env (ADR-018).
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -379,7 +408,10 @@ jobs:
     # The old design masked a dead key behind a green job (the live test
     # silently skipped for weeks — TASK-006).
     steps:
-      - uses: actions/checkout@v4
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
