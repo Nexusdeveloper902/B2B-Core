@@ -4,7 +4,7 @@
 2026-09-05
 
 ## Status
-IN PROGRESS
+COMPLETED — see RUN-2026-09-05-core-007
 
 ## Request
 Owner: *"Please, using the same protocol, fix the CI"* — the CI shows
@@ -57,12 +57,16 @@ usage touches none of the documented breaking surfaces.
 ## Scope
 - `.github/workflows/ci.yml` ONLY (13 version-token edits:
   10× checkout, 2× cache, 1× gitleaks-action)
+- Follow-up found during verification (see below): the live-LLM gate
+  gained a bounded, reason-scoped transient retry (ADR-019) after run
+  33923179031 failed on a documented-transient Gemini 503.
 - No script, test, or doc changes (verified: no doc/record pins these
   versions; `./run quality` docs-parity surface unaffected).
 
 ## Commit plan
 1. fix(ci): migrate actions off deprecated node20 runtime (ADR-018)
-2. docs(agent): TASK-009 closure records
+2. fix(ci): bounded transient retry in the live-LLM gate (ADR-019)
+3. docs(agent): TASK-009 closure records
 
 ## Verification plan
 - YAML sanity + actionlint happens in the workflows-lint job (it
@@ -72,3 +76,30 @@ usage touches none of the documented breaking surfaces.
   the run (API-verified, not just green conclusions — the exact
   forensics that found this).
 - Merge fast-forward to main, push, tip-run green + zero annotations.
+
+## Outcome (2026-09-05)
+
+Both commits landed on main (fast-forward from the feature branch):
+
+- a22302b fix(ci): migrate actions off the deprecated node20 runtime
+  (ADR-018) — checkout@v4→v7 (10), cache@v4→v6 (2),
+  gitleaks-action@v2→v3 (1); setup-php@v2 verified node24, unchanged.
+- 4eacd11 fix(ci): bounded transient retry in the live-LLM gate
+  (ADR-019) — absorbed the Gemini 503 class found mid-verification.
+
+Verification:
+
+- Fresh-truth dispatch on main @ 5dccb7d (33922483187): 13/13 success
+  WITH the node20 warning on every action-consuming job — the rot
+  evidence. Local mirror: doctor green, `./run ci` 3/3 stages green.
+- Branch dispatch on a22302b (33922978231): **13/13 success, 0
+  annotations** — deprecation gone.
+- Main tip push of a22302b (33923179031): live-LLM smoke red on a
+  Google 503 "high demand" (OBS-012); job re-run green → transience
+  proven → gate hardened (ADR-019, simulated all three paths locally).
+- Branch dispatch on 4eacd11 (33923574507): 13/13 success.
+- Main tip push of 4eacd11 (33923747128): **13/13 success, 0
+  annotations** — final acceptance met.
+
+Records: ADR-018, ADR-019, OBS-011, OBS-012, RUN-2026-09-05-core-007
++ ledger + snapshot, PROJECT.md facts.

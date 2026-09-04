@@ -273,3 +273,40 @@ Repository reality updates:
   .tools probing). On windows runners 5 skips are by-design OS-guards.
 - **Green logs of NEW platforms deserve forensics too**: the OBS-010
   false-positive was found in a SUCCESSFUL windows job's log.
+
+## RUN-2026-09-05-core-007 — appended project facts (CI node24 + live-gate hardening)
+
+This run fixed the CI the day the owner asked — nothing was red, but
+everything was warned. Repository reality updates:
+
+- **"Fix the CI" with a green board means: go one level deeper.** The
+  fresh dispatch (33922483187) was 13/13 success, yet every
+  action-consuming job carried the node20-deprecation annotation
+  (OBS-011). Job conclusions hide platform rot; the check-runs
+  annotations API shows it.
+- **The node20 deadline was real and near**: GitHub removes node20
+  from hosted runners on 2026-09-16; `actions/checkout@v4` (first
+  step of 10 of 13 jobs) would have hard-failed the whole pipeline
+  with zero repo-side changes. All actions now run node24
+  (ADR-018): checkout@v7, cache@v6, gitleaks-action@v3;
+  setup-php@v2 was already node24 and stays.
+- **Action majors are chosen by verification, not vibes**: each
+  target's `action.yml` `runs.using` was checked via API before
+  editing; current majors beat oldest-compatible majors because the
+  backport lines carry the same breaking changes anyway and this
+  repo's usage (plain pull_request, default ref, standard cache
+  inputs) touches none of them.
+- **The live-LLM gate retries, honestly (ADR-019)**: after a tip run
+  failed on Google's documented-transient 503 "high demand"
+  (transience proven by a 1-minute-later green job re-run, OBS-012),
+  the gate now retries ONLY the transport class
+  (`llm_unavailable`), max 3 attempts / 20s, with visible
+  `::warning::` annotations. Quota, invalid key, region, model,
+  wiring errors and skips still fail immediately — this is retry,
+  never masking.
+- **Acceptance for CI fixes is "green AND zero annotations"**: proven
+  on branch dispatch 33922978231 and main tip push 33923747128 (both
+  13/13, 0 annotations).
+- **Concurrency behavior is a feature to remember**: a dispatch on a
+  ref cancels that ref's in-flight push run (cancel-in-progress);
+  poll by event=workflow_dispatch or you watch the cancelled twin.
