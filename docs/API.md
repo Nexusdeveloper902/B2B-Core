@@ -14,8 +14,8 @@ Base URL (local dev): `http://localhost:8000`
 
 | Endpoints | Auth | Notes |
 |---|---|---|
-| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. Admin/teacher roles enforced per endpoint. |
+| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
+| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. Admin/teacher roles enforced per endpoint. |
 
 **Localization:** device-facing messages are bilingual. Send
 `Accept-Language: es` for Spanish (e.g. `{"message": "Tarjeta no reconocida"}`);
@@ -164,6 +164,71 @@ Desk redemption. **Admin or teacher role required.**
 
 The `points_ledger` is append-only: every earn (+) and spend (−) is recorded;
 the balance is always `SUM(delta)`, never a mutable counter.
+
+---
+
+## POST /api/v1/admin/students/{id}/arm-pairing — arm a card pairing (TASK-010, admin-only)
+
+First step of the two-step pairing flow (ADR-020): arm a short-lived
+**pending pairing** for a student. The next **fresh** card scanned at any
+reader within the window is linked to that student (device side below).
+
+The window is **45 seconds** by default (`PAIRING_WINDOW_SECONDS`,
+see `config/presence.php`) — long enough to walk to the reader, short
+enough that stray open sessions do not linger. If two students are armed
+at the same time, the **most recent** armed pairing wins (the desk flow is
+sequential by nature). Arming again simply creates a newer pairing.
+
+**Request**: empty JSON body — the student comes from the URL.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "student_id": 3,
+  "expires_at": "2026-09-05T14:02:31+00:00"
+}
+```
+
+`401`/`403` — guest / non-admin (teacher cannot arm). `404` — unknown student.
+
+## POST /api/v1/admin/cards/pair — pair a scanned card (TASK-010, device-side)
+
+Second step: the reader (any reader — the path lives under `/admin/` for
+discoverability, but authentication is the **reader Bearer key**, exactly
+like the tap endpoint) submits a freshly scanned card UID. The most
+recent unconsumed, unexpired pending pairing is consumed and the card is
+linked to its student.
+
+**Request** (JSON):
+
+```json
+{ "credential_uid": "A1B2C3D4E5" }
+```
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "paired_student_name": "Maria González",
+  "student_id": 3
+}
+```
+
+`409 Conflict` — no active pairing session (none armed, expired, or already
+consumed): `{"status":"error","message":"No pairing session active"}`.
+
+`422` — the `credential_uid` is already linked to an existing card row (any
+status — a replacement card is a NEW credential; existing cards are never
+reassigned): `{"status":"error","message":"Card already paired"}`. The
+pending pairing **stays armed** so the operator can immediately scan a
+different fresh card.
+
+`401` — missing/invalid reader Bearer key. A pairing is one-shot: after a
+successful pair, the next scan gets the 409. The newly paired card works
+immediately for taps on the tap endpoint.
 
 ---
 
