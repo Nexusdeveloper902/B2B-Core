@@ -310,3 +310,34 @@ everything was warned. Repository reality updates:
 - **Concurrency behavior is a feature to remember**: a dispatch on a
   ref cancels that ref's in-flight push run (cancel-in-progress);
   poll by event=workflow_dispatch or you watch the cancelled twin.
+
+## RUN-2026-09-05-core-008 — appended project facts (card pairing endpoint)
+
+This run built the two-step card-pairing capability (TASK-010, ADR-020)
+that the reader-firmware repository's TASK-001 requires for its PAIRING
+MODE — the owner-authorized narrow write exception; everything else in
+this repo was untouched. Repository reality updates:
+
+- **Card pairing is a real, tested capability now** — previously the
+  seeder fabricated cards and the docs recorded pairing as a gap.
+  `POST /api/v1/admin/students/{id}/arm-pairing` (admin session/PAT)
+  arms a 45 s pending pairing (`PAIRING_WINDOW_SECONDS` overridable);
+  `POST /api/v1/admin/cards/pair` (reader Bearer key — the tap
+  endpoint's identity plane) links the next fresh card UID. One-shot
+  consumption (row-locked), never-reassign, most-recent-wins.
+- **The firmware repo is unblocked**: B2B-Firmware TASK-001 Phase E2 can
+  now implement pairing calls against main. Cross-references both ways:
+  firmware RUN-2026-09-03-firmware-001 ↔ this repo's TASK-010.
+- **Test count is 141** (was 127): +14 CardPairingTest cases; the full
+  suite, Pint, `./run e2e` (22/22) and a live curl pairing verification
+  (20/20, 2 s window incl. expiry) all pass on this machine.
+- **DocumentationTest parity needles extended**: the bilingual API docs
+  and the Postman collection MUST cover the pairing endpoints — docs
+  cannot go stale now.
+- **pending_pairings is transient by design** (see
+  ARCHITECTURE/card-pairing-flow.md): rows expire or are consumed within
+  seconds; cards/events/points_ledger semantics are unchanged (a paired
+  card immediately tap-works; pairing awards nothing).
+- Deferred follow-ups (in the task file): dashboard "Pair new card"
+  button (explicitly out of scope of the firmware protocol), mass
+  pairing, reader-scoped arming, expired-row cleanup job.
