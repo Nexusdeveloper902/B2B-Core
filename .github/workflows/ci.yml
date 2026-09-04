@@ -462,10 +462,31 @@ jobs:
         # the phpunit-level empty value — the TASK-006 lesson.)
         # Skip-detection: a skip while a key is configured is a wiring bug
         # and must fail loudly, not hide behind a green job.
+        #
+        # Bounded transient retry (ADR-019): Google's 503 UNAVAILABLE
+        # "high demand... temporary" failure is documented-transient — the
+        # live gate retries ONLY the transport class (blocked reason
+        # llm_unavailable) up to 3 attempts. Invalid key, region, quota,
+        # model and wiring errors fail IMMEDIATELY; a transient that
+        # survives all attempts still fails red (OBS-007 honesty kept).
         run: |
           set -o pipefail
           status=0
-          ./run test feature --filter=NlQueryApiTest 2>&1 | tee live-smoke.log || status=$?
+          for attempt in 1 2 3; do
+            status=0
+            ./run test feature --filter=NlQueryApiTest 2>&1 | tee live-smoke.log || status=$?
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            # Retry decision is scoped to the transport-failure class by
+            # the blocked reason the API echoes (ADR-016 taxonomy).
+            if grep -q 'llm_unavailable' live-smoke.log && [ "$attempt" -lt 3 ]; then
+              echo "::warning::live-smoke attempt ${attempt} failed with a transient transport error (llm_unavailable) — retrying in 20s (Google: spikes in demand are usually temporary)."
+              sleep 20
+            else
+              break
+            fi
+          done
           if grep -q 'skipped' live-smoke.log; then
             echo "::error::Live-LLM smoke SKIPPED although GEMINI_API_KEY is configured — the key never reached the test (wiring bug, see TASK-006)."
             exit 1
