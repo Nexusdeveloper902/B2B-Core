@@ -10,6 +10,7 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -155,5 +156,20 @@ class UnpairCardsCommandTest extends TestCase
         // The guarded path also stays a noop (no prompt-driven crash).
         $this->artisan('cards:unpair')->assertSuccessful();
         $this->assertSame(0, Card::count());
+    }
+
+    #[Test]
+    public function a_not_ready_database_fails_fast_with_remediation_instead_of_a_traceback(): void
+    {
+        // A sqlite file that exists but was never migrated (setup
+        // interrupted mid-way): the counts run before ANY mutation, so
+        // the command must fail fast with the bilingual remediation,
+        // not a QueryException traceback.
+        Schema::drop('cards');
+
+        $this->artisan('cards:unpair', ['--force' => true])
+            ->assertExitCode(1)
+            ->expectsOutput('Database not ready (cards table unreachable) — run: ./run setup or ./run reset')
+            ->expectsOutput('Base de datos no lista (tabla cards inaccesible) — ejecuta: ./run setup o ./run reset');
     }
 }
