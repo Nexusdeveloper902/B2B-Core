@@ -2,9 +2,9 @@
 
 ## Repository state
 
-- Branch: main at the TASK-013 merge commit (feature/
-  TASK-013-unpair-cards-script merged --no-ff; see `git log` for the
-  hash)
+- Branch: main at b6be717 — the TASK-013 merge pair (73a5d20 main
+  merge + 7bb0673 friendly pre-`./run setup` guard fix, re-merged
+  b6be717 after the fresh-clone catch)
 - Working tree: clean
 - Test count: 167 passed / 3 skipped (was 161/3) — +5
   UnpairCardsCommandTest, +1 ScriptSuiteTest provider case

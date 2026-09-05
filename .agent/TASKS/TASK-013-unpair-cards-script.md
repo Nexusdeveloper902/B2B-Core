@@ -44,6 +44,9 @@ manual row delete.
 - [x] `./run quality` PASS (bash -n covers the new script via the
       maxdepth-1 scan; ScriptSuiteTest dispatch/help/docs parity green)
 - [x] `./run e2e` 22/22 (throwaway DB — unaffected by design)
+- [x] Fresh-clone catch fixed: pre-`./run setup` invocation now dies
+      bilingual-friendly (exit 1) instead of a QueryException traceback
+      (fix 7bb0673, re-merge b6be717) — proven in-tree and re-cloned
 - [x] SCRIPTS.md + SCRIPTS.es.md parity sections; pairing-flow doc note
 - [x] No new routes, no new write paths, no device-protocol changes
 
