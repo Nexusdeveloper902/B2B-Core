@@ -409,7 +409,7 @@ per student" bench report. Repository reality updates:
 - **The owner's bench loop is test-pinned**: pair → unpair → re-pair
   the SAME credential_uid to another student with clean event history
   (UnpairCardsCommandTest, 5 tests).
-- **Test count is 167** (was 161): +5 command tests, +1
+- **Test count is 168** (was 161): +6 command tests, +1
   ScriptSuiteTest provider case for the new `unpair` command.
 - No new routes, no new write paths — the device protocol is
   untouched; dev-side reset only, on purpose.

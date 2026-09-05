@@ -2,11 +2,12 @@
 
 ## Repository state
 
-- Branch: main at b6be717 — the TASK-013 merge pair (73a5d20 main
-  merge + 7bb0673 friendly pre-`./run setup` guard fix, re-merged
-  b6be717 after the fresh-clone catch)
+- Branch: main at 18a895e — TASK-013 landed as a merge pair (73a5d20
+  main merge; then two fresh-clone catches fixed on the feature branch
+  and re-merged: 7bb0673 preflight → b6be717, 9fbc576 fail-fast →
+  18a895e; records docs commit on top)
 - Working tree: clean
-- Test count: 167 passed / 3 skipped (was 161/3) — +5
+- Test count: 168 passed / 3 skipped (was 161/3) — +6
   UnpairCardsCommandTest, +1 ScriptSuiteTest provider case
 - B2B-Firmware: untouched this run (main @ f325b2e, TASK-007)
 
