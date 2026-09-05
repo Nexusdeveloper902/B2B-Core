@@ -16,13 +16,15 @@ class PendingPairing extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['student_id', 'reader_id', 'card_id', 'expires_at', 'consumed_at'];
+    protected $fillable = ['student_id', 'reader_id', 'card_id', 'expires_at', 'consumed_at',
+        'last_rejected_uid', 'last_rejected_reason', 'last_rejected_at'];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'datetime',
             'consumed_at' => 'datetime',
+            'last_rejected_at' => 'datetime',
         ];
     }
 

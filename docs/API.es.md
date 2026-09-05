@@ -251,7 +251,12 @@ sin mirar el monitor serial.
     "student_id": 3,
     "student_name": "Maria González",
     "expires_at": "2026-09-05T14:03:41+00:00",
-    "seconds_left": 23
+    "seconds_left": 23,
+    "last_rejection": {
+      "card_uid": "62041607",
+      "reason": "already_paired",
+      "at": "2026-09-05T14:03:12+00:00"
+    }
   },
   "last_pairing": {
     "card_uid": "62041607",
@@ -271,12 +276,20 @@ sin mirar el monitor serial.
 ```
 
 `pending` es `null` cuando no hay nada armado (o la ventana ya caducó).
-Las entradas de `recent_pairings` provienen de emparejamientos
-completados cuya columna de auditoría `pending_pairings.card_id`
-(TASK-011) apunta a la fila exacta de `cards` — las tarjetas demo
-sembradas (fabricadas por el seeder, nunca emparejadas) jamás aparecen
-aquí. `401`/`403` — invitado / no admin. Este endpoint nunca escribe:
-armar sigue siendo un POST y emparejar sigue siendo del lado del lector.
+`pending.last_rejection` (TASK-014) es `null` hasta que un toque sobre
+esta ventana sea RECHAZADO — un `422 already_paired` hacia el lector
+también sella la sesión armada, de modo que el panel puede MOSTRAR el
+UID rechazado, la razón y la remediación (toca una tarjeta distinta o
+ejecuta `./run unpair`) en lugar de contar en silencio; la ventana sigue
+armada, así que una tarjeta genuinamente fresca aún puede completarla.
+Un toque sin sesión armada responde `409` al lector y no sella nada (no
+hay ventana que reportar). Las entradas de `recent_pairings` provienen
+de emparejamientos completados cuya columna de auditoría
+`pending_pairings.card_id` (TASK-011) apunta a la fila exacta de
+`cards` — las tarjetas demo sembradas (fabricadas por el seeder, nunca
+emparejadas) jamás aparecen aquí. `401`/`403` — invitado / no admin.
+Este endpoint nunca escribe: armar sigue siendo un POST y emparejar
+sigue siendo del lado del lector.
 
 ## POST /api/v1/admin/cards/pair — emparejar una tarjeta leída (TASK-010, lado del dispositivo)
 

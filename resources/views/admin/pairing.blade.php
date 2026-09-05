@@ -54,11 +54,15 @@
         <div id="pairing-state" class="nl-answer {{ $activeSession ? 'answer-ok' : 'hidden' }}"
              aria-live="polite" data-initially-armed="{{ $activeSession ? '1' : '0' }}"
              @if($activeSession) data-student-name="{{ $activeSession->student?->name }}" @endif
-             @if($activeSession) data-seconds-left="{{ $activeSecondsLeft }}" @endif>
+             @if($activeSession) data-seconds-left="{{ $activeSecondsLeft }}" @endif
+             @if($activeRejectionNote) data-rejection-note="{{ $activeRejectionNote }}" @endif>
             @if($activeSession)
                 {{ __('app.pairing_armed_for', ['name' => $activeSession->student?->name]) }} —
                 {{ __('app.pairing_seconds_left', ['s' => $activeSecondsLeft]) }}
                 {{ __('app.pairing_go_tap') }}
+                @if($activeRejectionNote)
+                    {{ $activeRejectionNote }}
+                @endif
             @endif
         </div>
         @if(! $activeSession)
@@ -104,10 +108,30 @@
         var idleNote = document.getElementById('pairing-idle');
         var recentBody = document.getElementById('recent-body');
         var pollTimer = null;
-        var lastSeenUid = {{ $lastCardUid ? json_encode($lastCardUid) : 'null' }};
+        // TASK-014 — every JSON literal in this script is emitted through a
+        // raw (unescaped) echo: Blade's default escaped echo turns the
+        // quotes into HTML entities and kills the whole script — the
+        // original lastSeenUid line did exactly that after the FIRST
+        // completed pairing (dead buttons on every reload until the
+        // history was empty again). json_encode escapes slashes, so the
+        // output cannot break out of the script tag.
+        var lastSeenUid = {!! json_encode($lastCardUid) !!};
         var armed = stateBox.dataset.initiallyArmed === '1';
         var secondsLeft = parseInt(stateBox.dataset.secondsLeft || '0', 10);
         var armBtns = Array.prototype.slice.call(document.querySelectorAll('.arm-btn'));
+
+        // TASK-014 — localized templates for the rejection note (session
+        // locale, same convention as every other desk string).
+        var REJECTED_TPL = {!! json_encode(__('app.pairing_rejected', ['uid' => ':UID:', 'reason' => ':REASON:'])) !!};
+        var REASON_TEXT = {
+            'already_paired': {!! json_encode(__('app.pairing_reason_already_paired')) !!}
+        };
+        var rejectionNote = stateBox.dataset.rejectionNote || null;
+
+        var ARMED_TPL = {!! json_encode(__('app.pairing_armed_for', ['name' => ':NAME:']) . ' — ' . __('app.pairing_seconds_left', ['s' => ':S:']) . ' ' . __('app.pairing_go_tap')) !!};
+
+        var ACTIVE_MS = 2000;   // armed window: live countdown
+        var IDLE_MS = 15000;    // idle: quiet watch (cross-tab arm / success)
 
         function postJson(url) {
             return fetch(url, {
@@ -143,6 +167,21 @@
             stateBox.textContent = text;
         }
 
+        function armedLine() {
+            var line = ARMED_TPL.replace(':NAME:', stateBox.dataset.studentName || '')
+                .replace(':S:', secondsLeft);
+            // The armed window is still LIVE after a rejected tap — the note
+            // rides along with the countdown instead of replacing it.
+            if (rejectionNote) { line += ' ' + rejectionNote; }
+            return line;
+        }
+
+        function noteFromFeed(rejection) {
+            if (!rejection || !rejection.card_uid) return null;
+            var reason = REASON_TEXT[rejection.reason] || rejection.reason;
+            return REJECTED_TPL.replace(':UID:', rejection.card_uid).replace(':REASON:', reason);
+        }
+
         function renderRecent(list) {
             if (!recentBody || !list) return;
             recentBody.innerHTML = '';
@@ -165,55 +204,58 @@
                 secondsLeft -= 1;
             }
             if (secondsLeft > 0) {
-                var name = stateBox.dataset.studentName || '';
-                setState(
-                    '{{ __('app.pairing_armed_for', ['name' => ':NAME:']) }} — '.replace(':NAME:', name) +
-                    '{{ __('app.pairing_seconds_left', ['s' => ':S:']) }}'.replace(':S:', secondsLeft) + ' ' +
-                    '{{ __('app.pairing_go_tap') }}',
-                    true
-                );
+                setState(armedLine(), true);
             }
         }
 
-        function stopPolling() {
-            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-            armed = false;
+        // One poll function, two cadences: ACTIVE while an armed window is
+        // live, IDLE otherwise. IDLE is QUIET — it only speaks when a window
+        // appears (this tab or another one) or a new completion lands, so a
+        // finished/expired session can never be re-announced (TASK-014: the
+        // old "expired" tail loop overwrote the SUCCESS line seconds after
+        // a good pairing and kept re-lying every 3 s).
+        function setPollInterval(ms) {
+            if (pollTimer) { clearInterval(pollTimer); }
+            pollTimer = setInterval(poll, ms);
         }
 
-        function startPolling() {
-            if (pollTimer) return;
-            armed = true;
-            pollTimer = setInterval(function () {
-                getJson('/api/v1/admin/pairing/status').then(function (r) {
-                    if (!r.ok) return;
-                    var pending = r.data.pending;
-                    if (pending && pending.seconds_left > 0) {
-                        armed = true;
-                        secondsLeft = pending.seconds_left;
-                        stateBox.dataset.studentName = pending.student_name || '';
-                        return;
-                    }
-                    // Window closed: either a card got paired or it expired.
-                    var last = r.data.last_pairing;
-                    if (last && last.card_uid && last.card_uid !== lastSeenUid) {
-                        lastSeenUid = last.card_uid;
-                        setState('{{ __('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:']) }}'
-                            .replace(':UID:', last.card_uid)
-                            .replace(':NAME:', last.student_name || ''), true);
-                        renderRecent(r.data.recent_pairings);
-                        stopPolling();
-                        window.setTimeout(startPolling, 5000); // brief tail: catch a rapid re-arm
-                    } else if (!pending || pending.seconds_left === 0) {
-                        setState('{{ __('app.pairing_expired') }}', false);
-                        stopPolling();
-                        window.setTimeout(startPolling, 3000);
-                    }
-                });
-            }, 2000);
+        function poll() {
+            getJson('/api/v1/admin/pairing/status').then(function (r) {
+                if (!r.ok) return;
+                var pending = r.data.pending;
+                if (pending && pending.seconds_left > 0) {
+                    if (!armed) { setState(armedLine(), true); }  // armed elsewhere (other tab/phone)
+                    armed = true;
+                    secondsLeft = pending.seconds_left;
+                    stateBox.dataset.studentName = pending.student_name || '';
+                    rejectionNote = noteFromFeed(pending.last_rejection);
+                    if (rejectionNote) { setState(armedLine(), true); }
+                    setPollInterval(ACTIVE_MS);
+                    return;
+                }
+                // No live window: a card got paired, it expired, or nothing changed.
+                var last = r.data.last_pairing;
+                if (last && last.card_uid && last.card_uid !== lastSeenUid) {
+                    lastSeenUid = last.card_uid;
+                    setState({!! json_encode(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!}
+                        .replace(':UID:', last.card_uid)
+                        .replace(':NAME:', last.student_name || ''), true);
+                    renderRecent(r.data.recent_pairings);
+                    armed = false;
+                    rejectionNote = null;
+                    setPollInterval(IDLE_MS);
+                } else if (armed) {
+                    // We were following this window and it is gone without a
+                    // new completion — a REAL expiry (not a post-success lie).
+                    setState({!! json_encode(__('app.pairing_expired')) !!}, false);
+                    armed = false;
+                    rejectionNote = null;
+                    setPollInterval(IDLE_MS);
+                }
+            });
         }
 
-        // ONE global 1 s ticker (started once) — tick() no-ops when not armed;
-        // restarting the poll after success/expiry must never stack tickers.
+        // ONE global 1 s ticker (started once) — tick() no-ops when not armed.
         setInterval(tick, 1000);
 
         // Arm buttons -> the EXISTING TASK-010 endpoint, session-authed.
@@ -225,29 +267,30 @@
                         armBtns.forEach(function (b) { b.disabled = false; });
                         if (r.ok) {
                             armed = true;
+                            rejectionNote = null;   // new window, no rejections yet
                             stateBox.dataset.studentName = btn.dataset.name;
                             // expires_at comes back ISO; trust the server's window.
                             var ms = Date.parse(r.data.expires_at) - Date.now();
                             secondsLeft = Math.max(0, Math.round(ms / 1000));
-                            setState(
-                                '{{ __('app.pairing_armed_for', ['name' => ':NAME:']) }} — '.replace(':NAME:', btn.dataset.name) + ' ' +
-                                '{{ __('app.pairing_go_tap') }}',
-                                true
-                            );
-                            startPolling();
+                            setState(armedLine(), true);
+                            setPollInterval(ACTIVE_MS);
+                            poll();
                         } else {
-                            setState((r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
+                            setState((r.data && r.data.message) || {!! json_encode(__('app.error_generic')) !!}, false);
                         }
                     })
                     .catch(function () {
                         armBtns.forEach(function (b) { b.disabled = false; });
-                        setState('{{ __('app.error_generic') }}', false);
+                        setState({!! json_encode(__('app.error_generic')) !!}, false);
                     });
             });
         });
 
-        // An armed session found on page load: follow it live too.
-        if (armed) { startPolling(); }
+        // Start following immediately: ACTIVE when a window is live (page
+        // load / F5 mid-window — the rejection note comes with it), else
+        // the quiet idle watch.
+        setPollInterval(armed ? ACTIVE_MS : IDLE_MS);
+        poll();
     })();
 </script>
 @endsection

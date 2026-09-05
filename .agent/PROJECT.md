@@ -413,3 +413,28 @@ per student" bench report. Repository reality updates:
   ScriptSuiteTest provider case for the new `unpair` command.
 - No new routes, no new write paths — the device protocol is
   untouched; dev-side reset only, on purpose.
+
+## RUN-2026-09-05-core-012 — appended project facts (desk honesty, TASK-014)
+
+- **The pairing desk broke after the FIRST completed pairing** (the
+  owner's "button says nothing / F5 doesn't help" bench report,
+  reproduced live in a real browser): Blade's escaped echo rendered
+  the desk script's `lastSeenUid` JSON literal as `&quot;…&quot;` →
+  fatal SyntaxError → dead arm buttons + no polling on every reload.
+  Fixed by unescaped-echo JSON literals (+ regression test that
+  renders the desk WITH a completed pairing — the state TASK-011's
+  tests never exercised).
+- **Rejected taps are desk-visible now**: `pending_pairings.
+  last_rejected_uid/_reason/_at` (migration 000003), stamped inside
+  the pair transaction; `GET /api/v1/admin/pairing/status` reports
+  `pending.last_rejection`; the desk shows the bilingual note with the
+  remediation (different card / `./run unpair`). Window stays armed.
+  No new write path; device contract unchanged.
+- **Desk state machine honest**: success persists; "expired" only for
+  real expiry; 2 s active / 15 s quiet idle polling; the old eternal
+  3 s "Window expired" flashing loop (which overwrote the success line
+  ~7 s after a good pairing) is gone.
+- **Test count is 174** (was 168): +3 PairingStatusTest, +3
+  AdminPairingDeskTest (incl. the script-syntax regression).
+- Blade lessons recorded: `{{ }}` echo is forbidden for JS string
+  literals; brace pairs in comments are parsed by Blade (reword).

@@ -32,6 +32,14 @@ class PairingStatusController extends Controller
                 'student_name' => $active->student?->name,
                 'expires_at' => $active->expires_at->toIso8601String(),
                 'seconds_left' => max(0, (int) now()->diffInSeconds($active->expires_at)),
+                // TASK-014 — the latest REJECTED tap on this armed window
+                // (422 already_paired): the desk shows it with the fresh-card /
+                // ./run unpair remediation instead of counting down in silence.
+                'last_rejection' => $active->last_rejected_uid !== null ? [
+                    'card_uid' => $active->last_rejected_uid,
+                    'reason' => $active->last_rejected_reason,
+                    'at' => $active->last_rejected_at?->toIso8601String(),
+                ] : null,
             ] : null,
             'last_pairing' => $recent->isNotEmpty() ? [
                 'card_uid' => $recent->first()->card?->credential_uid,

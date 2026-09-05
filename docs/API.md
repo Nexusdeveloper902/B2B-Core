@@ -245,7 +245,12 @@ the session — no serial monitor needed.
     "student_id": 3,
     "student_name": "Maria González",
     "expires_at": "2026-09-05T14:03:41+00:00",
-    "seconds_left": 23
+    "seconds_left": 23,
+    "last_rejection": {
+      "card_uid": "62041607",
+      "reason": "already_paired",
+      "at": "2026-09-05T14:03:12+00:00"
+    }
   },
   "last_pairing": {
     "card_uid": "62041607",
@@ -265,11 +270,19 @@ the session — no serial monitor needed.
 ```
 
 `pending` is `null` when nothing is armed (or the window already
-expired). `recent_pairings` entries come from completed pairings whose
-`pending_pairings.card_id` audit column (TASK-011) points at the exact
-`cards` row — seeded demo cards (fabricated by the seeder, never paired)
-never appear here. `401`/`403` — guest / non-admin. This endpoint never
-writes: arming stays a POST, pairing stays reader-side.
+expired). `pending.last_rejection` (TASK-014) is `null` until a pair
+tap on this window is REJECTED — a `422 already_paired` answer to the
+reader also stamps the armed session, so the desk can SHOW the rejected
+UID, the reason, and the remediation (tap a different card or run
+`./run unpair`) instead of counting down in silence; the window stays
+armed, so a genuinely fresh card can still complete it. A tap with no
+armed session answers `409` to the reader and stamps nothing (there is
+no window to report on). `recent_pairings` entries come from completed
+pairings whose `pending_pairings.card_id` audit column (TASK-011)
+points at the exact `cards` row — seeded demo cards (fabricated by the
+seeder, never paired) never appear here. `401`/`403` — guest /
+non-admin. This endpoint never writes: arming stays a POST, pairing
+stays reader-side.
 
 ## POST /api/v1/admin/cards/pair — pair a scanned card (TASK-010, device-side)
 

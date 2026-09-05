@@ -34,6 +34,7 @@ POST /admin/students/{id}/arm         POST /admin/cards/pair
 | `pending_pairings` | `student_id` → `students` (cascade delete) | Transient: rows expire (45 s) or are consumed within seconds in normal use; they are never updated after consumption. |
 | `pending_pairings` | `reader_id` → `readers` (nullable, null on delete) | Stamped on consumption — which reader completed the pairing; null while armed. |
 | `pending_pairings` | `card_id` → `cards` (nullable, null on delete) | TASK-011 audit column: stamped at consumption — the exact cards row this pairing created. Powers the pairing desk's history; null on rows consumed before TASK-011 and while armed. |
+| `pending_pairings` | `last_rejected_uid` / `last_rejected_reason` / `last_rejected_at` (TASK-014, nullable) | Stamped when a pair tap on this armed window is REJECTED (422 already_paired) so the desk can show WHY pairing is not completing. Latest rejection wins; the window stays armed. |
 | `cards` | created by the pair step | `credential_uid` (unique) → `student_id`, status `active`. From then on the card is an ordinary tap identity. |
 | `events` | downstream | A paired card immediately produces ordinary tap events — pairing does NOT create an event. |
 | `points_ledger` | untouched | Pairing awards no points (the recycling earn loop is unchanged). |
@@ -54,6 +55,14 @@ POST /admin/students/{id}/arm         POST /admin/cards/pair
    the admin's session — no new write path, no client-supplied
    student identity on the device plane. Its status feed
    (GET /admin/pairing/status) is strictly read-only.
+6. **Every device-side outcome during an armed window is visible at
+   the desk** (TASK-014/ADR-024): a completed pair shows as success,
+   a REJECTED tap (422 already_paired) is stamped on the armed row
+   and rendered with its remediation (fresh card / `./run unpair`),
+   and "window expired" is only ever shown for a window that truly
+   expired — success is never overwritten with a false expiry, and
+   the desk script must stay valid JavaScript after the first
+   completed pairing (JSON literals render unescaped).
 
 ## Re-testing the flow (TASK-013, ADR-023)
 
