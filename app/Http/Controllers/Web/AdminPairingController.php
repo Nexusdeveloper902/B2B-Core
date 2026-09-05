@@ -28,6 +28,17 @@ class AdminPairingController extends Controller
         $active = $this->pairings->activeSession();
         $last = $this->pairings->recentCompletions(1)->first();
 
+        // TASK-014 — pre-render the armed window's rejection note (if any)
+        // so an F5 mid-window shows it immediately; the desk script keeps
+        // it fresh from the status feed afterwards.
+        $rejectionNote = null;
+        if ($active !== null && $active->last_rejected_uid !== null) {
+            $rejectionNote = __('app.pairing_rejected', [
+                'uid' => $active->last_rejected_uid,
+                'reason' => __('app.pairing_reason_'.$active->last_rejected_reason),
+            ]);
+        }
+
         return view('admin.pairing', [
             'students' => Student::orderBy('name')
                 ->with(['schoolClass', 'cards'])
@@ -38,6 +49,7 @@ class AdminPairingController extends Controller
                 : null,
             'recentPairings' => $this->pairings->recentCompletions(8),
             'lastCardUid' => $last?->card?->credential_uid,
+            'activeRejectionNote' => $rejectionNote,
         ]);
     }
 }

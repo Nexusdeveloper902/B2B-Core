@@ -96,6 +96,16 @@ class PairingService
                 ->first();
 
             if ($existing !== null) {
+                // TASK-014 — the rejection must be VISIBLE at the desk:
+                // stamp it on the armed window that witnessed it (the
+                // device gets the 422 JSON; without this, the operator
+                // saw only a countdown and then "window expired").
+                $pairing->update([
+                    'last_rejected_uid' => $credentialUid,
+                    'last_rejected_reason' => 'already_paired',
+                    'last_rejected_at' => now(),
+                ]);
+
                 return ['ok' => false, 'reason' => 'already_paired'];
             }
 

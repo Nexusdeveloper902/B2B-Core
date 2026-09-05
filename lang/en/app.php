@@ -95,6 +95,8 @@ return [
     'pairing_uid' => 'Card UID',
     'pairing_paired_at' => 'Paired at',
     'pairing_none_yet' => 'No cards paired yet.',
+    'pairing_rejected' => 'Card :uid was rejected — :reason. Tap a DIFFERENT card, or run ./run unpair on the server to make every card pairable again.',
+    'pairing_reason_already_paired' => 'that card is already paired',
     'current_card' => 'Current card',
     'no_card' => 'no card',
 

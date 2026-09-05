@@ -17,6 +17,11 @@ use Tests\TestCase;
  * state, the armed state (pending + countdown), the completed state
  * (last pairing + history, with the card_id audit trail stamped by the
  * pair step), and the auth surface (guest 401, teacher 403, admin ok).
+ *
+ * TASK-014 — the armed window also carries last_rejection: a rejected
+ * tap (422 already_paired) is stamped on the row and reported here so
+ * the desk can SHOW why pairing is not completing instead of counting
+ * down in silence and then claiming "window expired".
  */
 class PairingStatusTest extends TestCase
 {
@@ -83,10 +88,13 @@ class PairingStatusTest extends TestCase
             ->assertJsonPath('pending.student_name', $student->name)
             ->assertJsonStructure([
                 'status',
-                'pending' => ['student_id', 'student_name', 'expires_at', 'seconds_left'],
+                'pending' => ['student_id', 'student_name', 'expires_at', 'seconds_left', 'last_rejection'],
                 'last_pairing',
                 'recent_pairings',
             ]);
+
+        // A cleanly armed window reports NO rejection (TASK-014 field).
+        $this->assertNull($response->json('pending.last_rejection'));
 
         // Countdown: any value in (0, window] — never a hard-coded instant
         // (a 1 s tick between arm and read would flake an exact match).
@@ -139,6 +147,70 @@ class PairingStatusTest extends TestCase
             ->assertJsonPath('last_pairing.reader_label', $reader->label)
             ->assertJsonCount(1, 'recent_pairings')
             ->assertJsonPath('recent_pairings.0.card_uid', 'DESK00062041607');
+    }
+
+    #[Test]
+    public function a_rejected_tap_is_stamped_on_the_armed_window_and_reported(): void
+    {
+        // TASK-014 — the owner's bench scenario: pair one student, then
+        // tap the SAME (burned) card for the next one. The device gets
+        // 422; the desk must see WHY.
+        $reader = $this->reader('classroom');
+        $target = $this->studentWithoutCard();
+
+        $this->pairings()->arm($target);
+        $result = $this->pairings()->pair($reader, $this->cardUidFor('Maria González'));
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('already_paired', $result['reason']);
+
+        // The rejection is stamped on the pending row; the window stays ARMED.
+        $pairing = PendingPairing::latest('id')->first();
+        $this->assertNotNull($pairing->last_rejected_at);
+        $this->assertSame($this->cardUidFor('Maria González'), $pairing->last_rejected_uid);
+        $this->assertSame('already_paired', $pairing->last_rejected_reason);
+        $this->assertTrue($pairing->isActive(), 'a rejected tap must NOT consume the armed window');
+
+        $response = $this->actingAs($this->admin())->getStatus()->assertOk();
+        $response->assertJsonPath('pending.last_rejection.card_uid', $this->cardUidFor('Maria González'))
+            ->assertJsonPath('pending.last_rejection.reason', 'already_paired');
+        $this->assertNotNull($response->json('pending.last_rejection.at'));
+    }
+
+    #[Test]
+    public function a_rejected_tap_leaves_the_window_pairable_and_the_stamp_latest_wins(): void
+    {
+        $reader = $this->reader('classroom');
+        $target = $this->studentWithoutCard();
+
+        $this->pairings()->arm($target);
+
+        // Two rejections in the same window: the latest one is the stamp.
+        $this->pairings()->pair($reader, $this->cardUidFor('Maria González'));
+        $this->pairings()->pair($reader, $this->cardUidFor('Ana Martínez'));
+        $pairing = PendingPairing::latest('id')->first();
+        $this->assertSame($this->cardUidFor('Ana Martínez'), $pairing->last_rejected_uid);
+
+        // And the SAME window can still pair a genuinely fresh card.
+        $result = $this->pairings()->pair($reader, 'FRESH-AFTER-REJECTION');
+        $this->assertTrue($result['ok']);
+        $this->assertSame($target->id, $result['card']->student_id);
+    }
+
+    #[Test]
+    public function a_no_session_tap_has_no_row_to_stamp_and_no_pending_in_the_feed(): void
+    {
+        // Tap when nothing is armed: the device gets 409 (its own remediation
+        // path, TASK-004); there is no armed row to stamp and the feed's
+        // pending is null — nothing to report at the desk (by design).
+        $result = $this->pairings()->pair($this->reader('classroom'), 'ORPHAN123');
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('no_session', $result['reason']);
+
+        $this->actingAs($this->admin())->getStatus()
+            ->assertOk()
+            ->assertJsonPath('pending', null);
     }
 
     #[Test]

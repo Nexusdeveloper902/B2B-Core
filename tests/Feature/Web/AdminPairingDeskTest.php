@@ -114,6 +114,89 @@ class AdminPairingDeskTest extends TestCase
     }
 
     #[Test]
+    public function a_rejected_tap_is_server_rendered_on_the_armed_window(): void
+    {
+        // TASK-014 — F5 mid-window keeps the operator informed: the armed
+        // line rides with the rejection note (uid, reason, remediation).
+        $target = Student::create([
+            'name' => 'Estudiante Escritorio',
+            'grade' => '5°',
+            'pae_enrolled' => false,
+        ]);
+        $burnedUid = $this->cardUidFor('Maria González');
+
+        $pairings = $this->app->make(PairingService::class);
+        $pairings->arm($target);
+        $pairings->pair($this->reader('classroom'), $burnedUid);
+
+        $this->actingAs($this->admin())
+            ->get('/admin/pairing')
+            ->assertOk()
+            ->assertSeeText('Armed for Estudiante Escritorio')
+            ->assertSeeText('s left')
+            ->assertSeeText("Card {$burnedUid} was rejected")
+            ->assertSeeText('that card is already paired')
+            ->assertSeeText('./run unpair')
+            ->assertSee('data-rejection-note');
+    }
+
+    #[Test]
+    public function the_rejection_note_is_fully_translated_into_spanish(): void
+    {
+        $teacher = User::where('email', 'teacher@presence.test')->firstOrFail();
+        $target = Student::create([
+            'name' => 'Estudiante Escritorio ES',
+            'grade' => '5°',
+            'pae_enrolled' => false,
+        ]);
+        $burnedUid = $this->cardUidFor('Maria González');
+
+        $pairings = $this->app->make(PairingService::class);
+        $pairings->arm($target);
+        $pairings->pair($this->reader('classroom'), $burnedUid);
+
+        $this->actingAs($teacher)->get('/locale/es');
+
+        $this->actingAs($this->admin())
+            ->get('/admin/pairing')
+            ->assertOk()
+            ->assertSeeText("La tarjeta {$burnedUid} fue rechazada")
+            ->assertSeeText('esa tarjeta ya está emparejada')
+            ->assertSeeText('./run unpair');
+
+        $this->actingAs($teacher)->get('/locale/en');
+    }
+
+    #[Test]
+    public function the_desk_script_stays_valid_javascript_after_a_completed_pairing(): void
+    {
+        // TASK-014 regression — the owner's bench bug: after the FIRST
+        // completed pairing, lastCardUid became non-null and Blade's {{ }}
+        // escaped json_encode's quotes into &quot;, killing the WHOLE
+        // desk script (dead arm buttons + no polling on every reload).
+        // JSON literals inside the script MUST render unescaped ({!! !!}).
+        $student = Student::create([
+            'name' => 'Estudiante Script',
+            'grade' => '5°',
+            'pae_enrolled' => false,
+        ]);
+
+        $pairings = $this->app->make(PairingService::class);
+        $pairings->arm($student);
+        $pairings->pair(Reader::where('type', 'classroom')->firstOrFail(), 'DESKSCRIPT1');
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing');
+
+        $response->assertOk()
+            ->assertSee('var lastSeenUid = "DESKSCRIPT1";', false)
+            ->assertDontSee('&quot;');
+
+        // The script must also carry the TASK-014 templates as valid literals.
+        $this->assertStringContainsString('var REJECTED_TPL = "Card ', $response->getContent());
+        $this->assertStringContainsString('var ARMED_TPL = "Armed for ', $response->getContent());
+    }
+
+    #[Test]
     public function the_admin_nav_shows_the_pairing_desk_link(): void
     {
         $this->actingAs($this->admin())

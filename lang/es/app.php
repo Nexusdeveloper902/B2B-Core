@@ -94,6 +94,8 @@ return [
     'pairing_uid' => 'UID de tarjeta',
     'pairing_paired_at' => 'Emparejada',
     'pairing_none_yet' => 'Aún no hay tarjetas emparejadas.',
+    'pairing_rejected' => 'La tarjeta :uid fue rechazada — :reason. Toca una tarjeta DISTINTA, o ejecuta ./run unpair en el servidor para que toda tarjeta vuelva a ser emparejable.',
+    'pairing_reason_already_paired' => 'esa tarjeta ya está emparejada',
     'current_card' => 'Tarjeta actual',
     'no_card' => 'sin tarjeta',
 
