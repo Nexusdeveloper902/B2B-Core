@@ -31,6 +31,15 @@ resolve_php
 [ -d "$B2B_ROOT/vendor" ] || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
 ensure_env_and_key
 
+# Dev-DB preflight: the command reads the cards table, so a missing sqlite
+# file (fresh checkout, setup not yet run) must fail FRIENDLY instead of an
+# artisan QueryException traceback. Unset DB_CONNECTION counts as sqlite
+# (same convention as reset.sh — it is the .env.example default).
+DB_CONN="$(env_value DB_CONNECTION)"
+if { [ -z "$DB_CONN" ] || [ "$DB_CONN" = "sqlite" ]; } && [ ! -f "$B2B_ROOT/database/database.sqlite" ]; then
+    die "No dev database yet — run: ./run setup / Aún no hay BD de desarrollo — ejecuta: ./run setup"
+fi
+
 if [ "$FORCE" -eq 0 ]; then
     printf '%b\n' "${C_BOLD}${C_YELLOW}This deletes ALL cards (and their tap events) so every card becomes fresh and pairable again.${C_RESET}"
     printf '%b\n' "${C_BOLD}${C_YELLOW}Esto BORRA TODAS las tarjetas (y sus eventos) para que cada tarjeta vuelva a ser fresca y emparejable.${C_RESET}"
