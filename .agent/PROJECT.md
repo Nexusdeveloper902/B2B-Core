@@ -394,3 +394,22 @@ per student" bench report. Repository reality updates:
   FIRMWARE's Basic/Bearer scheme bug — fixed in B2B-Firmware TASK-007
   (its main @ f325b2e); the backend pair contract was verified correct
   and untouched here.
+
+## RUN-2026-09-05-core-011 — appended project facts (unpair-every-card script)
+
+- **`./run unpair` / `php artisan cards:unpair --force`** (TASK-013,
+  ADR-023) is the pairing bench reset: deletes every `cards` row (tap
+  events cascade, `pending_pairings.card_id` cleared, history rows
+  survive) so every credential is fresh/pairable again. Guarded by a
+  bilingual confirmation at BOTH layers unless `--force`; empty table
+  is a noop; `./run reset` restores the demo cards.
+- **Why delete and not student_id-null**: freshness = row
+  non-existence (ADR-020 invariant 2 — any existing row 422s); a
+  student_id-nulling "unpair" would be a fake one.
+- **The owner's bench loop is test-pinned**: pair → unpair → re-pair
+  the SAME credential_uid to another student with clean event history
+  (UnpairCardsCommandTest, 5 tests).
+- **Test count is 167** (was 161): +5 command tests, +1
+  ScriptSuiteTest provider case for the new `unpair` command.
+- No new routes, no new write paths — the device protocol is
+  untouched; dev-side reset only, on purpose.

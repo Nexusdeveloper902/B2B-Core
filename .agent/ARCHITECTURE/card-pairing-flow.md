@@ -54,3 +54,17 @@ POST /admin/students/{id}/arm         POST /admin/cards/pair
    the admin's session — no new write path, no client-supplied
    student identity on the device plane. Its status feed
    (GET /admin/pairing/status) is strictly read-only.
+
+## Re-testing the flow (TASK-013, ADR-023)
+
+Invariant 2 is exactly why a paired credential cannot be re-paired on the
+bench: a successful pair creates a `cards` row, and from then on that
+credential_uid is rejected (422). `./run unpair` (artisan `cards:unpair
+--force`) is the sanctioned testing reset: it deletes every `cards` row —
+restoring ALL credentials to fresh, pair-any-student state — cascading the
+tap events and clearing `pending_pairings.card_id` (history rows survive),
+leaving students/readers/users untouched. Guarded by a bilingual
+confirmation (`--force` to skip); `./run reset` is the heavier alternative
+(full reseed). This is a dev-side command on purpose: production card
+reassignment remains a deliberate data operation, never a device-side
+action.

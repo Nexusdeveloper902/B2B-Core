@@ -48,6 +48,8 @@ Commands / Comandos:
              / Estado de la app: entorno, base de datos, servidores, clasificador
   reset      Fresh database + reseed demo data (asks unless --force)
              / Base de datos nueva + datos demo (pregunta salvo --force)
+  unpair     Unpair every card so all credentials are fresh again (asks unless --force)
+             / Desvincula todas las tarjetas para que toda credencial vuelva a estar fresca (pregunta salvo --force)
   model      Local model server: start | stop | status | run
              / Servidor del modelo local: start | stop | status | run
   llm-check  One live Gemini call — exact verdict for THIS machine
@@ -87,6 +89,7 @@ script_for() {
         doctor)    printf '%s\n' "$B2B_ROOT/scripts/doctor.sh" ;;
         status)    printf '%s\n' "$B2B_ROOT/scripts/status.sh" ;;
         reset)     printf '%s\n' "$B2B_ROOT/scripts/reset.sh" ;;
+        unpair)    printf '%s\n' "$B2B_ROOT/scripts/unpair.sh" ;;
         model|model-server) printf '%s\n' "$B2B_ROOT/scripts/model-server.sh" ;;
         llm-check)   printf '%s\n' "$B2B_ROOT/scripts/llm-check.sh" ;;
         toolchain) printf '%s\n' "$B2B_ROOT/scripts/provision-toolchain.sh" ;;
