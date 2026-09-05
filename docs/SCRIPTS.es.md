@@ -156,6 +156,37 @@ frescos (`migrate:fresh --seed`), reimprimiendo todas las credenciales. La BD
 desechable del e2e no se afecta. Se niega a operar si `DB_CONNECTION` no es
 sqlite.
 
+## `unpair`
+
+```bash
+./run unpair               # pide confirmación
+./run unpair --force       # sin pregunta (ciclos de banco/pruebas)
+# forma artisan directa (misma guarda, mismo comportamiento):
+php artisan cards:unpair [--force]
+```
+
+**Reset de pruebas para el flujo de emparejamiento (TASK-013, ADR-023):**
+borra todas las filas de `cards` para que cada credential_uid vuelva a estar
+*fresca* — emparejable por el flujo normal de dos pasos (armar en el panel,
+tocar en el lector). Esto es lo que corres entre pasadas de banco del
+emparejamiento: tras un emparejamiento exitoso la credencial queda quemada
+(existe una fila → 422), y "unpair" es el camino de un comando de vuelta a un
+estado limpio.
+
+Qué borra / qué conserva (reflejando el contrato de FKs del esquema):
+
+| Dato | Efecto |
+| --- | --- |
+| `cards` | **todas las filas borradas** — cada credencial vuelve a ser fresca |
+| `events` (toques) | borrados (todos pertenecen a tarjetas) |
+| `pending_pairings.card_id` | limpiado — las **filas** de historial sobreviven (auditoría) |
+| estudiantes, lectores, usuarios, puntos, reciclaje | intactos |
+
+Imprime conteos honestos bilingües antes y después; pide confirmación salvo
+`--force` (tanto el wrapper `./run` como el comando artisan mismo tienen
+guarda). `./run reset` restaura las tarjetas demo sembradas si las quieres de
+vuelta.
+
 ## `model`
 
 ```bash

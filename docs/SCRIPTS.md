@@ -154,6 +154,35 @@ Wipes **the dev sqlite database only** and rebuilds it with fresh demo data
 (`migrate:fresh --seed`), re-printing all credentials. The e2e throwaway DB is
 unaffected. Refuses to operate when `DB_CONNECTION` is not sqlite.
 
+## `unpair`
+
+```bash
+./run unpair               # asks for confirmation
+./run unpair --force       # no prompt (bench/testing loops)
+# direct artisan form (same guard, same behavior):
+php artisan cards:unpair [--force]
+```
+
+**Testing reset for the pairing flow (TASK-013, ADR-023):** deletes every
+`cards` row so every credential_uid is *fresh* again — pairable through the
+normal arm-then-pair flow (`arm` on the dashboard, tap on the device). This is
+what you run between bench passes of pairing: after a successful pair the
+credential is burned (a row exists → 422), and "unpair" is the one-command way
+back to a clean slate.
+
+What it deletes / keeps (mirroring the schema's FK contract):
+
+| Data | Effect |
+| --- | --- |
+| `cards` | **all rows deleted** — every credential becomes fresh |
+| `events` (taps) | deleted (they all belong to cards) |
+| `pending_pairings.card_id` | cleared — history **rows** survive (audit trail) |
+| students, readers, users, points, recycling | untouched |
+
+Prints honest bilingual counts before and after; asks for confirmation unless
+`--force` (both the `./run` wrapper and the artisan command itself guard).
+`./run reset` restores the seeded demo cards if you want them back.
+
 ## `model`
 
 ```bash
