@@ -409,6 +409,40 @@
       }
     },
     {
+      "name": "10 Admin — Pairing desk status / Estado del escritorio de emparejamiento",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/pairing/status",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "pairing",
+            "status"
+          ]
+        },
+        "description": "TASK-011 — read-only pairing-desk state: the armed session (student + seconds left), the last completed pairing, and the 8 most recent completions. The dashboard \"Pair cards\" page polls this while a session is armed.\n\nResponse 200: { status, pending: {student_id, student_name, expires_at, seconds_left} | null, last_pairing: {card_uid, student_name, paired_at, reader_label} | null, recent_pairings: [...] }\nResponse 401/403: guest / non-admin.\n\nThis endpoint never writes: arming stays a POST, pairing stays reader-side.\n\nSugerencia: Accept-Language: es para mensajes en español."
+      }
+    },
+    {
       "name": "07 Health / Salud",
       "request": {
         "method": "GET",

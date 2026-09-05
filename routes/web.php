@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AdminDashboardController;
+use App\Http\Controllers\Web\AdminPairingController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\ParentViewController;
 use App\Http\Controllers\Web\TeacherDashboardController;
@@ -45,6 +46,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin', [AdminDashboardController::class, 'dashboard'])
         ->middleware('role:admin')
         ->name('admin.dashboard');
+
+    // TASK-011 — the pairing desk: one-click arming page (admin-only).
+    // The arming POST itself goes to the existing TASK-010 API endpoint.
+    Route::get('/admin/pairing', [AdminPairingController::class, 'page'])
+        ->middleware('role:admin')
+        ->name('admin.pairing');
 
     // Simplified parent view (admin/teacher selectable stand-in — a real
     // parent auth system is explicitly out of scope for this phase).

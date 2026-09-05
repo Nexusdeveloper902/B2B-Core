@@ -341,3 +341,30 @@ this repo was untouched. Repository reality updates:
 - Deferred follow-ups (in the task file): dashboard "Pair new card"
   button (explicitly out of scope of the firmware protocol), mass
   pairing, reader-scoped arming, expired-row cleanup job.
+
+## RUN-2026-09-05-core-009 — appended project facts (dashboard pairing desk)
+
+This run built the pairing desk (TASK-011, ADR-021) — the ADR-020
+deferred follow-up, triggered by the owner's "no manual post request
+per student" bench report. Repository reality updates:
+
+- **Pairing arming is a UI action now**: `/admin/pairing` ("Pair
+  cards" in the admin nav, session-authed, bilingual) — per-student
+  "Arm pairing" buttons POST to the UNCHANGED TASK-010 endpoint via
+  statefulApi (same pattern as the mode/redeem/NL forms). No PAT, no
+  curl, and no new write path exists.
+- **`GET /api/v1/admin/pairing/status`** is the read-only feed the
+  page polls (~2 s while a session is armed): pending session
+  (student + seconds_left), last completed pairing, 8-row history.
+  DocumentationTest now pins its coverage in API.md/.es.md + Postman.
+- **`pending_pairings.card_id`** (nullable FK, stamped in
+  `PairingService::pair()`) is the audit column making the history
+  exact: a completed pairing points at the very cards row it created.
+  Seeded demo cards never appear in the history.
+- **Test count is 155** (was 141): +14 (7 Api PairingStatusTest, 7 Web
+  AdminPairingDeskTest — incl. ES translation and role walls).
+- The page follows the no-build stack (Blade + inline JS, Event Ledger
+  tokens/components, server-rendered state first); the polling JS is
+  bench-verifiable only — recorded as the honesty boundary.
+- Cross-repo note: B2B-Firmware's canonical PAIRING.md should point at
+  this page as the recommended arming path (that repo's next task).

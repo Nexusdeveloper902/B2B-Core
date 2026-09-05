@@ -6,6 +6,7 @@ use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\Reader;
 use App\Models\Student;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,6 +34,35 @@ class PairingService
             'student_id' => $student->id,
             'expires_at' => now()->addSeconds($this->windowSeconds),
         ]);
+    }
+
+    /**
+     * TASK-011 — the currently active pending pairing (the one the next
+     * fresh card scan would consume), or null when nothing is armed.
+     * Same ordering rule as pair(): most recent armed wins.
+     */
+    public function activeSession(): ?PendingPairing
+    {
+        return PendingPairing::active()
+            ->orderByDesc('id')
+            ->with('student')
+            ->first();
+    }
+
+    /**
+     * TASK-011 — completed pairings (consumed + card stamped), newest
+     * first, eager-loaded for the pairing desk's history list.
+     *
+     * @return Collection<int, PendingPairing>
+     */
+    public function recentCompletions(int $limit = 8): Collection
+    {
+        return PendingPairing::whereNotNull('consumed_at')
+            ->whereNotNull('card_id')
+            ->with(['student', 'card', 'reader'])
+            ->orderByDesc('consumed_at')
+            ->limit($limit)
+            ->get();
     }
 
     /**
@@ -77,6 +107,7 @@ class PairingService
             $pairing->update([
                 'consumed_at' => now(),
                 'reader_id' => $reader->id,
+                'card_id' => $card->id, // TASK-011: audit trail for the pairing desk
             ]);
 
             return [

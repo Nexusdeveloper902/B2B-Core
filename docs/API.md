@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. Admin/teacher roles enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. Admin/teacher roles enforced per endpoint. |
 
 **Localization:** device-facing messages are bilingual. Send
 `Accept-Language: es` for Spanish (e.g. `{"message": "Tarjeta no reconocida"}`);
@@ -192,6 +192,67 @@ sequential by nature). Arming again simply creates a newer pairing.
 ```
 
 `401`/`403` — guest / non-admin (teacher cannot arm). `404` — unknown student.
+
+> **Dashboard shortcut (TASK-011)**: the admin dashboard has a **Pair
+> cards** page (`/admin/pairing`, admin session) with one-click **Arm
+> pairing** buttons per student — the buttons call THIS endpoint with
+> your logged-in session, so no PAT and no curl are needed. It polls
+> `GET /api/v1/admin/pairing/status` (below) and shows the live
+> countdown, the moment the card gets paired, and the recent history.
+
+## GET /api/v1/admin/pairing/status — pairing desk state (TASK-011, admin-only, read-only)
+
+Read-only state for the dashboard pairing desk: which session is armed
+right now (if any), the last completed pairing, and the 8 most recent
+completions. The page polls this every ~2 s while a session is armed, so
+the operator sees the card→student link the moment the reader consumes
+the session — no serial monitor needed.
+
+**Response `200`** (nothing armed, nothing paired yet):
+
+```json
+{
+  "status": "ok",
+  "pending": null,
+  "last_pairing": null,
+  "recent_pairings": []
+}
+```
+
+**Response `200`** (session armed; one card paired historically):
+
+```json
+{
+  "status": "ok",
+  "pending": {
+    "student_id": 3,
+    "student_name": "Maria González",
+    "expires_at": "2026-09-05T14:03:41+00:00",
+    "seconds_left": 23
+  },
+  "last_pairing": {
+    "card_uid": "62041607",
+    "student_name": "Carlos Pérez",
+    "paired_at": "2026-09-05T13:58:02+00:00",
+    "reader_label": "Demo Reader — Classroom/PAE"
+  },
+  "recent_pairings": [
+    {
+      "card_uid": "62041607",
+      "student_name": "Carlos Pérez",
+      "paired_at": "2026-09-05T13:58:02+00:00",
+      "reader_label": "Demo Reader — Classroom/PAE"
+    }
+  ]
+}
+```
+
+`pending` is `null` when nothing is armed (or the window already
+expired). `recent_pairings` entries come from completed pairings whose
+`pending_pairings.card_id` audit column (TASK-011) points at the exact
+`cards` row — seeded demo cards (fabricated by the seeder, never paired)
+never appear here. `401`/`403` — guest / non-admin. This endpoint never
+writes: arming stays a POST, pairing stays reader-side.
 
 ## POST /api/v1/admin/cards/pair — pair a scanned card (TASK-010, device-side)
 

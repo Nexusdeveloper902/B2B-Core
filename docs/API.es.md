@@ -15,7 +15,7 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Roles admin/teacher aplicados por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Roles admin/teacher aplicados por endpoint. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
 `Accept-Language: es` para español (p. ej. `{"message": "Tarjeta no reconocida"}`);
@@ -194,6 +194,71 @@ nuevo simplemente crea un emparejamiento más nuevo.
 ```
 
 `401`/`403` — invitado / no admin (un profesor no puede armar). `404` — estudiante desconocido.
+
+> **Atajo del panel (TASK-011)**: el panel de administración tiene una
+> página **Emparejar tarjetas** (`/admin/pairing`, sesión de admin) con
+> botones **Armar emparejamiento** de un clic por estudiante — los
+> botones llaman a ESTE endpoint con tu sesión iniciada, así que no
+> necesitas PAT ni curl. La página consulta `GET
+> /api/v1/admin/pairing/status` (abajo) y muestra la cuenta regresiva en
+> vivo, el momento exacto en que la tarjeta queda emparejada y el
+> historial reciente.
+
+## GET /api/v1/admin/pairing/status — estado del escritorio de emparejamiento (TASK-011, solo admin, solo lectura)
+
+Estado de solo lectura para el escritorio de emparejamiento del panel:
+>qué sesión está armada ahora (si hay alguna), el último emparejamiento
+completado y los 8 más recientes. La página la consulta cada ~2 s
+mientras hay una sesión armada, de modo que el operador ve el vínculo
+tarjeta→estudiante en el instante en que el lector consume la sesión —
+sin mirar el monitor serial.
+
+**Respuesta `200`** (nada armado, nada emparejado aún):
+
+```json
+{
+  "status": "ok",
+  "pending": null,
+  "last_pairing": null,
+  "recent_pairings": []
+}
+```
+
+**Respuesta `200`** (sesión armada; una tarjeta emparejada antes):
+
+```json
+{
+  "status": "ok",
+  "pending": {
+    "student_id": 3,
+    "student_name": "Maria González",
+    "expires_at": "2026-09-05T14:03:41+00:00",
+    "seconds_left": 23
+  },
+  "last_pairing": {
+    "card_uid": "62041607",
+    "student_name": "Carlos Pérez",
+    "paired_at": "2026-09-05T13:58:02+00:00",
+    "reader_label": "Demo Reader — Classroom/PAE"
+  },
+  "recent_pairings": [
+    {
+      "card_uid": "62041607",
+      "student_name": "Carlos Pérez",
+      "paired_at": "2026-09-05T13:58:02+00:00",
+      "reader_label": "Demo Reader — Classroom/PAE"
+    }
+  ]
+}
+```
+
+`pending` es `null` cuando no hay nada armado (o la ventana ya caducó).
+Las entradas de `recent_pairings` provienen de emparejamientos
+completados cuya columna de auditoría `pending_pairings.card_id`
+(TASK-011) apunta a la fila exacta de `cards` — las tarjetas demo
+sembradas (fabricadas por el seeder, nunca emparejadas) jamás aparecen
+aquí. `401`/`403` — invitado / no admin. Este endpoint nunca escribe:
+armar sigue siendo un POST y emparejar sigue siendo del lado del lector.
 
 ## POST /api/v1/admin/cards/pair — emparejar una tarjeta leída (TASK-010, lado del dispositivo)
 

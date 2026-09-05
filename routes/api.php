@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ArmPairingController;
 use App\Http\Controllers\Api\V1\CardPairingController;
 use App\Http\Controllers\Api\V1\NlQueryController;
+use App\Http\Controllers\Api\V1\PairingStatusController;
 use App\Http\Controllers\Api\V1\ReaderModeController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
 use App\Http\Controllers\Api\V1\RedemptionController;
@@ -62,6 +63,12 @@ Route::prefix('v1')->group(function () {
     Route::post('/admin/students/{student}/arm-pairing', [ArmPairingController::class, 'store'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.students.arm-pairing');
+
+    // TASK-011 — read-only pairing status for the dashboard pairing desk
+    // (active window, last completed pairing, recent history).
+    Route::get('/admin/pairing/status', [PairingStatusController::class, 'show'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.pairing.status');
 
     // Phase D — redemption (admin or teacher; desk interaction).
     Route::post('/students/{student}/redeem', [RedemptionController::class, 'store'])

@@ -103,6 +103,7 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 | `/login` | — | EN/ES login |
 | `/teacher` | teacher (or admin) | Today's class attendance: present / late (after configurable cutoff) / absent |
 | `/admin` | admin | School-wide stats (attendance, PAE breakfast/lunch, recycling items+points), reader mode control, NL query box, redemption desk, parent-view links |
+| `/admin/pairing` | admin | **Pairing desk** (TASK-011): one-click "Arm pairing" per student, live 45 s countdown, the moment the paired card lands, and recent pairing history — pairs new cards without curl or a PAT |
 | `/parent/students/{id}` | admin/teacher | One student's full event timeline (simplified parent stand-in — a real parent-auth system is intentionally out of scope) |
 
 Language switch: `EN·ES` in the navbar (session-based).

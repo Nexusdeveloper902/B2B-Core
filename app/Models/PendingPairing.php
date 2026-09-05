@@ -16,7 +16,7 @@ class PendingPairing extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['student_id', 'reader_id', 'expires_at', 'consumed_at'];
+    protected $fillable = ['student_id', 'reader_id', 'card_id', 'expires_at', 'consumed_at'];
 
     protected function casts(): array
     {
@@ -34,6 +34,12 @@ class PendingPairing extends Model
     public function reader(): BelongsTo
     {
         return $this->belongsTo(Reader::class);
+    }
+
+    /** TASK-011 — the exact cards row this pairing created (audit trail). */
+    public function card(): BelongsTo
+    {
+        return $this->belongsTo(Card::class);
     }
 
     /** Active = not consumed and not expired. */

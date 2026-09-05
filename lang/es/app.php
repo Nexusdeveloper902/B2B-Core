@@ -78,6 +78,25 @@ return [
     'material' => 'Material',
     'no_events' => 'Todavía no hay eventos registrados para este estudiante.',
 
+    // Escritorio de emparejamiento (TASK-011)
+    'action' => 'Acción',
+    'pairing_desk' => 'Emparejar tarjetas',
+    'pairing_desk_intro' => 'Arma un emparejamiento para un estudiante y luego acerca una tarjeta NUEVA al lector dentro de la ventana. El vínculo tarjeta-estudiante siempre es una decisión de admin tomada aquí — nunca en el lector.',
+    'pairing_arm' => 'Armar emparejamiento',
+    'pairing_armed_for' => 'Armada para :name',
+    'pairing_seconds_left' => 'quedan :s s',
+    'pairing_go_tap' => 'Ahora acerca una tarjeta NUEVA al lector.',
+    'pairing_no_session' => 'No hay sesión de emparejamiento armada.',
+    'pairing_expired' => 'La ventana expiró sin tarjeta — arma de nuevo.',
+    'pairing_success' => 'Tarjeta :uid emparejada con :name.',
+    'pairing_status' => 'Estado del emparejamiento',
+    'pairing_recent' => 'Tarjetas emparejadas recientemente',
+    'pairing_uid' => 'UID de tarjeta',
+    'pairing_paired_at' => 'Emparejada',
+    'pairing_none_yet' => 'Aún no hay tarjetas emparejadas.',
+    'current_card' => 'Tarjeta actual',
+    'no_card' => 'sin tarjeta',
+
     // Estados genéricos
     'ok' => 'OK',
     'saving' => 'Guardando…',
