@@ -21,6 +21,12 @@ Base URL (local dev): `http://localhost:8000`
 `Accept-Language: es` for Spanish (e.g. `{"message": "Tarjeta no reconocida"}`);
 English is the default and the fallback for any other language.
 
+**Timezone (TASK-015 / ADR-025):** the platform runs on **Colombia local
+time — `America/Bogota` (COT, fixed UTC−5, no DST)**. `occurred_at`
+timestamps are Bogota wall time; ISO 8601 strings emitted by the API
+carry the explicit `-05:00` offset. `client_timestamp` values may use
+any ISO 8601 offset and are honored as-is.
+
 **Using the dashboard from another device on your LAN (TASK-012).** The
 dashboard pages and their `/api/*` fetches are session-authenticated for
 same-origin "stateful" requests. Sanctum's stateful list defaults to

@@ -21,6 +21,13 @@ URL base (desarrollo local): `http://localhost:8000`
 `Accept-Language: es` para español (p. ej. `{"message": "Tarjeta no reconocida"}`);
 el inglés es el valor por defecto y el respaldo para cualquier otro idioma.
 
+**Zona horaria (TASK-015 / ADR-025):** la plataforma corre en **hora
+local de Colombia — `America/Bogota` (COT, UTC−5 fijo, sin horario de
+verano)**. Los `occurred_at` son hora local de Bogotá; las cadenas
+ISO 8601 que emite la API llevan el desfase explícito `-05:00`. Los
+`client_timestamp` pueden usar cualquier desfase ISO 8601 y se respetan
+tal cual.
+
 **Usar el panel desde otro dispositivo en tu LAN (TASK-012).** Las
 páginas del panel y sus fetch a `/api/*` se autentican por sesión cuando
 la petición es «stateful» (mismo origen). La lista stateful de Sanctum
