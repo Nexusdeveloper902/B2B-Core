@@ -21,6 +21,24 @@ URL base (desarrollo local): `http://localhost:8000`
 `Accept-Language: es` para español (p. ej. `{"message": "Tarjeta no reconocida"}`);
 el inglés es el valor por defecto y el respaldo para cualquier otro idioma.
 
+**Usar el panel desde otro dispositivo en tu LAN (TASK-012).** Las
+páginas del panel y sus fetch a `/api/*` se autentican por sesión cuando
+la petición es «stateful» (mismo origen). La lista stateful de Sanctum
+por defecto es localhost/127.0.0.1/`APP_URL` **más el host que sirve
+cada petición** — así que abrir el panel desde un teléfono en la misma
+red (p. ej. `http://192.168.1.6:8000`) funciona sin ajustes: inicia
+sesión en el teléfono y el botón «Armar emparejamiento» se autentica con
+esa sesión. Sirve en todas las interfaces (`php artisan serve
+--host=0.0.0.0` o `./run serve`) para que el teléfono alcance al host.
+Antes de TASK-012 todo origen distinto de localhost respondía `401
+Unauthenticated` en las rutas API aunque el login web hubiera funcionado.
+Para fijar el acceso stateful a una lista explícita de hosts, define
+`SANCTUM_STATEFUL_DOMAINS` en `.env` (reemplaza el valor por defecto por
+completo — incluye el host del escritorio y el del teléfono) y reinicia
+el servidor. Los endpoints de dispositivos no cambian: los lectores
+nunca envían Referer/Origin, así que su flujo con clave Bearer sigue
+siendo sin estado.
+
 ---
 
 ## POST /api/v1/events/tap — el bucle central de presencia (Fase B)

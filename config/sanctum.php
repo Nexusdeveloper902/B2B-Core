@@ -19,10 +19,24 @@ return [
     */
 
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
+        '%s%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
         Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
+        // TASK-012: the host actually serving each request is first-party.
+        // The dashboard (pairing desk) is used from phones on the LAN —
+        // e.g. http://192.168.1.6:8000 — and Sanctum only authenticates
+        // /api/* calls via the session when the request's Referer/Origin
+        // host matches this list. Without the request host here, a phone
+        // logs in fine (web routes) and then gets 401 "Unauthenticated"
+        // on the very next arm-pairing fetch. Stateful requests still run
+        // the full session + CSRF pipeline; device endpoints are
+        // unaffected (readers send no Referer/Origin).
+        // / TASK-012: el host que sirve cada peticion es de confianza —
+        // el panel se usa desde telefonos en la LAN; sin esto esos
+        // origenes no son stateful y el fetch responde 401 tras un login
+        // correcto. Las peticiones stateful siguen pasando por sesion +
+        // CSRF; los endpoints de dispositivos no cambian.
+        Sanctum::currentRequestHost(),
     ))),
 
     /*

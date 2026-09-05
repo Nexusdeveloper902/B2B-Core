@@ -21,6 +21,23 @@ Base URL (local dev): `http://localhost:8000`
 `Accept-Language: es` for Spanish (e.g. `{"message": "Tarjeta no reconocida"}`);
 English is the default and the fallback for any other language.
 
+**Using the dashboard from another device on your LAN (TASK-012).** The
+dashboard pages and their `/api/*` fetches are session-authenticated for
+same-origin "stateful" requests. Sanctum's stateful list defaults to
+localhost/127.0.0.1/`APP_URL` **plus the host actually serving each
+request** — so opening the dashboard from a phone on the same network
+(e.g. `http://192.168.1.6:8000`) works out of the box: log in on the
+phone and the "Arm pairing" button authenticates with that session.
+Serve on all interfaces (`php artisan serve --host=0.0.0.0` or
+`./run serve`) so the phone can reach the host. Before TASK-012 every
+non-localhost origin answered `401 Unauthenticated` on the API routes
+even though the web login itself had succeeded. To pin stateful access
+to an explicit host list instead, set `SANCTUM_STATEFUL_DOMAINS` in
+`.env` (this replaces the default entirely — include your desktop and
+phone hosts) and restart the server. Device endpoints are unaffected:
+readers never send a Referer/Origin, so their Bearer-key flows stay
+stateless.
+
 ---
 
 ## POST /api/v1/events/tap — the core presence loop (Phase B)
