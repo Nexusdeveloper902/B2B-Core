@@ -368,3 +368,29 @@ per student" bench report. Repository reality updates:
   bench-verifiable only — recorded as the honesty boundary.
 - Cross-repo note: B2B-Firmware's canonical PAIRING.md should point at
   this page as the recommended arming path (that repo's next task).
+
+## RUN-2026-09-05-core-010 — appended project facts (stateful LAN access)
+
+- **The default Sanctum stateful list includes the request's own host**
+  (config/sanctum.php, `Sanctum::currentRequestHost()` placeholder —
+  TASK-012/ADR-022): any host that serves the app is first-party for
+  its same-origin dashboard fetches. Phones on the LAN log in and drive
+  the pairing desk with no .env change (DHCP-proof).
+  `SANCTUM_STATEFUL_DOMAINS`, when set, replaces the default entirely
+  (the empty-uncommented-value trap is documented in .env.example).
+- **Why this exists**: web login from a phone worked (host-only session
+  cookie) but `auth:sanctum` API fetches 401'd — Sanctum session-auth
+  applies only to requests whose Referer/Origin host is stateful, and
+  the stock default covers only localhost/127.0.0.1/::1/APP_URL.
+- **Device endpoints are unaffected**: readers send no Referer/Origin,
+  so `fromFrontend()` is false and their Bearer flow stays stateless
+  (pinned by StatefulDomainMatchingTest: no-referer → not stateful).
+- **Testing pitfall (recorded in RUN-010)**: full-stack session tests
+  cannot honestly diff this middleware — the guard/session are shared
+  across requests within a test, keeping users authenticated
+  regardless; the fromFrontend() level is what tests pin.
+- **Test count is 161** (was 155): +6 StatefulDomainMatchingTest.
+- Cross-repo note: the same bench session's device-side 401s were the
+  FIRMWARE's Basic/Bearer scheme bug — fixed in B2B-Firmware TASK-007
+  (its main @ f325b2e); the backend pair contract was verified correct
+  and untouched here.
