@@ -438,3 +438,21 @@ per student" bench report. Repository reality updates:
   AdminPairingDeskTest (incl. the script-syntax regression).
 - Blade lessons recorded: `{{ }}` echo is forbidden for JS string
   literals; brace pairs in comments are parsed by Blade (reword).
+
+## RUN-2026-09-06-core-013 — appended project facts (Colombia timezone)
+
+- **The platform runs on Colombia school time** (TASK-015, ADR-025):
+  `America/Bogota` (COT, fixed UTC−5, no DST) via
+  `APP_TIMEZONE`-overridable config default. ONE timezone, wall-clock
+  semantics end to end — `now()`, Eloquent datetime storage, dashboard
+  clocks and "today" boundaries are the same Bogota local time; API
+  ISO 8601 strings carry `-05:00` explicitly. UTC-store + display
+  conversion rejected (single-school LAN: nothing gained, a conversion
+  bug class bought).
+- **No-DST is load-bearing**: COT has no transitions, so naive `H:i`
+  comparisons (the 08:15 late cutoff) are school-local wall time
+  forever — pinned by a test asserting −05:00 in January AND July.
+- **Test count is 178** (was 174): +4 TimezoneTest; `DocumentationTest`
+  pins the `America/Bogota` note in API.md EN/ES.
+- Carry-over bench rows created pre-change are UTC-stamped (read 5 h
+  off); `./run reset` is the sanctioned re-seed.

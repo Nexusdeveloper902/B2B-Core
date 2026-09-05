@@ -60,12 +60,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions. The platform
+    | runs at a Colombian school, so the default is America/Bogota (COT,
+    | fixed UTC-5, no DST) — one timezone, wall-clock semantics end to end
+    | (TASK-015 / ADR-025). Override per deployment with APP_TIMEZONE.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'America/Bogota'),
 
     /*
     |--------------------------------------------------------------------------
