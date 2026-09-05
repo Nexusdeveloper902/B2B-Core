@@ -111,6 +111,7 @@ Documentación completa de endpoints: [docs/API.es.md](docs/API.es.md) ·
 | `/login` | — | Inicio de sesión EN/ES |
 | `/teacher` | profesor (o admin) | Asistencia de hoy de la clase: presente / tarde (tras el corte configurable) / ausente |
 | `/admin` | admin | Estadísticas de toda la escuela (asistencia, PAE desayuno/almuerzo, reciclaje artículos+puntos), control de modo de lectores, caja de consulta NL, mostrador de canjes, enlaces a vista de padres |
+| `/admin/pairing` | admin | **Escritorio de emparejamiento** (TASK-011): botón "Armar emparejamiento" de un clic por estudiante, cuenta regresiva de 45 s en vivo, el instante en que la tarjeta queda emparejada e historial reciente — empareja tarjetas nuevas sin curl ni PAT |
 | `/parent/students/{id}` | admin/profesor | Línea de tiempo completa de eventos de un estudiante (sustituto simplificado de vista de padres — un sistema real de autenticación de padres está intencionalmente fuera del alcance) |
 
 Cambio de idioma: `EN·ES` en la barra de navegación (por sesión).

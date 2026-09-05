@@ -79,6 +79,25 @@ return [
     'material' => 'Material',
     'no_events' => 'No events recorded yet for this student.',
 
+    // Pairing desk (TASK-011)
+    'action' => 'Action',
+    'pairing_desk' => 'Pair cards',
+    'pairing_desk_intro' => 'Arm a pairing for a student, then tap a FRESH card on the reader within the window. The card-to-student link is always an admin decision made here — never at the reader.',
+    'pairing_arm' => 'Arm pairing',
+    'pairing_armed_for' => 'Armed for :name',
+    'pairing_seconds_left' => ':s s left',
+    'pairing_go_tap' => 'Now tap a FRESH card on the reader.',
+    'pairing_no_session' => 'No pairing session armed.',
+    'pairing_expired' => 'Window expired without a card — arm again.',
+    'pairing_success' => 'Card :uid paired to :name.',
+    'pairing_status' => 'Pairing status',
+    'pairing_recent' => 'Recently paired cards',
+    'pairing_uid' => 'Card UID',
+    'pairing_paired_at' => 'Paired at',
+    'pairing_none_yet' => 'No cards paired yet.',
+    'current_card' => 'Current card',
+    'no_card' => 'no card',
+
     // Generic statuses
     'ok' => 'OK',
     'saving' => 'Saving…',

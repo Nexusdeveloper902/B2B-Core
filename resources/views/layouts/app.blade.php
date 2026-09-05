@@ -28,6 +28,10 @@
                        @class(['is-active' => request()->routeIs('admin.dashboard')])>
                         {{ __('app.admin_dashboard') }}
                     </a>
+                    <a href="{{ route('admin.pairing') }}"
+                       @class(['is-active' => request()->routeIs('admin.pairing')])>
+                        {{ __('app.pairing_desk') }}
+                    </a>
                 @endif
                 <a href="{{ route('teacher.dashboard') }}"
                    @class(['is-active' => request()->routeIs('teacher.dashboard') || request()->routeIs('dashboard')])>

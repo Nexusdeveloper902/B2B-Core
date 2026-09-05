@@ -35,7 +35,7 @@ class DocumentationTest extends TestCase
         $en = file_get_contents(base_path('docs/API.md'));
         $es = file_get_contents(base_path('docs/API.es.md'));
 
-        foreach (['POST /api/v1/events/tap', 'POST /api/v1/recycling/classify', 'POST /api/v1/students', 'nl-query', 'POST /api/v1/admin/students/{id}/arm-pairing', 'POST /api/v1/admin/cards/pair'] as $needle) {
+        foreach (['POST /api/v1/events/tap', 'POST /api/v1/recycling/classify', 'POST /api/v1/students', 'nl-query', 'POST /api/v1/admin/students/{id}/arm-pairing', 'POST /api/v1/admin/cards/pair', 'GET /api/v1/admin/pairing/status'] as $needle) {
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");
         }
@@ -67,6 +67,7 @@ class DocumentationTest extends TestCase
             '{{base_url}}/api/v1/nl-query',
             '{{base_url}}/api/v1/admin/students/{{student_id}}/arm-pairing',
             '{{base_url}}/api/v1/admin/cards/pair',
+            '{{base_url}}/api/v1/admin/pairing/status',
         ] as $expected) {
             $this->assertContains($expected, $urls, "Postman collection must cover [{$expected}]");
         }
