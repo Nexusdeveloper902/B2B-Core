@@ -6,6 +6,7 @@ use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\PresenceEvent;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -38,9 +39,21 @@ class UnpairCardsCommand extends Command
 
     public function handle(): int
     {
-        $cardCount = Card::count();
-        $eventCount = PresenceEvent::count(); // every event belongs to a card (FK), so all of them go
-        $linkCount = PendingPairing::whereNotNull('card_id')->count();
+        // The counts read the schema, so a database that exists but was
+        // never migrated (setup interrupted, hand-touched sqlite file)
+        // must fail FAST with remediation, not a QueryException
+        // traceback — the counts run BEFORE any mutation, so nothing
+        // has been touched when this fires.
+        try {
+            $cardCount = Card::count();
+            $eventCount = PresenceEvent::count(); // every event belongs to a card (FK), so all of them go
+            $linkCount = PendingPairing::whereNotNull('card_id')->count();
+        } catch (QueryException) {
+            $this->error('Database not ready (cards table unreachable) — run: ./run setup or ./run reset');
+            $this->error('Base de datos no lista (tabla cards inaccesible) — ejecuta: ./run setup o ./run reset');
+
+            return self::FAILURE;
+        }
 
         if ($cardCount === 0) {
             $this->info('Nothing to unpair — 0 cards. / Nada que desvincular — 0 tarjetas.');
