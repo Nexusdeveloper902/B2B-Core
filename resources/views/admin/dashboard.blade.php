@@ -17,6 +17,9 @@
     <x-stat :label="__('app.recycling_points')">{{ $recyclingToday['points'] }}</x-stat>
 </section>
 
+{{-- TASK-016 — live activity: server-rendered, then WebSocket-live --}}
+@include('partials.live-feed')
+
 <section class="grid-2">
     {{-- Reader list + mode control --}}
     <x-panel :label="__('app.readers')" rule>
@@ -115,6 +118,7 @@
     </x-panel>
 </section>
 
+<script src="{{ asset('js/realtime.js') }}"></script>
 <script>
     (function () {
         var csrf = document.querySelector('meta[name="csrf-token"]').content;

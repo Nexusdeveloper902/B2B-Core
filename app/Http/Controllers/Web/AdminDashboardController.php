@@ -7,12 +7,15 @@ use App\Models\Reader;
 use App\Models\Reward;
 use App\Models\Student;
 use App\Services\AttendanceService;
+use App\Services\Realtime\RealtimeFeed;
+use App\Services\Realtime\RealtimeToken;
 use Illuminate\View\View;
 
 class AdminDashboardController extends Controller
 {
     public function __construct(
         private readonly AttendanceService $attendance,
+        private readonly RealtimeFeed $realtimeFeed,
     ) {}
 
     public function dashboard(): View
@@ -30,6 +33,9 @@ class AdminDashboardController extends Controller
             'students' => Student::orderBy('name')->with('schoolClass')->get(),
             'rewards' => Reward::orderBy('point_cost')->get(),
             'nlQueryConfigured' => ! empty(config('recycling.nl_query.api_key')),
+            'recentEvents' => $this->realtimeFeed->recent((int) config('realtime.history_limit')),
+            'realtimeToken' => RealtimeToken::issue((int) auth()->id()),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 }

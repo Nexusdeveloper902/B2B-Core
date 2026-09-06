@@ -7,6 +7,7 @@ use App\Models\RecyclingDeposit;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\Realtime\RealtimeToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -151,6 +152,88 @@ class DashboardTest extends TestCase
             ->assertSeeText('Teacher Dashboard')
             ->assertSeeText('Absent')
             ->assertSeeText('Late');
+    }
+
+    #[Test]
+    public function the_admin_dashboard_renders_the_live_feed_panel_server_side(): void
+    {
+        PresenceEvent::create([
+            'card_id' => $this->cardOf('Maria González')->id,
+            'reader_id' => $this->reader('classroom')->id,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => now()->setTime(7, 50),
+        ]);
+
+        $response = $this->actingAs($this->user('admin'))->get('/admin');
+
+        // SSR-first: the panel works with the realtime server DOWN —
+        // the initial rows are server-rendered from RealtimeFeed.
+        $response->assertOk()
+            ->assertSee('Live activity')
+            ->assertSee('Maria González')
+            ->assertSee('CLASS_ATTENDANCE')
+            ->assertSee('id="live-list"', false)
+            ->assertSee('id="live-badge"', false)
+            ->assertSee('data-realtime=', false)
+            ->assertSee('js/realtime.js', false)
+            ->assertSeeText('Connecting…');
+    }
+
+    #[Test]
+    public function the_live_feed_shows_an_honest_waiting_state_with_no_events(): void
+    {
+        $this->actingAs($this->user('admin'))
+            ->get('/admin')
+            ->assertOk()
+            ->assertSeeText('Waiting for the first tap…');
+    }
+
+    #[Test]
+    public function the_teacher_dashboard_marks_attendance_rows_for_live_updates(): void
+    {
+        $response = $this->actingAs($this->user('teacher'))->get('/teacher');
+
+        $response->assertOk()
+            ->assertSee('Live activity')
+            ->assertSee('data-student-row=', false)
+            ->assertSee('js-tap-status', false)
+            ->assertSee('js-tap-time', false)
+            ->assertSee('data-cutoff=', false)
+            ->assertSee('js/realtime.js', false);
+    }
+
+    #[Test]
+    public function the_live_feed_panel_translates_to_spanish(): void
+    {
+        $teacher = $this->user('teacher');
+
+        $this->actingAs($teacher)->get('/locale/es');
+        $this->actingAs($teacher)->get('/teacher')
+            ->assertOk()
+            ->assertSeeText('Actividad en vivo')
+            ->assertSeeText('Esperando el primer toque…')
+            ->assertSeeText('Conectando…');
+    }
+
+    #[Test]
+    public function the_live_feed_bootstrap_json_survives_html_attribute_escaping(): void
+    {
+        $admin = User::where('role', 'admin')->firstOrFail();
+        $html = $this->actingAs($admin)->get('/admin')->getContent();
+
+        // The bootstrap rides a data-* ATTRIBUTE: it must be the escaped
+        // echo (raw JSON quotes would terminate the attribute at the
+        // first " — the live bench caught exactly that truncation).
+        $this->assertMatchesRegularExpression('/data-realtime="([^"]*)"/', $html);
+        preg_match('/data-realtime="([^"]*)"/', $html, $match);
+
+        $boot = json_decode(html_entity_decode($match[1] ?? ''), true);
+
+        $this->assertIsArray($boot, 'the data-realtime attribute must decode to JSON');
+        $this->assertSame((int) $admin->id, RealtimeToken::verify($boot['token'] ?? null));
+        $this->assertSame((int) config('realtime.port'), $boot['port']);
+        $this->assertArrayHasKey('strings', $boot);
+        $this->assertArrayHasKey('state_live', $boot['strings']);
     }
 
     private function user(string $role): User

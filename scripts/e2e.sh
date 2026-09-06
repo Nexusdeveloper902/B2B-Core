@@ -37,11 +37,16 @@ IMG="database/.e2e_img.png"
 PASS=0
 FAIL=0
 SERVER_PID=""
+WS_PID=""
 
 cleanup() {
     if [ -n "$SERVER_PID" ]; then
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    if [ -n "$WS_PID" ]; then
+        kill "$WS_PID" 2>/dev/null || true
+        wait "$WS_PID" 2>/dev/null || true
     fi
     rm -f "$E2E_DB" "$IMG"
 }
@@ -192,6 +197,42 @@ check "Login page renders / La página de login responde" "$R" '200'
 
 R=$(curl -s -w '\n%{http_code}' "$BASE_URL/admin")
 check "Guests are redirected away from /admin / Invitados redirigidos" "$R" '302'
+
+# ---------------------------------------------------------------------------
+say "== Fase G — canal en vivo / realtime feed (TASK-016) =="
+WS_PORT=8091
+WS_PID=""
+"$PHP_BIN" artisan realtime:serve --host=127.0.0.1 --port="$WS_PORT" >/dev/null 2>&1 &
+WS_PID=$!
+# Wait for the listener with the PHP TCP probe ONLY — curl's telnet://
+# mode relays STDIN to the socket and hangs forever when stdin is an
+# open pipe (a harness/CI session); the fsockopen probe is portable
+# (works on Git Bash too) and honest.
+for i in $(seq 1 30); do
+    "$PHP_BIN" -r 'exit(@fsockopen("127.0.0.1", (int)$argv[1], $errno, $errstr, 0.5) === false ? 1 : 0);' "$WS_PORT" 2>/dev/null && break
+    kill -0 "$WS_PID" 2>/dev/null || break
+    sleep 0.3
+done
+
+WS_TOKEN=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $u=App\Models\User::where("email","admin@presence.test")->first(); echo App\Services\Realtime\RealtimeToken::issue((int)$u->id);')
+
+if "$PHP_BIN" scripts/_lib/realtime-probe.php "ws://127.0.0.1:${WS_PORT}" "$WS_TOKEN" >/dev/null 2>&1; then
+    ok "Realtime feed answers hello / El canal en vivo responde hello"
+else
+    bad "Realtime feed answers hello / El canal en vivo responde hello"
+fi
+
+BAD_RC=0
+"$PHP_BIN" scripts/_lib/realtime-probe.php "ws://127.0.0.1:${WS_PORT}" "definitely-not-a-token" >/dev/null 2>&1 || BAD_RC=$?
+if [ "$BAD_RC" = "2" ]; then
+    ok "Realtime rejects invalid tokens 401 / El canal rechaza tokens inválidos 401"
+else
+    bad "Realtime rejects invalid tokens 401 / El canal rechaza tokens inválidos 401"
+fi
+
+kill "$WS_PID" 2>/dev/null || true
+wait "$WS_PID" 2>/dev/null || true
+WS_PID=""
 
 # ---------------------------------------------------------------------------
 echo ""

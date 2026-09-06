@@ -74,5 +74,13 @@ else
     row "model server" "$(down) — start with: ./run model start"
 fi
 
+# Realtime feed health (TASK-016 — started by ./run serve alongside the web server)
+WS_PORT="${B2B_REALTIME_PORT:-8081}"
+if "$PHP_BIN" -r 'exit(@fsockopen("127.0.0.1", (int)$argv[1], $errno, $errstr, 0.5) === false ? 1 : 0);' "$WS_PORT" 2>/dev/null; then
+    row "realtime feed" "$(up) at ws://127.0.0.1:${WS_PORT}"
+else
+    row "realtime feed" "$(down) — starts with: ./run serve"
+fi
+
 printf '%b\n' "${C_DIM}  Fixes: ./run doctor · ./run setup · ./run serve · ./run model start${C_RESET}"
 exit 0

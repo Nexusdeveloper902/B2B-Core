@@ -74,14 +74,23 @@ Exit codes: `0` ok · `1` failure with a suggested fix printed.
 ## `serve`
 
 ```bash
-./run serve                # 127.0.0.1:8000
-./run serve 8080           # custom port
+./run serve                # 127.0.0.1:8000 (web) + :8081 (realtime feed)
+./run serve 8080           # custom web port (realtime stays 8081)
 ./run serve --host=0.0.0.0 # all interfaces (LAN demo)
 ```
 
 Fails **before** binding (not at request time) when setup is incomplete, and
 tells you exactly which `./run` command fixes it. Env overrides:
 `B2B_SERVE_PORT`, `B2B_SERVE_HOST`.
+
+Since TASK-016 `serve` also starts the **realtime feed** — a WebSocket
+server (`php artisan realtime:serve`) on port 8081 that pushes every
+card tap to the dashboard live-activity panels (no F5). Ctrl+C stops
+both. If port 8081 is busy the web server still starts and the
+dashboards honestly show an offline badge. Env overrides:
+`B2B_REALTIME_PORT` (port) and `B2B_REALTIME=0` (start without the
+feed). `./run status` reports the feed's health; the protocol contract
+lives in `.agent/ARCHITECTURE/realtime-feed.md`.
 
 ## `test`
 

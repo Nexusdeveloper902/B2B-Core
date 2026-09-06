@@ -10,7 +10,11 @@
     </p>
 </div>
 
-<div class="stack">
+{{-- TASK-016 — live activity feed + live attendance rows --}}
+@include('partials.live-feed')
+
+<div class="stack" data-cutoff="{{ $cutoff }}"
+     data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}">
     @if($classes->isEmpty())
         <x-empty>{{ __('app.no_students') }}</x-empty>
     @else
@@ -34,7 +38,7 @@
                         </thead>
                         <tbody>
                         @forelse($rows as $row)
-                            <tr>
+                            <tr data-student-row="{{ $row['student']->id }}">
                                 <td>
                                     <span class="student-cell">
                                         {{ $row['student']->name }}
@@ -43,10 +47,10 @@
                                         </a>
                                     </span>
                                 </td>
-                                <td>
+                                <td class="js-tap-status">
                                     <x-stamp :status="$row['status']">{{ __('app.'.$row['status']) }}</x-stamp>
                                 </td>
-                                <td class="num">{{ $row['tappedAt'] ?? '—' }}</td>
+                                <td class="num js-tap-time">{{ $row['tappedAt'] ?? '—' }}</td>
                                 <td class="num">{{ $row['student']->pae_enrolled ? '✓' : '—' }}</td>
                             </tr>
                         @empty
@@ -59,4 +63,48 @@
         @endforeach
     @endif
 </div>
+
+<script src="{{ asset('js/realtime.js') }}"></script>
+<script>
+    (function () {
+        // TASK-016 — attendance rows go live: a CLASS_ATTENDANCE tap
+        // flips the student's row to Present/Late without a reload.
+        // FIRST tap wins (the server keeps the day's first event as
+        // the attendance one) — later taps never overwrite an earlier
+        // time, matching classAttendanceToday's semantics.
+        var stack = document.querySelector('.stack[data-cutoff]');
+        if (!stack) return;
+        var cutoff = stack.dataset.cutoff || '08:15';
+        var labelPresent = stack.dataset.labelPresent || 'Present';
+        var labelLate = stack.dataset.labelLate || 'Late';
+
+        document.addEventListener('realtime:tap', function (e) {
+            var ev = e.detail || {};
+            if (ev.type !== 'CLASS_ATTENDANCE') return;
+
+            var row = document.querySelector('tr[data-student-row="' + ev.student_id + '"]');
+            if (!row) return;
+
+            var timeCell = row.querySelector('.js-tap-time');
+            if (timeCell && timeCell.textContent !== '—' && timeCell.textContent !== '') {
+                if ((ev.time || '99:99') >= timeCell.textContent) return; // first tap wins
+            }
+
+            var late = (ev.time || '') > cutoff;
+            var statusCell = row.querySelector('.js-tap-status');
+            if (statusCell) {
+                statusCell.textContent = '';
+                var stamp = document.createElement('span');
+                stamp.className = 'stamp stamp-' + (late ? 'late' : 'present');
+                stamp.textContent = late ? labelLate : labelPresent;
+                statusCell.appendChild(stamp);
+            }
+            if (timeCell) { timeCell.textContent = ev.time || '—'; }
+
+            row.classList.remove('js-row-flash');
+            void row.offsetWidth; // restart the animation
+            row.classList.add('js-row-flash');
+        });
+    })();
+</script>
 @endsection

@@ -99,6 +99,15 @@ return [
     'current_card' => 'Tarjeta actual',
     'no_card' => 'sin tarjeta',
 
+    // Actividad en vivo (TASK-016)
+    'live_activity' => 'Actividad en vivo',
+    'live_panel_sub' => 'Cada toque de tarjeta, al instante',
+    'live_state_live' => 'En vivo',
+    'live_state_connecting' => 'Conectando…',
+    'live_state_offline' => 'Desconectado',
+    'live_waiting' => 'Esperando el primer toque…',
+    'live_offline_hint' => 'Canal en vivo no disponible — recarga la página para ver los últimos toques.',
+
     // Estados genéricos
     'ok' => 'OK',
     'saving' => 'Guardando…',

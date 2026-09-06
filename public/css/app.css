@@ -474,6 +474,76 @@ code {
     color: var(--copy);
 }
 
+/* ---------- Live activity feed (TASK-016) ---------- */
+.live-panel { margin-bottom: clamp(18px, 3vw, 28px); }
+.live-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.live-panel-sub { margin: 0; }
+
+.live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 600 11.5px/1 var(--font-mono);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    border: 1px solid;
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+.live-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--steel); }
+.live-badge[data-state="live"] { color: var(--pine-dark); border-color: var(--go); background: var(--ok-bg); }
+.live-badge[data-state="live"] .live-dot { background: var(--go); animation: live-pulse 2s ease infinite; }
+.live-badge[data-state="connecting"] { color: var(--ink); border-color: var(--line-strong); background: var(--wash); }
+.live-badge[data-state="connecting"] .live-dot { background: var(--steel); }
+.live-badge[data-state="offline"] { color: var(--alert); border-color: var(--alert); background: var(--alert-bg); }
+.live-badge[data-state="offline"] .live-dot { background: var(--alert); }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+.live-list { list-style: none; margin: 0; padding: 0; }
+.live-row {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 4px 18px;
+    align-items: baseline;
+    padding: 10px 0 10px 20px;
+    border-bottom: 1px solid var(--row-line);
+    position: relative;
+}
+.live-row:last-child { border-bottom: none; }
+.live-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 17px;
+    width: 7px;
+    height: 7px;
+    background: var(--pine);
+}
+.live-row.live-empty::before { background: var(--line-strong); }
+.live-time { font: 500 13px/1.45 var(--font-mono); color: var(--ink); }
+.live-student { font-weight: 600; font-size: 14.5px; }
+.live-context {
+    color: var(--steel);
+    font: 400 12.5px/1.5 var(--font-mono);
+    text-align: right;
+}
+.live-context code { font-size: 11px; padding: 1px 5px; }
+
+/* freshly-arrived live row + live-updated attendance row flash */
+.live-new { animation: live-flash 1.8s ease; }
+tr.js-row-flash td { animation: live-flash 1.8s ease; }
+@keyframes live-flash { from { background: var(--row-flash); } to { background: transparent; } }
+
+.live-hint { color: var(--alert); font-size: 13px; margin: 12px 0 0; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 940px) {
     .topbar-in { gap: 14px; min-height: 64px; }
@@ -497,6 +567,8 @@ code {
     .stat-strip { grid-template-columns: 1fr; }
     .stat { border-right: none; border-top: 1px solid var(--line); }
     .stat:first-child { border-top: none; }
+    .live-row { grid-template-columns: 56px 1fr; }
+    .live-context { grid-column: 2; text-align: left; }
     /* Ledger tables keep their column structure on phones: the wrapper
        scrolls horizontally instead of crushing columns into slivers. */
     .ledger-table { min-width: 540px; }
@@ -508,4 +580,5 @@ code {
 /* ---------- Motion ---------- */
 @media (prefers-reduced-motion: reduce) {
     * { transition-duration: 0.01ms !important; }
+    .live-dot, .live-new, tr.js-row-flash td { animation: none; }
 }

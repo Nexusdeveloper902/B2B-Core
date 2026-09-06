@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AdminDashboardController;
 use App\Http\Controllers\Web\AdminPairingController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\ParentViewController;
+use App\Http\Controllers\Web\RealtimeTokenController;
 use App\Http\Controllers\Web\TeacherDashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,4 +59,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/parent/students/{student}', [ParentViewController::class, 'timeline'])
         ->middleware('role:admin,teacher')
         ->name('parent.timeline');
+
+    // TASK-016 — feed token for the dashboard's WebSocket handshake
+    // (session-authed; the socket process verifies the HMAC, not the session).
+    Route::get('/realtime/token', [RealtimeTokenController::class, 'issue'])
+        ->middleware('role:admin,teacher')
+        ->name('realtime.token');
 });
