@@ -549,3 +549,23 @@ per student" bench report. Repository reality updates:
   Spanish, zero console errors. Research sources recorded in the
   RUN ledger (26 sources across dashboard/realtime/empty-state/
   mobile/form UX).
+
+## TASK-018 (RUN-2026-09-06-core-016) — CI red fixed
+
+- **CI had been red since TASK-016** (two merges shipped red —
+  4 jobs each: Lint, Scripts lint, Windows smoke, Arch smoke): one
+  shellcheck warning, `scripts/serve.sh:77 SC2034` — TASK-016's
+  realtime startup probe loop declared `i` but never read it.
+  Local gates missed it because `./run quality` runs shellcheck
+  only when installed and the sandbox had none; CI installs and
+  enforces it.
+- **Fix**: the probe counter is now used honestly — the realtime
+  startup failure warning reports the probe count ("did not come
+  up after N probe(s)", EN+ES; 10 = exhausted, <10 = process died
+  early). Loop behavior unchanged. No `shellcheck disable` pragma.
+- **Dev-sandbox parity restored**: shellcheck 0.10.0 at
+  /home/z/my-project/tools/shellcheck (sandbox artifact, not a
+  repo file) — with tools on PATH, the local quality gate is
+  byte-for-byte as strict as CI's scripts-lint job.
+- Gates unchanged: tests 219/3, e2e 24/24, quality PASS (now with
+  shellcheck enforced). GitHub Actions green on main post-push.
