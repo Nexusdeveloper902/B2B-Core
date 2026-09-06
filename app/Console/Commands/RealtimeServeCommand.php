@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Services\Realtime\Handshake;
 use App\Services\Realtime\RealtimeFeed;
 use App\Services\Realtime\RealtimePairing;
+use App\Services\Realtime\RealtimeRecycling;
 use App\Services\Realtime\RealtimeToken;
 use App\Services\Realtime\WsFrame;
 use Illuminate\Console\Command;
@@ -26,6 +27,14 @@ use Illuminate\Support\Facades\DB;
  * changes (arm / consume / reject) broadcast the shared pairing status
  * payload, so the pairing desk updates the instant a card is paired —
  * no poll cadence, no F5.
+ *
+ * TASK-025 item 6 adds the recycling channel (spec §24–§29): the
+ * append-only `recycling_updates` table is written transactionally by
+ * whatever process performs a recycling state change (capture stored,
+ * validation started, validated, points awarded, reward redeemed,
+ * leaderboard updated); this server polls rows newer than its head and
+ * pushes them as `recycling` frames — committed state only, by
+ * construction (rows become visible only at commit).
  *
  * Auth: the HTTP upgrade request must carry a valid feed token
  * (HMAC-SHA256, APP_KEY-signed — see RealtimeToken). Invalid or
@@ -58,14 +67,20 @@ class RealtimeServeCommand extends Command
     /** TASK-020 — last-seen pairing signature (row-data fingerprint). */
     private string $lastPairingSignature = '';
 
+    /** TASK-025 item 6 — head id of the recycling channel. */
+    private int $lastRecyclingId = 0;
+
     private RealtimeFeed $feed;
 
     private RealtimePairing $pairing;
 
-    public function handle(RealtimeFeed $feed, RealtimePairing $pairing): int
+    private RealtimeRecycling $recycling;
+
+    public function handle(RealtimeFeed $feed, RealtimePairing $pairing, RealtimeRecycling $recycling): int
     {
         $this->feed = $feed;
         $this->pairing = $pairing;
+        $this->recycling = $recycling;
 
         $host = (string) ($this->option('host') ?: config('realtime.host'));
         $port = (int) ($this->option('port') ?: config('realtime.port'));
@@ -88,6 +103,9 @@ class RealtimeServeCommand extends Command
         // TASK-020 — same rule for the pairing channel: connect AFTER the
         // current snapshot (hello carries it), broadcast only changes.
         $this->lastPairingSignature = $pairing->signature();
+        // TASK-025 — and the recycling channel: hello carries the recent
+        // snapshot, then only genuinely new updates broadcast.
+        $this->lastRecyclingId = $recycling->latestUpdateId();
 
         $this->info("realtime:serve listening on ws://{$host}:{$port} — poll {$pollMs} ms, history {$historyLimit}, head id {$this->lastEventId}.");
 
@@ -220,6 +238,10 @@ class RealtimeServeCommand extends Command
             'type' => 'hello',
             'last_id' => $this->lastEventId,
             'events' => $this->feed->recent((int) config('realtime.history_limit')),
+            // TASK-025 — the recycling channel's initial snapshot rides the
+            // same hello (student names + points, same exposure level as
+            // tap frames — no card UIDs, so every role may receive it).
+            'recycling' => $this->recycling->recent((int) config('realtime.history_limit')),
         ];
         if ($this->clients[$clientId]['admin']) {
             // TASK-020 — the pairing desk's initial state rides the same
@@ -256,7 +278,9 @@ class RealtimeServeCommand extends Command
 
     /**
      * Push any events newer than the head to every connected client,
-     * and any pairing-state change as a `pairing` frame (TASK-020).
+     * any pairing-state change as a `pairing` frame (TASK-020), and any
+     * recycling updates newer than the head as `recycling` frames
+     * (TASK-025 item 6 — committed state only, by construction).
      */
     private function poll(int $pollMs): void
     {
@@ -311,6 +335,32 @@ class RealtimeServeCommand extends Command
                 // UIDs (see handshake()); teacher dashboards never see
                 // them, exactly like the REST status endpoint.
                 if ($client['handshook'] && $client['admin']) {
+                    $this->write($clientId, $frame);
+                }
+            }
+        }
+
+        // TASK-025 — the recycling channel: same poll beat, same rule as
+        // the tap feed — rows newer than the head, oldest first, to
+        // every authenticated connection (payloads carry student names
+        // and points — the same exposure level as tap frames; no card
+        // UIDs). Reads ONLY: the writers were the transactions.
+        try {
+            $updates = $this->recycling->updatesAfter($this->lastRecyclingId);
+        } catch (QueryException) {
+            DB::purge();
+
+            return;
+        }
+
+        foreach ($updates as $update) {
+            $this->lastRecyclingId = $update['id'];
+            $frame = WsFrame::encode(json_encode(
+                ['type' => 'recycling', 'update' => $update],
+                JSON_UNESCAPED_UNICODE,
+            ));
+            foreach ($this->clients as $clientId => $client) {
+                if ($client['handshook']) {
                     $this->write($clientId, $frame);
                 }
             }

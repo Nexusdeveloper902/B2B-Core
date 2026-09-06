@@ -47,8 +47,11 @@ class DeepSeekClassifier implements MaterialClassifier
                     // JSON Output contract (api-docs.deepseek.com, "JSON
                     // Output"): response_format json_object REQUIRES the
                     // word "json" plus a format example in the prompt.
+                    // TASK-025 item 8: the prompt also asks for the
+                    // is_bottle / is_recyclable boundary semantics (spec §9)
+                    // — the model OPINES, the backend still owns the rules.
                     ['type' => 'text', 'text' => 'Classify the recyclable material shown in this image. '
-                        .'Answer ONLY with a json object: {"material_class": "<plastic|paper|metal|glass|other>", "confidence": <0-1>}'],
+                        .'Answer ONLY with a json object: {"material_class": "<plastic|paper|metal|glass|other>", "confidence": <0-1>, "is_bottle": <true|false>, "is_recyclable": <true|false>}'],
                     // Vision contract: images ride as data URLs in
                     // image_url content parts (user messages only).
                     [
@@ -93,6 +96,11 @@ class DeepSeekClassifier implements MaterialClassifier
         return [
             'material_class' => $class,
             'confidence' => round(min(max($confidence, 0.0), 1.0), 2),
+            // TASK-025 item 8 — boundary semantics; defaulted from the
+            // class when the model omits them (bottle => plastic shape,
+            // recyclable => everything but 'other').
+            'is_bottle' => (bool) ($decoded['is_bottle'] ?? ($class === 'plastic')),
+            'is_recyclable' => (bool) ($decoded['is_recyclable'] ?? ($class !== 'other')),
         ];
     }
 }

@@ -12,11 +12,12 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
- * Dashboard user (admin or teacher). Parents intentionally do NOT get
- * accounts in this phase — see .agent/TASKS/TASK-002-core-platform-mvp.md
- * (Phase F simplification) and ADR-003 in .agent/DECISIONS/.
+ * Platform user (admin, teacher, or student — TASK-025 item 5 adds the
+ * student account layer, a 1:1 reference to the students table). Parents
+ * intentionally do NOT get accounts in this phase — see
+ * .agent/TASKS/TASK-002-core-platform-mvp.md (Phase F simplification).
  */
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'email', 'password', 'role', 'student_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -31,6 +32,22 @@ class User extends Authenticatable
     public function isTeacher(): bool
     {
         return $this->role === UserRole::Teacher->value;
+    }
+
+    /** TASK-025 item 5 — student self-service account role. */
+    public function isStudent(): bool
+    {
+        return $this->role === UserRole::Student->value;
+    }
+
+    /**
+     * The students row this account references (1:1; null for
+     * admin/teacher accounts). NEVER a second identity — the student
+     * row stays the single source of identity truth (spec §11/§30).
+     */
+    public function student()
+    {
+        return $this->belongsTo(Student::class);
     }
 
     public function classes()

@@ -32,6 +32,12 @@ class StubClassifier implements MaterialClassifier
         return [
             'material_class' => $class->value,
             'confidence' => $confidence,
+            // TASK-025 item 8 — deterministic boundary semantics, derived
+            // from the same hash so tests stay stable: bottles are the
+            // plastic shape the recycling flow cares about; recyclability
+            // follows the material class (other = non-recyclable).
+            'is_bottle' => $class === MaterialClass::Plastic && hexdec(substr($hash, 8, 2)) % 2 === 0,
+            'is_recyclable' => $class !== MaterialClass::Other,
         ];
     }
 }

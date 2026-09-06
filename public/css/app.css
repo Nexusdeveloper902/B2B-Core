@@ -1469,3 +1469,50 @@ code {
         gap: 4px;
     }
 }
+
+/* ---------- TASK-025: student self-service + leaderboard ---------- */
+/* Two-stat variant of the staff stat strip (balance + rank). */
+.stat-strip-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* The leaderboard list (student desk + future dashboard panel). */
+.board-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.board-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.board-row:last-child {
+    border-bottom: 0;
+}
+.board-row.is-me {
+    background: var(--band, rgba(127, 144, 96, 0.12));
+    font-weight: 700;
+}
+.board-rank {
+    font: 600 0.9rem/1 var(--font-mono);
+    color: var(--data);
+    min-width: 2ch;
+    text-align: right;
+}
+.board-name {
+    flex: 1;
+    font: 500 0.95rem/1.3 var(--font-body);
+    color: var(--text);
+}
+.board-points {
+    font: 600 1rem/1 var(--font-display);
+    color: var(--text);
+}
+
+/* Affordable-row affordance in the student rewards catalog. */
+.ledger-table tr.is-affordable td:first-child {
+    color: var(--text);
+}

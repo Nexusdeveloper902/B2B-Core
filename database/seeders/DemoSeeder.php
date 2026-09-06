@@ -62,6 +62,7 @@ class DemoSeeder extends Seeder
         ];
 
         $cards = [];
+        $studentRows = [];
 
         foreach ($students as $data) {
             $student = Student::firstOrCreate(
@@ -72,6 +73,22 @@ class DemoSeeder extends Seeder
                     'class_id' => $class->id,
                 ],
             );
+
+            // TASK-025 item 5 (spec §11/§30) — the 1:1 student account
+            // layer: a users row REFERENCING the students row (never a
+            // second identity). Same login path as staff.
+            $slug = str($data['name'])->before(' ')->lower()->ascii();
+            User::firstOrCreate(
+                ['email' => "{$slug}@presence.test"],
+                [
+                    'name' => $data['name'],
+                    'password' => 'password',
+                    'role' => UserRole::Student->value,
+                    'student_id' => $student->id,
+                ],
+            );
+
+            $studentRows[] = $student;
 
             $card = Card::firstOrCreate(
                 ['student_id' => $student->id],
@@ -106,11 +123,13 @@ class DemoSeeder extends Seeder
         // ---------- Rewards ----------
         // ASSUMED DEFAULT CATALOG — the owner must confirm or replace it
         // (see ADR-004 in .agent/DECISIONS/).
+        // TASK-025 item 7 (spec §19/§20): the catalog now carries
+        // type / value / active / stock (NULL stock = unlimited).
         $rewards = [
-            ['name' => 'Canteen discount voucher', 'point_cost' => 50, 'description' => 'One-time canteen discount.'],
-            ['name' => 'Raffle entry', 'point_cost' => 20, 'description' => 'One entry in the end-of-term raffle.'],
-            ['name' => 'Leaderboard shout-out', 'point_cost' => 5, 'description' => 'Name highlighted on the school leaderboard.'],
-            ['name' => 'Early lunch pass', 'point_cost' => 15, 'description' => 'Skip the lunch line for one day.'],
+            ['name' => 'Canteen discount voucher', 'point_cost' => 50, 'description' => 'One-time canteen discount.', 'type' => 'voucher', 'value' => 2000, 'active' => true, 'stock' => 10],
+            ['name' => 'Raffle entry', 'point_cost' => 20, 'description' => 'One entry in the end-of-term raffle.', 'type' => 'raffle', 'value' => null, 'active' => true, 'stock' => 50],
+            ['name' => 'Leaderboard shout-out', 'point_cost' => 5, 'description' => 'Name highlighted on the school leaderboard.', 'type' => 'shoutout', 'value' => null, 'active' => true, 'stock' => null],
+            ['name' => 'Early lunch pass', 'point_cost' => 15, 'description' => 'Skip the lunch line for one day.', 'type' => 'privilege', 'value' => null, 'active' => true, 'stock' => 3],
         ];
 
         foreach ($rewards as $reward) {
@@ -118,10 +137,10 @@ class DemoSeeder extends Seeder
         }
 
         // ---------- Console output (hard requirement, bilingual) ----------
-        $this->printCredentials($cards, $classroomReader, $recyclingReader, $admin, $teacher);
+        $this->printCredentials($cards, $classroomReader, $recyclingReader, $admin, $teacher, $studentRows);
     }
 
-    private function printCredentials(array $cards, Reader $classroom, Reader $recycling, User $admin, User $teacher): void
+    private function printCredentials(array $cards, Reader $classroom, Reader $recycling, User $admin, User $teacher, array $studentRows = []): void
     {
         $line = str_repeat('=', 74);
 
@@ -133,10 +152,22 @@ class DemoSeeder extends Seeder
         $this->command->info(' [EN] Dashboard users / Usuarios del panel:');
         $this->command->table(
             ['User / Usuario', 'Email', 'Password', 'Role / Rol'],
-            [
-                [$admin->name, $admin->email, 'password', $admin->role],
-                [$teacher->name, $teacher->email, 'password', $teacher->role],
-            ],
+            array_merge(
+                [
+                    [$admin->name, $admin->email, 'password', $admin->role],
+                    [$teacher->name, $teacher->email, 'password', $teacher->role],
+                    // TASK-025 item 5 — demo student accounts (own data only).
+                ],
+                array_map(
+                    fn (Student $student) => [
+                        $student->name,
+                        str($student->name)->before(' ')->lower()->ascii().'@presence.test',
+                        'password',
+                        UserRole::Student->value,
+                    ],
+                    $studentRows,
+                ),
+            ),
         );
 
         $this->command->info(' [EN] Cards — use credential_uid as {"credential_uid": "..."} in POST /api/v1/events/tap');

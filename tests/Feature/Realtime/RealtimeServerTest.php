@@ -183,6 +183,45 @@ class RealtimeServerTest extends TestCase
         fclose($sock);
     }
 
+    #[Test]
+    public function recycling_updates_broadcast_to_every_connection_and_ride_the_hello(): void
+    {
+        // TASK-025 item 6 — rows in recycling_updates written by ANOTHER
+        // process (the award transaction's job) broadcast as `recycling`
+        // frames to every authenticated connection, and the hello frame
+        // carries the channel's recent snapshot.
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $teacherId = $this->seedUser($db, 'teacher');
+        $seededId = $this->seedRecyclingUpdate($db, 'points_awarded', ['student_id' => 7, 'points' => 10, 'new_balance' => 10]);
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue($teacherId, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertSame('hello', $hello['type']);
+        $this->assertArrayHasKey('recycling', $hello, 'the hello carries the recycling channel snapshot');
+        $this->assertSame('points_awarded', $hello['recycling'][0]['type']);
+        $this->assertSame(10, $hello['recycling'][0]['payload']['points']);
+
+        // A committed recycling update (the award transaction's write)
+        // broadcasts — to EVERY role (no card UIDs in payloads).
+        $newId = $this->seedRecyclingUpdate($db, 'reward_redeemed', ['student_id' => 7, 'points_spent' => 5]);
+
+        $frame = $this->readMessage($sock);
+        $this->assertNotNull($frame, 'no recycling frame arrived after a committed update');
+        $this->assertSame('recycling', $frame['type']);
+        $this->assertSame($newId, $frame['update']['id']);
+        $this->assertSame('reward_redeemed', $frame['update']['type']);
+        $this->assertSame(5, $frame['update']['payload']['points_spent']);
+
+        fclose($sock);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private function freshFileDatabase(): string
@@ -261,6 +300,20 @@ class RealtimeServerTest extends TestCase
             'password' => 'irrelevant',
             'remember_token' => null,
             'role' => $role,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one recycling_updates row (an award transaction's write); returns the id. */
+    private function seedRecyclingUpdate(string $db, string $type, array $payload): int
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        return (int) $conn->table('recycling_updates')->insertGetId([
+            'type' => $type,
+            'payload' => json_encode($payload),
             'created_at' => $now,
             'updated_at' => $now,
         ]);

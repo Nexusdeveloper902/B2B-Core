@@ -749,3 +749,33 @@ per student" bench report. Repository reality updates:
   was supplied (only a GitHub PAT). First owner action: create the
   key, `./run llm-check`, add the CI secret — the live smoke job
   re-proves the pipeline the moment the secret exists.
+
+## TASK-025 additions (2026-09-07, RUN-2026-09-07-core-022)
+
+The recycling backend now implements the owner's full spec:
+
+- **Bottle-first flow** (spec §3 Case B): `POST /api/v1/recycling/
+  capture` holds an image `awaiting_card` (TTL, pending_pairings
+  pattern); `POST /api/v1/recycling/captures/{id}/associate` resolves
+  card → event → classify → award in one call. Card-first taps must
+  classify inside the configurable window. No classifier call ever
+  precedes student association (cost gate, test-pinned).
+- **Atomic awards**: deposit + ledger share one transaction; the
+  unique(event_id) race answers with the duplicate response (ADR-031
+  adjacency; see ClassificationService).
+- **Image persistence**: every classified image stored on disk 'local'
+  under `recycling-captures/` and referenced by its deposit.
+- **Leaderboard**: `GET /api/v1/recycling/leaderboard` — ledger-derived,
+  competition ranks, students also get `me` (ADR-035).
+- **Student self-service**: role `student`, 1:1 `users.student_id`
+  account layer (ADR-033); login → `/student` desk (own points /
+  history / rewards; live balance via the feed).
+- **Realtime recycling frames**: third WS channel from the append-only
+  `recycling_updates` table, written inside each state change's
+  transaction — commit-only broadcast by construction (ADR-032).
+- **Rewards catalog**: type/value/active/stock; first-class
+  `reward_redemptions`; atomic stock guard; `request_id` idempotency +
+  window fallback (ADR-034).
+- **AI boundary schema**: `is_bottle` / `is_recyclable` returned by
+  every classifier driver and persisted on deposits; business rules
+  stay material_class + config.

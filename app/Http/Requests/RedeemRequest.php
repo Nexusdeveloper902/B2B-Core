@@ -19,6 +19,10 @@ class RedeemRequest extends FormRequest
     {
         return [
             'reward_id' => ['required', 'integer', 'exists:rewards,id'],
+            // TASK-025 item 7 — idempotency key for double-submit
+            // protection (spec §20): a replayed request_id returns the
+            // original redemption answer, never a second charge.
+            'request_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

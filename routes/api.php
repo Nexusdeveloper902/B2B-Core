@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\V1\ArmPairingController;
 use App\Http\Controllers\Api\V1\CardPairingController;
+use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\NlQueryController;
 use App\Http\Controllers\Api\V1\PairingStatusController;
 use App\Http\Controllers\Api\V1\ReaderModeController;
+use App\Http\Controllers\Api\V1\RecyclingCaptureController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
 use App\Http\Controllers\Api\V1\RedemptionController;
 use App\Http\Controllers\Api\V1\TapEventController;
@@ -34,6 +36,16 @@ Route::prefix('v1')->group(function () {
         // Phase C — classification + points earn (multipart: event_id, image).
         Route::post('/recycling/classify', [RecyclingClassificationController::class, 'store'])
             ->name('api.v1.recycling.classify');
+
+        // TASK-025 item 2 — the bottle-first flow (spec §3 Case B/§5/§32):
+        // an image captured BEFORE any card, held awaiting_card until a
+        // card association resolves it. NO classifier call before the
+        // association (spec §4 cost gate).
+        Route::post('/recycling/capture', [RecyclingCaptureController::class, 'store'])
+            ->name('api.v1.recycling.capture');
+
+        Route::post('/recycling/captures/{capture}/associate', [RecyclingCaptureController::class, 'associate'])
+            ->name('api.v1.recycling.captures.associate');
 
         // TASK-010 (firmware TASK-001 Phase E1) — device side of card
         // pairing: pair a freshly scanned card with the pending pairing
@@ -69,6 +81,13 @@ Route::prefix('v1')->group(function () {
     Route::get('/admin/pairing/status', [PairingStatusController::class, 'show'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.pairing.status');
+
+    // TASK-025 item 4 — the leaderboard (spec §22/§28): ranking derived
+    // from the real points ledger; students also receive their own
+    // standing (resolved from their account, never a URL parameter).
+    Route::get('/recycling/leaderboard', [LeaderboardController::class, 'show'])
+        ->middleware(['auth:sanctum', 'role:admin,teacher,student'])
+        ->name('api.v1.recycling.leaderboard');
 
     // Phase D — redemption (admin or teacher; desk interaction).
     Route::post('/students/{student}/redeem', [RedemptionController::class, 'store'])

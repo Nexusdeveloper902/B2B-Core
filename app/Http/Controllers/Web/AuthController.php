@@ -26,7 +26,11 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        // TASK-025 item 5 — students land on their self-service desk,
+        // staff on the staff dashboard (students have no /dashboard).
+        return redirect()->intended(
+            auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')
+        );
     }
 
     public function logout(): RedirectResponse
