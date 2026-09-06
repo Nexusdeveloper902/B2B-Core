@@ -276,6 +276,27 @@ class AdminPairingDeskTest extends TestCase
         $this->assertStringContainsString('Math.min(WINDOW_TOTAL', $html);
     }
 
+    #[Test]
+    public function the_status_box_follows_the_live_panel_full_bleed_grammar(): void
+    {
+        // TASK-021 — a live-panel is an UNPADDED container, so the status
+        // box is a full-bleed tone strip (18px gutters, one rule line,
+        // no inset card-in-card) and the draining bar meters the panel's
+        // full width; the dashboards' answer boxes live in padded panels
+        // and keep the inset base grammar. The idle note uses the
+        // live-empty row grammar.
+        $css = file_get_contents(public_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression('/\.live-panel \.nl-answer\s*{[^}]*margin: 0[^}]*border-radius: 0/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.nl-answer\s*{[^}]*padding: 13px 18px/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.answer-ok\s*{[^}]*var\(--data-tint\)/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.answer-error\s*{[^}]*var\(--accent-tint\)/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.countdown\s*{[^}]*margin: 0[^}]*border-radius: 0/', $css);
+        // the idle note is a live-empty row, not a bare <p> at the edges
+        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+        $this->assertStringContainsString('class="live-empty" id="pairing-idle"', $html);
+    }
+
     private function admin(): User
     {
         return User::where('email', 'admin@presence.test')->firstOrFail();

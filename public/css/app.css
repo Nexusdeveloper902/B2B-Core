@@ -562,8 +562,9 @@ code {
     animation: rowin 0.24s cubic-bezier(0.22, 1, 0.36, 1) both,
                rowflash 2.4s ease-out 1;
 }
-.live-row.live-empty {
+.live-row.live-empty, .live-empty {
     display: block;
+    margin: 0;
     font: 400 13px/1.5 var(--font-mono);
     color: var(--text-muted);
     padding: 24px 18px;
@@ -695,6 +696,24 @@ code {
     transition: width 0.35s linear, background-color 0.3s ease;
 }
 .countdown.is-low .countdown-fill { background: var(--accent); }
+
+/* TASK-021 — a live-panel is a FULL-BLEED container (padding: 0), so the
+   pairing status box follows the row/strip grammar, not the inset card
+   grammar: 18px gutters matching .live-head, an edge-to-edge tone field
+   with a single rule line (the .live-hint / marketplace .tap-visual
+   pattern), and the draining window meters the panel's full width
+   instead of floating with side-free margins. The dashboards' answer
+   boxes live in PADDED panels and keep the inset .form-alert grammar. */
+.live-panel .nl-answer {
+    margin: 0;
+    border: none;
+    border-bottom: 1px solid;
+    border-radius: 0;
+    padding: 13px 18px;
+}
+.live-panel .answer-ok { background: var(--data-tint); border-bottom-color: var(--color-muted-teal-800); color: var(--data-strong); }
+.live-panel .answer-error { background: var(--accent-tint); border-bottom-color: var(--color-primary-scarlet-800); color: var(--color-primary-scarlet-300); }
+.live-panel .countdown { margin: 0; border-radius: 0; }
 
 /* ---------- Ruled list (students quick links) ---------- */
 .ruled { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--text); }

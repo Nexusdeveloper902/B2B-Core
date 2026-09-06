@@ -88,7 +88,9 @@
         </div>
         {{-- TASK-017 — the window as a draining bar: urgency at a glance.
              SIBLING of #pairing-state (the script rewrites that box's
-             textContent — a child would not survive it). --}}
+             textContent — a child would not survive it). TASK-021 — the
+             status box + bar follow the live-panel full-bleed grammar
+             (tone strip + edge-to-edge meter, app.css scopes it). --}}
         <div id="pairing-countdown" class="countdown {{ $activeSession ? '' : 'hidden' }}"
              role="progressbar" aria-label="{{ __('app.pairing_window') }}"
              data-total="{{ $pairingWindowSeconds }}"
@@ -96,7 +98,7 @@
             <div class="countdown-fill"></div>
         </div>
         @if(! $activeSession)
-            <p class="muted" id="pairing-idle">{{ __('app.pairing_no_session') }}</p>
+            <p class="live-empty" id="pairing-idle">{{ __('app.pairing_no_session') }}</p>
         @endif
     </x-panel>
 </section>

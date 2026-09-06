@@ -650,3 +650,31 @@ per student" bench report. Repository reality updates:
 - Test count 232/3 (+9; `the_most_recent_armed_pairing_wins`
   strengthened to pin the invariant); e2e 24/24; device + realtime
   tap contracts byte-identical — firmware needs nothing.
+
+## TASK-021 (RUN-2026-09-06-core-019) — pairing status card → Signal tone strip
+
+- **Owner-reported inconsistency confirmed by measurement**: the
+  desk's status panel is an UNPADDED full-bleed `.live-panel`, but
+  the state box was an inset bordered rounded card (the padded-
+  panel answer-box grammar) with 16px gutters vs the head's 18px,
+  a floating 14px top gap, while the countdown bar had ZERO side
+  inset (touched the panel borders) and the idle note ran flush
+  at the edges — three gutter systems in one panel.
+- **Fix (presentation only, scoped `.live-panel` descendants)**:
+  the status box is now a full-bleed tone STRIP — 18px gutters,
+  edge-to-edge data-tint (ok) / accent-tint (error) field, single
+  1px rule line, no personal radius — the `.live-hint` /
+  marketplace `.tap-visual` pattern. The draining window meters
+  the panel's full width beneath the strip (margin 0, radius 0;
+  `is-low` scarlet unchanged). The idle note uses the
+  `.live-empty` row grammar (24px 18px, mono, muted).
+- **Zero contract drift**: JS still writes `nl-answer answer-ok|
+  answer-error`; every pinned ID/structure survives (sibling bar,
+  data-total, hidden toggles, aria). The dashboards' answer boxes
+  in padded panels keep the inset card grammar — ADR-028's value
+  match is untouched (no new ADR: applying the existing Signal
+  rule to a TASK-020-era element).
+- Proven live (7 screenshots + VLM review, all four states, ES
+  render, mobile 390px no h-scroll, zero console errors).
+- Test count 233/3 (+1 grammar pin in AdminPairingDeskTest); e2e
+  24/24.
