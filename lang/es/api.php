@@ -28,10 +28,10 @@ return [
     'pairing_card_already_paired' => 'La tarjeta ya está emparejada',
 
     // Endpoint de consulta en lenguaje natural
-    'nlq_not_configured' => 'La consulta en lenguaje natural no está configurada: falta GEMINI_API_KEY (bloqueada, no fallida).',
-    'nlq_invalid_key' => 'Google rechazó el GEMINI_API_KEY configurado (inválido o revocado). Crea una clave nueva en Google AI Studio, ponla en .env y verifica con: ./run llm-check',
-    'nlq_region_unsupported' => 'Google rechaza las llamadas a la API de Gemini desde esta red o región («User location is not supported»). La clave sí es válida: ejecuta ./run llm-check desde esta máquina y consulta la página «Available regions» de la API de Gemini.',
-    'nlq_model_not_found' => 'El GEMINI_MODEL configurado no existe para esta cuenta o versión de la API. Usa el valor por defecto (gemini-3.1-flash-lite) y verifica con: ./run llm-check',
+    'nlq_not_configured' => 'La consulta en lenguaje natural no está configurada: falta DEEPSEEK_API_KEY (bloqueada, no fallida).',
+    'nlq_invalid_key' => 'DeepSeek rechazó el DEEPSEEK_API_KEY configurado (inválido o revocado). Crea una clave nueva en platform.deepseek.com, ponla en .env y verifica con: ./run llm-check',
+    'nlq_insufficient_balance' => 'La clave es válida pero el saldo de la cuenta de DeepSeek está vacío (pago por uso, sin capa gratuita). Recarga en platform.deepseek.com y verifica con: ./run llm-check',
+    'nlq_model_not_found' => 'El DEEPSEEK_MODEL configurado no existe para esta cuenta o versión de la API. Usa el valor por defecto (deepseek-v4-flash) y verifica con: ./run llm-check',
     'nlq_rate_limited' => 'La cuota del modelo de lenguaje se agotó, reintenta más tarde.',
     'nlq_unavailable' => 'El servicio del modelo de lenguaje no está disponible, reintenta más tarde.',
 

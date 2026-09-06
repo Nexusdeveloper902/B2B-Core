@@ -37,7 +37,7 @@ command to run is always printed for you — and it's usually `./run doctor`.
 | `./run status` | guessing | App state: toolchain, .env, DB, servers, classifier |
 | `./run reset` | `migrate:fresh --seed` | Fresh DB + demo data (asks first) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Local model server: start/stop/status/run |
-| `./run llm-check` | reading a generic "unavailable" | One live Gemini call — exact verdict for THIS machine |
+| `./run llm-check` | reading a generic "unavailable" | One live DeepSeek call — exact verdict for THIS machine |
 | `./run toolchain` | manual PHP installation | Hermetic static PHP+Composer into `.tools/` |
 | `./run ci` | reading ci.yml | Everything CI runs, locally, in order |
 
@@ -103,7 +103,7 @@ lives in `.agent/ARCHITECTURE/realtime-feed.md`.
 ```
 
 Anything after the suite name is forwarded to `php artisan test`. Live-LLM
-tests remain opt-in (`RUN_LIVE_LLM_TESTS=1` + `GEMINI_API_KEY`).
+tests remain opt-in (`RUN_LIVE_LLM_TESTS=1` + `DEEPSEEK_API_KEY`).
 
 ## `e2e`
 
@@ -210,7 +210,7 @@ Env: `B2B_MODEL_PORT` (default 8501, matching `LOCAL_CLASSIFIER_URL`).
 ## `llm-check`
 
 ```bash
-./run llm-check    # one bare live call to the Gemini API + exact verdict
+./run llm-check    # one bare live call to the DeepSeek API + exact verdict
 ```
 
 Self-diagnosing connectivity check for the NL-query feature. Makes ONE

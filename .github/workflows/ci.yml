@@ -381,25 +381,25 @@ jobs:
     env:
       # secrets context IS allowed in job-level env (unlike job-level if —
       # see ADR-012; that distinction silently killed this workflow before).
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
     outputs:
       enabled: ${{ steps.gate.outputs.enabled }}
     steps:
-      - name: Detect whether the Gemini key is configured
+      - name: Detect whether the DeepSeek key is configured
         id: gate
         run: |
-          if [ -n "$GEMINI_API_KEY" ]; then
+          if [ -n "$DEEPSEEK_API_KEY" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::GEMINI_API_KEY secret is not configured — live-LLM smoke will be skipped by design (free-tier friendly)."
+            echo "::notice::DEEPSEEK_API_KEY secret is not configured — live-LLM smoke will be skipped by design (owner opts in by adding the secret)."
           fi
 
   live-llm-smoke:
-    name: Optional live-LLM smoke (Gemini flash-lite)
+    name: Optional live-LLM smoke (DeepSeek v4 flash)
     # needs context IS allowed in job-level if; this is the canonical gate
     # pattern (ADR-012). Runs only when the repo owner configures the
-    # GEMINI_API_KEY secret — never blocks CI otherwise.
+    # DEEPSEEK_API_KEY secret — never blocks CI otherwise.
     needs: llm-gate
     if: needs.llm-gate.outputs.enabled == 'true'
     runs-on: ubuntu-latest
@@ -423,52 +423,53 @@ jobs:
       - name: Bootstrap via the run suite
         run: ./run setup --ci
 
-      - name: Probe the Gemini API directly (raw diagnostics)
+      - name: Probe the DeepSeek API directly (raw diagnostics)
         # Diagnostics ONLY — a transient network timeout here must not
         # fail the job (the live TEST below is the authoritative gate).
         # One retry after 5s, then report whatever happened and continue.
         run: |
-          model="$(grep '^GEMINI_MODEL=' .env | cut -d= -f2-)"
-          url="https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent"
-          body='{"contents":[{"parts":[{"text":"Reply with exactly: OK"}]}]}'
+          model="$(grep '^DEEPSEEK_MODEL=' .env | cut -d= -f2-)"
+          url="https://api.deepseek.com/chat/completions"
+          body="{\"model\":\"${model}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"max_tokens\":8,\"thinking\":{\"type\":\"disabled\"}}"
           code="$(curl -sS -o probe.json -w '%{http_code}' -m 30 "$url" \
-            -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+            -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
             -H 'Content-Type: application/json' \
             -d "$body")" || code=000
           if [ "$code" = "000" ]; then
             echo "::warning::probe attempt 1 failed (timeout/network) — retrying once in 5s"
             sleep 5
             code="$(curl -sS -o probe.json -w '%{http_code}' -m 45 "$url" \
-              -H "x-goog-api-key: ${GEMINI_API_KEY}" \
+              -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
               -H 'Content-Type: application/json' \
               -d "$body")" || code=000
           fi
-          echo "probe: HTTP ${code} — models/${model}:generateContent"
+          echo "probe: HTTP ${code} — chat/completions (model ${model})"
           [ -s probe.json ] && cat probe.json || echo '(no response body)'
           echo
-          echo '--- flash-family models reachable with this key ---'
-          curl -sS -m 30 "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" \
-            -H "x-goog-api-key: ${GEMINI_API_KEY}" \
-            | python3 -c "import json,sys; d=json.load(sys.stdin); [print(' ', m['name']) for m in d.get('models',[]) if 'flash' in m['name']]" \
+          echo '--- models reachable with this key ---'
+          curl -sS -m 30 "https://api.deepseek.com/models" \
+            -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); [print(' ', m['id']) for m in d.get('data',[])]" \
             || echo '(model list unavailable)'
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
       - name: Run the live NL-query smoke test (single light call)
         # The key MUST arrive as a real process env var (step env below).
-        # phpunit.xml pins GEMINI_API_KEY="" with force=false, so phpunit
+        # phpunit.xml pins DEEPSEEK_API_KEY="" with force=false, so phpunit
         # only applies it when the var is absent; a process env var wins.
         # (Appending the key to .env NEVER worked: immutable dotenv keeps
         # the phpunit-level empty value — the TASK-006 lesson.)
         # Skip-detection: a skip while a key is configured is a wiring bug
         # and must fail loudly, not hide behind a green job.
         #
-        # Bounded transient retry (ADR-019): Google's 503 UNAVAILABLE
-        # "high demand... temporary" failure is documented-transient — the
-        # live gate retries ONLY the transport class (blocked reason
-        # llm_unavailable) up to 3 attempts. Invalid key, region, quota,
-        # model and wiring errors fail IMMEDIATELY; a transient that
-        # survives all attempts still fails red (OBS-007 honesty kept).
+        # Bounded transient retry (ADR-019): DeepSeek's 500/503
+        # "Server Error / Server Overloaded — retry after a brief wait"
+        # class is documented-transient — the live gate retries ONLY the
+        # transport class (blocked reason llm_unavailable) up to 3 attempts.
+        # Invalid key, insufficient balance, model, quota and wiring errors
+        # fail IMMEDIATELY; a transient that survives all attempts still
+        # fails red (OBS-007 honesty kept).
         run: |
           set -o pipefail
           status=0
@@ -481,14 +482,14 @@ jobs:
             # Retry decision is scoped to the transport-failure class by
             # the blocked reason the API echoes (ADR-016 taxonomy).
             if grep -q 'llm_unavailable' live-smoke.log && [ "$attempt" -lt 3 ]; then
-              echo "::warning::live-smoke attempt ${attempt} failed with a transient transport error (llm_unavailable) — retrying in 20s (Google: spikes in demand are usually temporary)."
+              echo "::warning::live-smoke attempt ${attempt} failed with a transient transport error (llm_unavailable) — retrying in 20s (DeepSeek: overload is usually temporary)."
               sleep 20
             else
               break
             fi
           done
           if grep -q 'skipped' live-smoke.log; then
-            echo "::error::Live-LLM smoke SKIPPED although GEMINI_API_KEY is configured — the key never reached the test (wiring bug, see TASK-006)."
+            echo "::error::Live-LLM smoke SKIPPED although DEEPSEEK_API_KEY is configured — the key never reached the test (wiring bug, see TASK-006)."
             exit 1
           fi
           if [ "$status" -ne 0 ]; then
@@ -498,4 +499,4 @@ jobs:
           fi
         env:
           RUN_LIVE_LLM_TESTS: '1'
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

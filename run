@@ -52,10 +52,10 @@ Commands / Comandos:
              / Desvincula todas las tarjetas para que toda credencial vuelva a estar fresca (pregunta salvo --force)
   model      Local model server: start | stop | status | run
              / Servidor del modelo local: start | stop | status | run
-  llm-check  One live Gemini call — exact verdict for THIS machine
-             (key / region / model / quota) with fix guidance
-             / Una llamada en vivo a Gemini — veredicto exacto para ESTA
-               máquina (clave / región / modelo / cuota) y cómo corregirlo
+  llm-check  One live DeepSeek call — exact verdict for THIS machine
+             (key / balance / model / rate limit) with fix guidance
+             / Una llamada en vivo a DeepSeek — veredicto exacto para ESTA
+               máquina (clave / saldo / modelo / límite) y cómo corregirlo
   toolchain  Provision hermetic PHP + Composer into .tools/ (no root, no system pkgs)
              / Provisiona PHP + Composer herméticos en .tools/ (sin root ni paquetes)
   ci         Everything CI runs, locally: quality -> test all -> e2e

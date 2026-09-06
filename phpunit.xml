@@ -40,7 +40,7 @@
         <!-- Presence Platform test defaults: stub classifier, NO live LLM
              calls (live LLM tests require an explicit opt-in env pair). -->
         <env name="RECYCLING_CLASSIFIER_DRIVER" value="stub"/>
-        <env name="GEMINI_API_KEY" value=""/>
+        <env name="DEEPSEEK_API_KEY" value=""/>
         <env name="ATTENDANCE_LATE_CUTOFF" value="08:15"/>
     </php>
 </phpunit>

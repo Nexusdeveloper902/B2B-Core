@@ -71,7 +71,7 @@ return [
     'nl_query' => 'Natural language query',
     'nl_query_placeholder' => 'Ask e.g.: How many students attended today? / PAE lunch totals? / recycling this week?',
     'ask' => 'Ask',
-    'nl_query_not_configured' => 'NL query is not configured (no GEMINI_API_KEY) — endpoint reports this as blocked.',
+    'nl_query_not_configured' => 'NL query is not configured (no DEEPSEEK_API_KEY) — endpoint reports this as blocked.',
     'redemption' => 'Redeem reward',
     'student' => 'Student',
     'reward' => 'Reward',

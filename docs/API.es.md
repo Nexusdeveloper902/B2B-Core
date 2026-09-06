@@ -345,7 +345,7 @@ toques en el endpoint de tap.
 **Petición**: `{"question": "¿Cuántos niños llegaron tarde esta semana?"}`
 
 Flujo: la pregunta + un conjunto fijo de esquemas de funciones va al modelo
-flash-lite de Gemini (por defecto `gemini-3.1-flash-lite`) → el modelo
+de DeepSeek (por defecto `deepseek-v4-flash`) → el modelo
 **selecciona una función** → el backend ejecuta la
 **consulta Eloquent real** → el resultado vuelve al modelo → el modelo redacta
 la respuesta final. El LLM nunca calcula ni fabrica cifras.
@@ -368,28 +368,28 @@ Funciones disponibles: `get_attendance_count(date, class_id?)`,
 
 `503` — **bloqueo honesto** — cada clase de rechazo tiene su propio
 `blocked_reason` accionable (según el contrato de errores documentado de
-Google):
+DeepSeek):
 
 | `blocked_reason` | Significado | Corrección |
 |---|---|---|
-| `missing_llm_credential` | No hay `GEMINI_API_KEY` en `.env` | Añade la clave y ejecuta `./run llm-check` |
-| `llm_invalid_key` | Google rechazó la clave (400 `API_KEY_INVALID` / 401 / 403) | Crea una clave nueva en AI Studio y actualiza `.env` |
-| `llm_region_unsupported` | «User location is not supported» — la clave SÍ es válida; Google rechaza la región | Ejecuta `./run llm-check` desde esta máquina; consulta la página de regiones soportadas de Google |
-| `llm_model_not_found` | `GEMINI_MODEL` desconocido para esta cuenta/API (404) | Usa el valor por defecto `gemini-3.1-flash-lite` |
-| `llm_rate_limited` | Cuota agotada (429) | Reintenta más tarde |
+| `missing_llm_credential` | No hay `DEEPSEEK_API_KEY` en `.env` | Añade la clave y ejecuta `./run llm-check` |
+| `llm_invalid_key` | DeepSeek rechazó la clave (401 Authentication Fails) | Crea una clave nueva en platform.deepseek.com y actualiza `.env` |
+| `llm_insufficient_balance` | 402 — la clave SÍ es válida pero el saldo de la cuenta está vacío (pago por uso) | Recarga el saldo en platform.deepseek.com |
+| `llm_model_not_found` | `DEEPSEEK_MODEL` desconocido para esta cuenta/API (404 Model Not Exist) | Usa el valor por defecto `deepseek-v4-flash` |
+| `llm_rate_limited` | Límite de peticiones alcanzado (429) | Reintenta más tarde |
 | `llm_unavailable` | Error de transporte/servidor | Reintenta; el detalle está en `storage/logs/laravel.log` |
 
 ```json
 {
   "status": "blocked",
   "blocked_reason": "missing_llm_credential",
-  "message": "La consulta en lenguaje natural no está configurada: falta GEMINI_API_KEY (bloqueada, no fallida)."
+  "message": "La consulta en lenguaje natural no está configurada: falta DEEPSEEK_API_KEY (bloqueada, no fallida)."
 }
 ```
 
 Ejecuta `./run llm-check` en la máquina que hace las llamadas — realiza una
 petición directa en vivo con la misma clave + modelo e imprime el veredicto
-exacto de Google con orientación bilingüe.
+exacto de DeepSeek con orientación bilingüe.
 
 ---
 

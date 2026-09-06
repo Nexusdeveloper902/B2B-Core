@@ -320,7 +320,7 @@
             "nl-query"
           ]
         },
-        "description": "Phase E — Gemini function-calling; the LLM only SELECTS functions, the backend computes the real answer.\n\nResponse 200: { status, answer, functions_called }\nResponse 503: { status: 'blocked', blocked_reason } when no GEMINI_API_KEY is configured (honest blocker, not a fake answer)."
+        "description": "Phase E — DeepSeek tool-calling; the LLM only SELECTS functions, the backend computes the real answer.\n\nResponse 200: { status, answer, functions_called }\nResponse 503: { status: 'blocked', blocked_reason } when no DEEPSEEK_API_KEY is configured (honest blocker, not a fake answer)."
       }
     },
     {

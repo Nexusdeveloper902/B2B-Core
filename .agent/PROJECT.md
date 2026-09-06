@@ -678,3 +678,59 @@ per student" bench report. Repository reality updates:
   render, mobile 390px no h-scroll, zero console errors).
 - Test count 233/3 (+1 grammar pin in AdminPairingDeskTest); e2e
   24/24.
+
+## TASK-022 (RUN-2026-09-06-core-020) — provider migration: Gemini → DeepSeek V4 Flash
+
+- **The LLM provider is DeepSeek** (ADR-030, superseding ADR-006 and
+  ADR-015's Gemini wire format): NL queries run on `deepseek-v4-flash`
+  through a hand-rolled OpenAI-compatible `DeepSeekClient`
+  (api.deepseek.com/chat/completions, Bearer auth, thinking mode
+  explicitly DISABLED — V4 thinks by default, ignores temperature and
+  multiplies latency — temperature 0, tools built from the registry's
+  provider-neutral declarations, assistant turns echoed VERBATIM +
+  role:"tool" replies). The optional vision classifier driver is
+  `deepseek` (`DeepSeekClassifier` on `deepseek-v4-flash-vision-exp`,
+  the ONLY image-capable DeepSeek model — non-vision models 400 on
+  images) using response_format json_object + the prompt contract the
+  JSON Output guide requires.
+- **The migration is grounded in docs pulled from the web THIS run**
+  (OBS-013): the V4 family lineup, the 2026-07-24 death of the
+  legacy deepseek-chat/deepseek-reasoner names, the vision model's
+  release (2026-08-21), the thinking-mode default, and the error
+  table are all first-hand current facts — no stale-knowledge model
+  names anywhere.
+- **Error taxonomy swapped to DeepSeek's documented contract**
+  (ADR-016 pattern kept): 401 llm_invalid_key · 402
+  llm_insufficient_balance (NEW actionable pay-as-you-go class) ·
+  404/"Model Not Exist" llm_model_not_found · 429 llm_rate_limited ·
+  5xx llm_unavailable (ADR-019's retry class unchanged).
+  llm_region_unsupported is RETIRED — DeepSeek documents no region
+  restriction, so the OBS-002 sandbox geo-block is expected to be
+  moot for LLM calls once a key exists.
+- **No free tier anymore**: DeepSeek is pay-as-you-go balance
+  (peak/off-peak pricing). All "free-tier friendly" framing is
+  replaced by the honest owner-opts-in framing; the CI secret is
+  `DEEPSEEK_API_KEY` and the owner must add it to re-arm the
+  live-llm-smoke job (gated skip until then — by design, never
+  masked).
+- Env surface: `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`
+  (deepseek-v4-flash) / `DEEPSEEK_VISION_MODEL`
+  (deepseek-v4-flash-vision-exp) / `DEEPSEEK_TIMEOUT`. Zero GEMINI_*
+  references remain in code, config, docs, tests, or scripts; the
+  old AIza/AQ leak-tripwire PATTERNS are deliberately kept in
+  DocumentationTest (git-history defense) and joined by a DeepSeek
+  `sk-…` pattern.
+- `./run llm-check` is the DeepSeek diagnosis tool now: one bare
+  chat/completions probe, DeepSeek's exact verdict (401 key / 402
+  balance / 404 model / 429 rate / 000 network), bilingual fix
+  guidance, legacy-model-name and vision-model warnings, exit
+  0/1/2 unchanged.
+- Test count is 238/1 (was 235/1): DeepSeekClientTest (9,
+  docs-derived fixtures incl. the JSON-string tool arguments trap)
+  replaces GeminiClientTest; +1 balance-blocker feature test; Pint
+  clean; e2e 24/24; baseline was measured green BEFORE the first
+  edit so the delta is attributable.
+- Live round-trip NOT verified this run: no DEEPSEEK_API_KEY value
+  was supplied (only a GitHub PAT). First owner action: create the
+  key, `./run llm-check`, add the CI secret — the live smoke job
+  re-proves the pipeline the moment the secret exists.

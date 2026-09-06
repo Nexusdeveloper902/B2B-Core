@@ -333,8 +333,8 @@ immediately for taps on the tap endpoint.
 
 **Request**: `{"question": "How many kids were late this week?"}`
 
-Flow: the question + a fixed set of function schemas goes to the Gemini
-flash-lite model (default `gemini-3.1-flash-lite`) → the model **selects a
+Flow: the question + a fixed set of function schemas goes to the DeepSeek
+model (default `deepseek-v4-flash`) → the model **selects a
 function** → the backend executes the **real
 Eloquent query** → the result returns to the model → the model phrases the
 final answer. The LLM never computes or fabricates numbers.
@@ -356,27 +356,27 @@ Callable functions: `get_attendance_count(date, class_id?)`,
 ```
 
 `503` — **honest blocker** — each refusal class has its own actionable
-`blocked_reason` (per Google's documented error contract):
+`blocked_reason` (per DeepSeek's documented error contract):
 
 | `blocked_reason` | Meaning | Fix |
 |---|---|---|
-| `missing_llm_credential` | No `GEMINI_API_KEY` in `.env` | Add the key, then `./run llm-check` |
-| `llm_invalid_key` | Google rejected the key (400 `API_KEY_INVALID` / 401 / 403) | Create a fresh key in AI Studio, update `.env` |
-| `llm_region_unsupported` | "User location is not supported" — the key is valid; Google refuses the region | Run `./run llm-check` from this machine; see Google's Available regions page |
-| `llm_model_not_found` | `GEMINI_MODEL` unknown for this account/API (404) | Use the default `gemini-3.1-flash-lite` |
-| `llm_rate_limited` | Quota exhausted (429) | Retry later |
+| `missing_llm_credential` | No `DEEPSEEK_API_KEY` in `.env` | Add the key, then `./run llm-check` |
+| `llm_invalid_key` | DeepSeek rejected the key (401 Authentication Fails) | Create a fresh key at platform.deepseek.com, update `.env` |
+| `llm_insufficient_balance` | 402 — the key is valid but the account balance is empty (pay-as-you-go) | Top up at platform.deepseek.com |
+| `llm_model_not_found` | `DEEPSEEK_MODEL` unknown for this account/API (404 Model Not Exist) | Use the default `deepseek-v4-flash` |
+| `llm_rate_limited` | Rate limit reached (429) | Retry later |
 | `llm_unavailable` | Transport/server error | Retry; see `storage/logs/laravel.log` for the raw cause |
 
 ```json
 {
   "status": "blocked",
   "blocked_reason": "missing_llm_credential",
-  "message": "Natural-language query is not configured: no GEMINI_API_KEY set (blocked, not failed)."
+  "message": "Natural-language query is not configured: no DEEPSEEK_API_KEY set (blocked, not failed)."
 }
 ```
 
 Run `./run llm-check` on the machine making the calls — it performs one
-bare live request with the same key + model and prints Google's exact
+bare live request with the same key + model and prints DeepSeek's exact
 verdict with bilingual fix guidance.
 
 ---

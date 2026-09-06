@@ -71,7 +71,7 @@ return [
     'nl_query' => 'Consulta en lenguaje natural',
     'nl_query_placeholder' => 'Pregunta p. ej.: ¿Cuántos estudiantes asistieron hoy? / ¿PAE del almuerzo? / ¿reciclaje de esta semana?',
     'ask' => 'Preguntar',
-    'nl_query_not_configured' => 'La consulta NL no está configurada (sin GEMINI_API_KEY) — el endpoint lo reporta como bloqueado.',
+    'nl_query_not_configured' => 'La consulta NL no está configurada (sin DEEPSEEK_API_KEY) — el endpoint lo reporta como bloqueado.',
     'redemption' => 'Canjear recompensa',
     'students' => 'Estudiantes',
     'reward' => 'Recompensa',

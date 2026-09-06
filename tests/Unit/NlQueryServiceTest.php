@@ -2,16 +2,16 @@
 
 namespace Tests\Unit;
 
+use App\Services\NlQuery\DeepSeekClient;
 use App\Services\NlQuery\Exceptions\NlQueryException;
 use App\Services\NlQuery\FunctionRegistry;
-use App\Services\NlQuery\GeminiClient;
 use App\Services\NlQuery\NlQueryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Full function-calling orchestration — with the transport MOCKED, so the
+ * Full tool-calling orchestration — with the transport MOCKED, so the
  * LLM protocol (call -> real query -> response -> final answer) is verified
  * without any network or API quota.
  */
@@ -30,7 +30,7 @@ class NlQueryServiceTest extends TestCase
     {
         config(['recycling.nl_query.api_key' => null]);
 
-        $service = $this->makeService(new GeminiClient(null, 'gemini-3.1-flash-lite'));
+        $service = $this->makeService(new DeepSeekClient(null, 'deepseek-v4-flash'));
 
         $this->expectException(NlQueryException::class);
         $this->expectExceptionMessage('nl_query.not_configured');
@@ -41,36 +41,52 @@ class NlQueryServiceTest extends TestCase
     #[Test]
     public function executes_the_selected_function_and_phrases_the_answer(): void
     {
-        $fake = new class('fake-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        $fake = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
         {
             public int $calls = 0;
 
-            public bool $sawFunctionResponse = false;
+            public bool $sawToolResult = false;
 
-            public array $lastContents = [];
+            public array $lastMessages = [];
 
-            public function generate(array $contents, ?array $tools = null): array
+            public function generate(array $messages, ?array $tools = null): array
             {
-                $this->lastContents = $contents;
+                $this->lastMessages = $messages;
                 $this->calls++;
 
                 // Round 1: the model selects a function to call.
                 if ($this->calls === 1) {
                     return [
                         'text' => null,
-                        'function_call' => [
+                        'tool_calls' => [[
+                            'id' => 'call_0_test',
                             'name' => 'get_attendance_count',
-                            'args' => ['date' => now()->toDateString()],
+                            'arguments' => ['date' => now()->toDateString()],
+                        ]],
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => null,
+                            'tool_calls' => [[
+                                'id' => 'call_0_test',
+                                'type' => 'function',
+                                'function' => [
+                                    'name' => 'get_attendance_count',
+                                    'arguments' => json_encode(['date' => now()->toDateString()]),
+                                ],
+                            ]],
                         ],
                     ];
                 }
 
-                // Round 2: the model saw the functionResponse and answers.
-                $this->sawFunctionResponse = collect($contents)
-                    ->flatMap(fn ($c) => $c['parts'])
-                    ->contains(fn ($part) => isset($part['functionResponse']));
+                // Round 2: the model saw the role:"tool" result and answers.
+                $this->sawToolResult = collect($messages)
+                    ->contains(fn ($m) => ($m['role'] ?? '') === 'tool' && isset($m['tool_call_id']));
 
-                return ['text' => 'Three students attended class today.', 'function_call' => null];
+                return [
+                    'text' => 'Three students attended class today.',
+                    'tool_calls' => [],
+                    'message' => ['role' => 'assistant', 'content' => 'Three students attended class today.'],
+                ];
             }
         };
 
@@ -80,28 +96,52 @@ class NlQueryServiceTest extends TestCase
         $this->assertSame('Three students attended class today.', $result['answer']);
         $this->assertSame(2, $fake->calls, 'Exactly one tool round must happen.');
         $this->assertSame('get_attendance_count', $result['functions_called'][0]['name']);
-        $this->assertTrue($fake->sawFunctionResponse, 'The model must receive the function response before answering.');
+        $this->assertTrue($fake->sawToolResult, 'The model must receive the tool result before answering.');
 
         // The conversation fed back to the model contains the real backend result.
-        $modelTurn = collect($fake->lastContents)->firstWhere('role', 'model');
-        $this->assertNotNull($modelTurn);
-        $this->assertSame('get_attendance_count', $modelTurn['parts'][0]['functionCall']['name']);
+        $assistantTurn = collect($fake->lastMessages)->firstWhere('role', 'assistant');
+        $this->assertNotNull($assistantTurn);
+        $this->assertSame('get_attendance_count', $assistantTurn['tool_calls'][0]['function']['name']);
+        $this->assertSame('call_0_test', $assistantTurn['tool_calls'][0]['id'], 'The assistant turn must keep the tool call id for the tool reply.');
 
-        $responseTurn = collect($fake->lastContents)->last();
-        $this->assertArrayHasKey('functionResponse', $responseTurn['parts'][0]);
-        $this->assertArrayHasKey('attendance_count', $responseTurn['parts'][0]['functionResponse']['response']['result']);
+        $toolTurn = collect($fake->lastMessages)->firstWhere('role', 'tool');
+        $this->assertNotNull($toolTurn);
+        $this->assertSame('call_0_test', $toolTurn['tool_call_id']);
+        $toolPayload = json_decode((string) $toolTurn['content'], true);
+        $this->assertArrayHasKey('attendance_count', $toolPayload);
+
+        // The question rides as the user message; the system message sets
+        // the language/behavior contract.
+        $this->assertSame('How many students attended today?', $fake->lastMessages[1]['content']);
+        $this->assertSame('system', $fake->lastMessages[0]['role']);
     }
 
     #[Test]
     public function refuses_to_loop_forever(): void
     {
-        $alwaysCalls = new class('fake-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        $alwaysCalls = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
         {
-            public function generate(array $contents, ?array $tools = null): array
+            public function generate(array $messages, ?array $tools = null): array
             {
                 return [
                     'text' => null,
-                    'function_call' => ['name' => 'get_recycling_totals', 'args' => ['date_from' => '2026-09-01', 'date_to' => '2026-09-02']],
+                    'tool_calls' => [[
+                        'id' => 'call_loop',
+                        'name' => 'get_recycling_totals',
+                        'arguments' => ['date_from' => '2026-09-01', 'date_to' => '2026-09-02'],
+                    ]],
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => null,
+                        'tool_calls' => [[
+                            'id' => 'call_loop',
+                            'type' => 'function',
+                            'function' => [
+                                'name' => 'get_recycling_totals',
+                                'arguments' => json_encode(['date_from' => '2026-09-01', 'date_to' => '2026-09-02']),
+                            ],
+                        ]],
+                    ],
                 ];
             }
         };
@@ -110,7 +150,7 @@ class NlQueryServiceTest extends TestCase
 
         try {
             $service->ask('recycling totals?');
-            $this->fail('Expected NlQueryException for runaway function calling.');
+            $this->fail('Expected NlQueryException for runaway tool calling.');
         } catch (NlQueryException $e) {
             $this->assertSame('nl_query.max_rounds_exceeded', $e->getMessage());
         }
@@ -119,11 +159,11 @@ class NlQueryServiceTest extends TestCase
     #[Test]
     public function empty_model_answer_is_an_error_not_a_fake_success(): void
     {
-        $silent = new class('fake-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        $silent = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
         {
-            public function generate(array $contents, ?array $tools = null): array
+            public function generate(array $messages, ?array $tools = null): array
             {
-                return ['text' => '', 'function_call' => null];
+                return ['text' => '', 'tool_calls' => [], 'message' => ['role' => 'assistant', 'content' => '']];
             }
         };
 
@@ -135,7 +175,7 @@ class NlQueryServiceTest extends TestCase
         $service->ask('anything');
     }
 
-    private function makeService(GeminiClient $client): NlQueryService
+    private function makeService(DeepSeekClient $client): NlQueryService
     {
         return new NlQueryService($client, app(FunctionRegistry::class));
     }
