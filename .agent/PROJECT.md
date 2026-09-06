@@ -456,3 +456,51 @@ per student" bench report. Repository reality updates:
   pins the `America/Bogota` note in API.md EN/ES.
 - Carry-over bench rows created pre-change are UTC-stamped (read 5 h
   off); `./run reset` is the sanctioned re-seed.
+
+## RUN-2026-09-06-core-014 — appended project facts (realtime WebSocket feed)
+
+- **The dashboards update live** (TASK-016, ADR-026): `php artisan
+  realtime:serve` — a hand-rolled, zero-dependency pure-PHP WebSocket
+  server (stream_select + own RFC 6455 codec, ~270 lines) — polls the
+  **events table every ~300 ms** and pushes new taps to every open
+  dashboard. No F5, sub-300 ms perceived latency, ~3 tiny SQLite
+  queries/second. `./run serve` starts it next to the web server and
+  the EXIT trap tears both down; `./run status` reports it.
+- **The events spine is the broadcast source** — the tap endpoint is
+  byte-identical (empty diff, device protocol untouched), works for
+  taps written by ANY process sharing the DB, and the WS process
+  dying degrades honestly: SSR rows + Offline badge + reload hint.
+  Broadcasting from the tap endpoint was rejected (couples the device
+  write path to a UI concern).
+- **WS auth = HMAC-SHA256 one-time-window tokens** (`userId.expiry.
+  sig`, keyed by APP_KEY, TTL 900 s) minted session-side by
+  `GET /realtime/token` (admin/teacher) into the page render;
+  re-minted on reconnect. The socket process never parses Laravel
+  sessions. Invalid tokens get plain-HTTP 401 before any framing.
+- **SSR-first live panel on both dashboards**: rows server-rendered
+  from the same `RealtimeFeed::recent()` query the hello frame sends
+  (one rendering path, one truth); `public/js/realtime.js` is no-build
+  native WebSocket: badge honesty (live/connecting/offline),
+  prepend+flash, backoff reconnect 1 s→15 s, `realtime:tap`
+  CustomEvent; teacher attendance rows flip live with FIRST-tap-wins
+  (matching `classAttendanceToday`).
+- **Feed payload mirrors dashboard-visible data only** (no credential
+  UIDs) — LAN eavesdroppers learn nothing the login wall doesn't
+  gate. No permessage-deflate advertised, 1 MiB inbound frame ceiling
+  as an abuse guard.
+- **Test count is 211** (was 178): +33 — WsFrame 8 (lengths
+  125/126/65536, masking, partial buffers), Handshake 5 (RFC 6455
+  worked example), RealtimeToken 6 (expiry/tamper/wrong-key),
+  RealtimeFeed 3, token route 3, DashboardTest +5 (SSR, waiting
+  state, teacher rows, ES, attribute-JSON escaping — the TASK-014
+  Blade lesson applied: attribute context takes the ESCAPED echo,
+  script literals the unescaped one), RealtimeServerTest 2 — **real
+  sockets against the real command process** (hello+history, live
+  broadcast, 401). `./run e2e` is 24 (was 22): realtime probe checks.
+- **Browser-proven live** (RUN record): offline badge honesty,
+  auto-reconnect, tap→row without reload (flash class), attendance
+  row Absent→Late live, first-tap-wins honored, zero console errors.
+  Sandbox note (owner unaffected): `artisan serve`'s inner `php -S`
+  child filters env vars — the deb-extracted sandbox PHP loses
+  PHPRC/LD_LIBRARY_PATH there; raw `php -S` + router, phpunit and
+  e2e are fine, the owner's system PHP is immune.

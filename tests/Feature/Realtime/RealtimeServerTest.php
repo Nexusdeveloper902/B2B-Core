@@ -1,0 +1,286 @@
+<?php
+
+namespace Tests\Feature\Realtime;
+
+use App\Services\Realtime\RealtimeToken;
+use App\Services\Realtime\WsFrame;
+use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+/**
+ * RealtimeServerTest — the REAL server process over REAL sockets
+ * (TASK-016, ADR-026).
+ *
+ * Boots `php artisan realtime:serve` as a child process against a
+ * dedicated file database, then drives the actual wire protocol with
+ * a hand-rolled client: HTTP upgrade → 101 → hello (history) → live
+ * broadcast after another process writes a tap row — exactly how the
+ * web tier produces taps. The tap API itself is already pinned by
+ * TapEventTest; here we pin "rows in → frames out".
+ */
+class RealtimeServerTest extends TestCase
+{
+    private const APP_KEY = 'realtime-server-test-key';
+
+    /** @var array{proc: resource, pipes: array<int, resource>, port: int, db: string}|null */
+    private ?array $server = null;
+
+    protected function tearDown(): void
+    {
+        $this->stopServer();
+        parent::tearDown();
+    }
+
+    #[Test]
+    public function the_feed_answers_hello_with_history_and_broadcasts_new_taps(): void
+    {
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $seededId = $this->seedTap($db, 'CLASS_ATTENDANCE', '07:50', 'LIVE TEST One');
+
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue(1, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertSame('hello', $hello['type']);
+        $this->assertSame($seededId, $hello['last_id']);
+        $this->assertContains('LIVE TEST One', array_column($hello['events'], 'student_name'));
+
+        // A tap written by ANOTHER process (the web tier's job) must
+        // broadcast to the connected dashboard within a few polls.
+        $newId = $this->seedTap($db, 'PAE_LUNCH', '12:02', 'LIVE TEST Two');
+
+        $tap = $this->readMessage($sock);
+        $this->assertNotNull($tap, 'no tap frame arrived after a new event row');
+        $this->assertSame('tap', $tap['type']);
+        $this->assertSame($newId, $tap['event']['id']);
+        $this->assertSame('LIVE TEST Two', $tap['event']['student_name']);
+        $this->assertSame('PAE_LUNCH', $tap['event']['type']);
+        $this->assertSame('12:02', $tap['event']['time']);
+        $this->assertSame('Live Reader', $tap['event']['reader_label']);
+        $this->assertIsInt($tap['event']['student_id']);
+
+        fclose($sock);
+    }
+
+    #[Test]
+    public function invalid_tokens_are_refused_with_plain_http_401_before_any_framing(): void
+    {
+        $db = storage_path('framework/testing/realtime-bogus-'.uniqid().'.sqlite');
+
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        [$sock, $head] = $this->upgrade($port, 'totally-bogus-token');
+
+        // The head terminator stops fgets; the body rides the same TCP
+        // segment and comes back from the stream buffer.
+        $body = (string) @fread($sock, 256);
+
+        $this->assertStringStartsWith('HTTP/1.1 401', $head);
+        $this->assertStringContainsString('Connection: close', $head);
+        $this->assertStringContainsString('realtime feed token', $head.$body);
+
+        fclose($sock);
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private function freshFileDatabase(): string
+    {
+        $db = storage_path('framework/testing/realtime-'.uniqid().'.sqlite');
+        @mkdir(dirname($db), 0777, true);
+        touch($db);
+
+        config(['database.connections.realtime_file' => [
+            'driver' => 'sqlite',
+            'database' => $db,
+            'prefix' => '',
+        ]]);
+
+        $this->artisan('migrate', ['--database' => 'realtime_file', '--force' => true]);
+
+        return $db;
+    }
+
+    /** Insert one complete tap (reader + student + card + event) and return the event id. */
+    private function seedTap(string $db, string $type, string $time, string $studentName): int
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        $readerId = $conn->table('readers')->where('label', 'Live Reader')->value('id');
+        if ($readerId === null) {
+            $readerId = $conn->table('readers')->insertGetId([
+                'label' => 'Live Reader',
+                'type' => 'classroom',
+                'active_event_type' => $type,
+                'api_key' => 'realtime-test-key-'.uniqid(),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $studentId = $conn->table('students')->insertGetId([
+            'name' => $studentName,
+            'grade' => '3°',
+            'pae_enrolled' => 0,
+            'class_id' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $cardId = $conn->table('cards')->insertGetId([
+            'credential_uid' => 'LIVE'.strtoupper(bin2hex(random_bytes(4))),
+            'student_id' => $studentId,
+            'status' => 'active',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return (int) $conn->table('events')->insertGetId([
+            'card_id' => $cardId,
+            'reader_id' => $readerId,
+            'type' => $type,
+            'occurred_at' => now()->toDateString()." {$time}:00",
+            'metadata' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Boot the server process on a free port; null when it never listens. */
+    private function startServer(string $db): ?int
+    {
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $port = random_int(21000, 39000);
+
+            // Inherit the phpunit env (PATH, SystemRoot on Windows, test
+            // overrides) and point the app at the dedicated file DB.
+            $env = array_merge(getenv() ?: [], [
+                'APP_ENV' => 'testing',
+                'APP_DEBUG' => 'false',
+                'APP_KEY' => self::APP_KEY,
+                'DB_CONNECTION' => 'sqlite',
+                'DB_DATABASE' => $db,
+                'REALTIME_POLL_MS' => '100',
+            ]);
+
+            $pipes = [];
+            $proc = proc_open(
+                [PHP_BINARY, 'artisan', 'realtime:serve', '--host=127.0.0.1', "--port={$port}"],
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+                base_path(),
+                $env,
+            );
+            if (! is_resource($proc)) {
+                continue;
+            }
+            fclose($pipes[0]);
+
+            for ($i = 0; $i < 60; $i++) {
+                $probe = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
+                if ($probe !== false) {
+                    fclose($probe);
+                    $this->server = ['proc' => $proc, 'pipes' => $pipes, 'port' => $port, 'db' => $db];
+
+                    return $port;
+                }
+                $status = proc_get_status($proc);
+                if (! $status['running']) {
+                    break; // died (port clash?) — diag below, then retry
+                }
+                usleep(100000);
+            }
+
+            $diagnostics = '';
+            foreach (array_slice($pipes, 1) as $pipe) {
+                $diagnostics .= stream_get_contents($pipe);
+            }
+            @fwrite(STDERR, "realtime:serve boot attempt failed on port {$port}: {$diagnostics}\n");
+            proc_close($proc);
+        }
+
+        return null;
+    }
+
+    private function stopServer(): void
+    {
+        if ($this->server === null) {
+            return;
+        }
+        proc_terminate($this->server['proc']);
+        usleep(100000);
+        proc_close($this->server['proc']);
+        @unlink($this->server['db']);
+        $this->server = null;
+    }
+
+    /** Perform the HTTP upgrade; returns [socket, response head]. */
+    private function upgrade(int $port, string $token): array
+    {
+        $sock = @stream_socket_client("tcp://127.0.0.1:{$port}", $errno, $errstr, 5);
+        $this->assertIsResource($sock, "connect failed: {$errstr} ({$errno})");
+        stream_set_timeout($sock, 5);
+
+        $key = base64_encode(random_bytes(16));
+        fwrite($sock,
+            'GET /app?token='.urlencode($token)." HTTP/1.1\r\n"
+            ."Host: 127.0.0.1:{$port}\r\n"
+            ."Upgrade: websocket\r\n"
+            ."Connection: Upgrade\r\n"
+            ."Sec-WebSocket-Key: {$key}\r\n"
+            ."Sec-WebSocket-Version: 13\r\n\r\n"
+        );
+
+        $head = '';
+        while (strpos($head, "\r\n\r\n") === false) {
+            $line = fgets($sock, 256);
+            if ($line === false) {
+                break;
+            }
+            $head .= $line;
+        }
+
+        return [$sock, $head];
+    }
+
+    /** Read WS text frames until a JSON message arrives (5 s budget). */
+    private function readMessage($sock): ?array
+    {
+        $buffer = '';
+        $deadline = microtime(true) + 5.0;
+
+        while (microtime(true) < $deadline) {
+            $result = WsFrame::decode($buffer);
+            if ($result['frame'] !== null) {
+                if ($result['frame']['opcode'] === WsFrame::OP_TEXT) {
+                    $message = json_decode($result['frame']['payload'], true);
+
+                    return is_array($message) ? $message : null;
+                }
+                $buffer = substr($buffer, $result['consumed']);
+
+                continue;
+            }
+            if ($result['error'] !== null) {
+                return null;
+            }
+
+            $chunk = @fread($sock, 8192);
+            if ($chunk === false || ($chunk === '' && feof($sock))) {
+                return null;
+            }
+            $buffer .= $chunk;
+        }
+
+        return null;
+    }
+}

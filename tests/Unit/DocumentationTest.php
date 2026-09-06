@@ -79,6 +79,26 @@ class DocumentationTest extends TestCase
         $this->assertFileExists(base_path('.github/workflows/ci.yml'));
     }
 
+    #[Test]
+    public function the_realtime_feed_contract_is_documented(): void
+    {
+        // TASK-016 — the WS protocol contract lives with the architecture
+        // records (not the HTTP API docs): ws URL, token, frame shapes.
+        $doc = base_path('.agent/ARCHITECTURE/realtime-feed.md');
+        $this->assertFileExists($doc);
+
+        $contents = (string) file_get_contents($doc);
+        foreach (['realtime:serve', 'realtime:tap', 'hello', 'token', '8081'] as $needle) {
+            $this->assertStringContainsString($needle, $contents, "realtime contract must document [{$needle}]");
+        }
+
+        // The serve script's realtime line must be documented bilingually.
+        foreach (['docs/SCRIPTS.md', 'docs/SCRIPTS.es.md'] as $path) {
+            $scripts = (string) file_get_contents(base_path($path));
+            $this->assertStringContainsString('realtime', $scripts, "{$path} must document the realtime feed");
+        }
+    }
+
     /**
      * THE security invariant: no committed file may contain a real secret.
      * Detects CREDENTIAL PATTERNS (not literal values — the test itself must

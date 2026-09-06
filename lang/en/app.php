@@ -100,6 +100,15 @@ return [
     'current_card' => 'Current card',
     'no_card' => 'no card',
 
+    // Live activity feed (TASK-016)
+    'live_activity' => 'Live activity',
+    'live_panel_sub' => 'Every card tap, as it happens',
+    'live_state_live' => 'Live',
+    'live_state_connecting' => 'Connecting…',
+    'live_state_offline' => 'Offline',
+    'live_waiting' => 'Waiting for the first tap…',
+    'live_offline_hint' => 'Live feed unavailable — reload the page to see the latest taps.',
+
     // Generic statuses
     'ok' => 'OK',
     'saving' => 'Saving…',

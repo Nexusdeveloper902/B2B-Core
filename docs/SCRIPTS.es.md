@@ -74,14 +74,24 @@ Códigos de salida: `0` bien · `1` fallo con la solución sugerida impresa.
 ## `serve`
 
 ```bash
-./run serve                # 127.0.0.1:8000
-./run serve 8080           # puerto personalizado
+./run serve                # 127.0.0.1:8000 (web) + :8081 (canal en vivo)
+./run serve 8080           # puerto web personalizado (el canal queda en 8081)
 ./run serve --host=0.0.0.0 # todas las interfaces (demo en LAN)
 ```
 
 Falla **antes** de abrir el puerto (no a mitad de una petición) cuando el setup
 está incompleto, y te dice exactamente qué comando de `./run` lo arregla.
 Variables: `B2B_SERVE_PORT`, `B2B_SERVE_HOST`.
+
+Desde TASK-016 `serve` también arranca el **canal en vivo** — un
+servidor WebSocket (`php artisan realtime:serve`) en el puerto 8081
+que empuja cada toque de tarjeta a los paneles de actividad en vivo
+del panel (sin F5). Ctrl+C detiene ambos. Si el 8081 está ocupado, el
+servidor web arranca igual y los paneles muestran honestamente el
+estado «Desconectado». Variables: `B2B_REALTIME_PORT` (puerto) y
+`B2B_REALTIME=0` (arrancar sin el canal). `./run status` reporta la
+salud del canal; el contrato del protocolo vive en
+`.agent/ARCHITECTURE/realtime-feed.md`.
 
 ## `test`
 
