@@ -42,7 +42,12 @@
 
         <div class="topbar-tools">
             @auth
-                <span class="topbar-user">{{ __('app.welcome', ['name' => auth()->user()->name]) }}</span>
+                @php($nameParts = explode(' ', trim(auth()->user()->name)))
+                @php($initials = strtoupper(mb_substr($nameParts[0] ?? '·', 0, 1) . mb_substr($nameParts[1] ?? '', 0, 1)))
+                <span class="topbar-user" title="{{ auth()->user()->email }}">
+                    <span class="user-avatar" aria-hidden="true">{{ $initials }}</span>
+                    {{ __('app.welcome', ['name' => auth()->user()->name]) }}
+                </span>
 
                 <form method="POST" action="{{ route('logout') }}" class="inline-form">
                     @csrf

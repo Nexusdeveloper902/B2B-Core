@@ -30,7 +30,14 @@ return [
 
     // Login
     'login_title' => 'Inicia sesión en la Plataforma de Presencia',
+    'login_subtitle' => 'Inicia sesión con tu cuenta escolar.',
+    'login_band_sub' => 'Asistencia, comidas y recompensas — un día de escuela a la vez',
     'login_hint' => 'Usuarios demo (del seeder): admin@presence.test / teacher@presence.test — contraseña "password".',
+    'show' => 'Ver',
+    'hide' => 'Ocultar',
+    'role_admin' => 'Admin',
+    'role_teacher' => 'Profesor',
+    'demo_chip_hint' => 'Clic para rellenar el formulario',
 
     // Panel del profesor
     'today_attendance' => 'Asistencia de hoy',
@@ -43,6 +50,7 @@ return [
     'tapped_at' => 'Tap a las',
     'late_cutoff_note' => 'Tarde = tap después de las :cutoff',
     'no_students' => 'Aún no hay estudiantes en esta clase.',
+    'class_summary' => 'Resumen de la clase',
     'pae_enrolled' => 'PAE',
     'points' => 'Puntos',
 
@@ -78,10 +86,11 @@ return [
     'material' => 'Material',
     'no_events' => 'Todavía no hay eventos registrados para este estudiante.',
 
-    // Escritorio de emparejamiento (TASK-011)
+    // Escritorio de emparejamiento (TASK-011 + TASK-017 barra de cuenta atrás)
     'action' => 'Acción',
     'pairing_desk' => 'Emparejar tarjetas',
     'pairing_desk_intro' => 'Arma un emparejamiento para un estudiante y luego acerca una tarjeta NUEVA al lector dentro de la ventana. El vínculo tarjeta-estudiante siempre es una decisión de admin tomada aquí — nunca en el lector.',
+    'pairing_window' => 'Ventana de emparejamiento',
     'pairing_arm' => 'Armar emparejamiento',
     'pairing_armed_for' => 'Armada para :name',
     'pairing_seconds_left' => 'quedan :s s',
@@ -99,7 +108,7 @@ return [
     'current_card' => 'Tarjeta actual',
     'no_card' => 'sin tarjeta',
 
-    // Actividad en vivo (TASK-016)
+    // Actividad en vivo (TASK-016 + TASK-017 tiempo relativo)
     'live_activity' => 'Actividad en vivo',
     'live_panel_sub' => 'Cada toque de tarjeta, al instante',
     'live_state_live' => 'En vivo',
@@ -107,6 +116,8 @@ return [
     'live_state_offline' => 'Desconectado',
     'live_waiting' => 'Esperando el primer toque…',
     'live_offline_hint' => 'Canal en vivo no disponible — recarga la página para ver los últimos toques.',
+    'live_rel_now' => 'ahora mismo',
+    'live_rel_min' => 'hace :n min',
 
     // Estados genéricos
     'ok' => 'OK',

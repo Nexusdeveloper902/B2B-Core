@@ -1,31 +1,38 @@
 /* ==========================================================================
-   Presence Platform — Core Platform design tokens
-   Single source of truth for the UI passover (TASK-005).
+   Presence Platform — "Calm Ledger" design tokens (TASK-017, ADR-027)
 
-   Values are value-matched 1:1 from the marketplace storefront
-   (B2B-Marketplace @ ecde2d5, "The Event Ledger", marketplace ADR-002)
-   — see .agent/DECISIONS/ADR-013-design-tokens-value-matched.md.
-   Whoever changes one side's tokens MUST update the other.
+   Brand values (paper/pine/ink/steel family, IBM Plex + Space Grotesk)
+   carry over from the ADR-013 value-match era; the component layer
+   (radii, elevation, tones, motion) is Core-only and supersedes the
+   1:1 marketplace value-match — see ADR-027.
    ========================================================================== */
 
 :root {
-    /* ---- palette ---- */
-    --paper:     #F3F4F0;  /* cool porcelain page ground */
-    --surface:   #FFFFFF;  /* content surfaces (tables, panels, fields) */
+    /* ---- palette (brand, kept) ---- */
+    --paper:     #F4F5F1;  /* cool porcelain page ground */
+    --surface:   #FFFFFF;  /* content surfaces (cards, tables, fields) */
     --ink:       #101D18;  /* deep green-black text + emphasis rules */
     --pine:      #0A5C38;  /* primary brand green: CTAs, links, rules */
     --pine-dark: #07422A;  /* CTA hover */
     --go:        #1D9E5F;  /* signal green — sparing: live dots, success */
     --steel:     #53615A;  /* secondary text */
-    --line:      #D7DCD5;  /* hairline rules and borders */
-    --wash:      #E9EEE9;  /* tinted alternating ground */
+    --line:      #DCE1DA;  /* hairline rules and borders */
+    --wash:      #EBF0EB;  /* tinted alternating ground */
     --alert:     #B3261E;  /* errors only (functional) */
 
-    /* literal supporting values (from marketplace app.css) */
+    /* ---- tones (TASK-017: semantic chips + late status) ---- */
+    --amber:      #9A5B00;  /* late / PAE chips text */
+    --amber-line: #E4C48C;
+    --amber-bg:   #FBF3E4;
+    --sky:        #175E9E;  /* recycling chips text */
+    --sky-line:   #B9D2E8;
+    --sky-bg:     #EAF2FA;
+
+    /* literal supporting values */
     --copy:        #37453F;   /* body copy on paper */
     --line-strong: #CBD5CC;   /* hairlines on wash */
     --row-line:    #EEF1EC;   /* ledger table row rules */
-    --field-line:  #97A29A;   /* input borders */
+    --field-line:  #9AA69E;   /* input borders */
     --row-flash:   #DCEDE2;   /* freshly-written row flash */
     --alert-line:  #E5C0BC;   /* error border */
     --alert-bg:    #FBEFEE;   /* error ground */
@@ -43,12 +50,21 @@
     --font-body:    'IBM Plex Sans', system-ui, sans-serif;
     --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
 
-    /* ---- rhythm / shape ---- */
-    --radius: 2px;                       /* buttons + inputs only */
-    --shell: 1120px;                     /* content column */
-    --pad-inline: clamp(20px, 5vw, 40px);
+    /* ---- rhythm / shape (Calm Ledger: soft cards) ---- */
+    --radius-s: 6px;                     /* controls: buttons, inputs, chips */
+    --radius:   10px;                    /* cards, panels, stat tiles */
+    --shell: 1140px;                     /* content column */
+    --pad-inline: clamp(20px, 5vw, 44px);
     --section-pad: clamp(40px, 6vw, 64px);
+    --tap: 44px;                         /* minimum touch target */
 
-    /* ---- motion ---- */
-    --ease: 0.15s ease;
+    /* ---- elevation (two levels only) ---- */
+    --shadow-1: 0 1px 2px rgba(16, 29, 24, 0.05), 0 1px 6px rgba(16, 29, 24, 0.04);
+    --shadow-2: 0 2px 6px rgba(16, 29, 24, 0.07), 0 8px 24px rgba(16, 29, 24, 0.09);
+    --shadow-pine: 0 6px 18px rgba(10, 92, 56, 0.22);   /* primary CTA press zone */
+
+    /* ---- motion (200-400 ms sweet spot; reduced-motion kills all) ---- */
+    --t-fast: 150ms;
+    --t-med:  280ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }

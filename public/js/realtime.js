@@ -1,5 +1,9 @@
 /* ==========================================================================
    Presence Platform — realtime feed client (TASK-016, ADR-026).
+   TASK-017 — Calm Ledger row shape: initial avatars, event chips and
+   "just now → N min ago" relative time for live arrivals (history rows
+   keep their absolute time — only the arrival moment is knowable
+   client-side, and SSR-first means no lying timestamps).
 
    No build step, no dependencies: the browser's native WebSocket API.
    Loaded by the dashboards after the server-rendered feed panel.
@@ -15,6 +19,11 @@
        session-authed /realtime/token endpoint when it is near expiry;
      - page hooks: a `realtime:tap` CustomEvent (detail = the event
        row) so page scripts can react (teacher attendance rows).
+
+   Row DOM contract (mirrored by the SSR partial — one rendering
+   path, one truth; the chip tone mapping lives in CSS only):
+     li.live-row > .avatar + .live-main(.live-student + .live-context)
+                                  + .live-side(.live-chip + .live-time)
    ========================================================================== */
 (function () {
     'use strict';
@@ -38,9 +47,9 @@
         if (badgeText) { badgeText.textContent = strings['state_' + name] || name; }
     }
 
-    function contextText(ev) {
-        var parts = [ev.class_name || '—', ev.reader_label || '—'];
-        return parts[0] + ' · ' + parts[1];
+    function initialsOf(name) {
+        var parts = String(name || '').trim().split(/\s+/);
+        return ((parts[0] || '·').charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
     }
 
     function rowFor(ev, fresh) {
@@ -48,9 +57,13 @@
         li.className = 'live-row' + (fresh ? ' live-new' : '');
         li.dataset.eventId = String(ev.id);
 
-        var time = document.createElement('span');
-        time.className = 'live-time';
-        time.textContent = ev.time || '';
+        var avatar = document.createElement('span');
+        avatar.className = 'avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = initialsOf(ev.student_name);
+
+        var main = document.createElement('span');
+        main.className = 'live-main';
 
         var student = document.createElement('span');
         student.className = 'live-student';
@@ -58,14 +71,36 @@
 
         var context = document.createElement('span');
         context.className = 'live-context';
-        context.appendChild(document.createTextNode(contextText(ev) + ' · '));
-        var type = document.createElement('code');
-        type.textContent = ev.type || '';
-        context.appendChild(type);
+        context.textContent = (ev.class_name || '—') + ' · ' + (ev.reader_label || '—');
 
-        li.appendChild(time);
-        li.appendChild(student);
-        li.appendChild(context);
+        main.appendChild(student);
+        main.appendChild(context);
+
+        var side = document.createElement('span');
+        side.className = 'live-side';
+
+        var chip = document.createElement('span');
+        chip.className = 'live-chip';
+        chip.setAttribute('data-event-type', ev.type || '');
+        chip.textContent = ev.type || '';
+
+        var time = document.createElement('span');
+        time.className = 'live-time';
+        time.textContent = ev.time || '';
+        // absolute time survives as data, so a relative "just now" can
+        // age out back to the wall clock without another round-trip
+        li.dataset.absTime = ev.time || '';
+        if (fresh) {
+            li.dataset.arrived = String(Date.now());
+            time.textContent = strings.rel_now || 'just now';
+        }
+
+        side.appendChild(chip);
+        side.appendChild(time);
+
+        li.appendChild(avatar);
+        li.appendChild(main);
+        li.appendChild(side);
         return li;
     }
 
@@ -75,7 +110,7 @@
     }
 
     // The hello frame replaces the server-rendered rows with the same
-    // query the server rendered them from — one rendering path, one
+    // shape the server rendered them from — one rendering path, one
     // truth (oldest first, capped).
     function renderHistory(events) {
         if (!events || !events.length) { return; }
@@ -93,6 +128,28 @@
             list.removeChild(list.lastChild);
         }
     }
+
+    // Relative-time ticker: live-arrived rows age from "just now" to
+    // "N min ago" for up to 10 minutes, then fall back to the absolute
+    // wall time (kept in data-abs-time). History rows are untouched.
+    function ageRelativeTimes() {
+        var now = Date.now();
+        Array.prototype.forEach.call(list.children, function (li) {
+            if (!li.dataset || !li.dataset.arrived) { return; }
+            var ageSec = Math.floor((now - Number(li.dataset.arrived)) / 1000);
+            var time = li.querySelector('.live-time');
+            if (!time) { return; }
+            if (ageSec < 45) {
+                time.textContent = strings.rel_now || 'just now';
+            } else if (ageSec < 600) {
+                time.textContent = (strings.rel_min || ':n min ago').replace(':n', String(Math.floor(ageSec / 60)));
+            } else {
+                time.textContent = li.dataset.absTime || '';
+                delete li.dataset.arrived;
+            }
+        });
+    }
+    setInterval(ageRelativeTimes, 15000);
 
     function refreshPageState(ev) {
         try {
