@@ -47,6 +47,7 @@ class AdminPairingController extends Controller
             'activeSecondsLeft' => $active !== null
                 ? max(0, (int) now()->diffInSeconds($active->expires_at))
                 : null,
+            'pairingWindowSeconds' => (int) config('presence.pairing_window_seconds'),
             'recentPairings' => $this->pairings->recentCompletions(8),
             'lastCardUid' => $last?->card?->credential_uid,
             'activeRejectionNote' => $rejectionNote,

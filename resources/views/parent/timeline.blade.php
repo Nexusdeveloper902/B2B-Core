@@ -35,7 +35,7 @@
             <x-empty>{{ __('app.no_events') }}</x-empty>
         @else
             <div class="ledger-wrap">
-                <table class="ledger-table">
+                <table class="ledger-table" data-stack>
                     <thead>
                     <tr>
                         <th scope="col">{{ __('app.event_type') }}</th>
@@ -48,11 +48,13 @@
                     <tbody>
                     @foreach($timeline as $event)
                         <tr>
-                            <td><code>{{ $event['type'] }}</code></td>
-                            <td class="num">{{ \Illuminate\Support\Carbon::parse($event['occurred_at'])->format('Y-m-d H:i') }}</td>
-                            <td>{{ $event['reader'] ?? '—' }}</td>
-                            <td>{{ $event['material'] ?? '—' }}</td>
-                            <td class="num em">{{ $event['points'] !== null ? '+'.$event['points'] : '—' }}</td>
+                            <td data-label="{{ __('app.event_type') }}">
+                                <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ $event['type'] }}</span>
+                            </td>
+                            <td class="num" data-label="{{ __('app.tapped_at') }}">{{ \Illuminate\Support\Carbon::parse($event['occurred_at'])->format('Y-m-d H:i') }}</td>
+                            <td data-label="{{ __('app.reader_label') }}">{{ $event['reader'] ?? '—' }}</td>
+                            <td data-label="{{ __('app.material') }}">{{ $event['material'] ?? '—' }}</td>
+                            <td class="num em" data-label="{{ __('app.points') }}">{{ $event['points'] !== null ? '+'.$event['points'] : '—' }}</td>
                         </tr>
                     @endforeach
                     </tbody>

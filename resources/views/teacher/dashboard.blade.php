@@ -20,14 +20,26 @@
     @else
         @foreach($classes as $class)
             @php($rows = $attendanceByClass[$class->id])
+            {{-- TASK-017 — per-class summary chips: counts answer the
+                  first question ("who's here?") before any table scan. --}}
+            @php($counts = ['present' => 0, 'late' => 0, 'absent' => 0])
+            @foreach($rows as $row)
+                @php($counts[$row['status']] = ($counts[$row['status']] ?? 0) + 1)
+            @endforeach
             <x-panel :label="__('app.class')" rule>
                 <h2>{{ $class->name }}</h2>
                 @if($class->teacher)
                     <p class="panel-sub">{{ $class->teacher->name }}</p>
                 @endif
 
+                <div class="sum-chips" aria-label="{{ __('app.class_summary') }}">
+                    <span class="sum-chip sum-chip-present">{{ __('app.present') }} {{ $counts['present'] }}</span>
+                    <span class="sum-chip sum-chip-late">{{ __('app.late') }} {{ $counts['late'] }}</span>
+                    <span class="sum-chip sum-chip-absent">{{ __('app.absent') }} {{ $counts['absent'] }}</span>
+                </div>
+
                 <div class="ledger-wrap">
-                    <table class="ledger-table">
+                    <table class="ledger-table" data-stack>
                         <thead>
                         <tr>
                             <th scope="col">{{ __('app.student') }}</th>
@@ -39,7 +51,7 @@
                         <tbody>
                         @forelse($rows as $row)
                             <tr data-student-row="{{ $row['student']->id }}">
-                                <td>
+                                <td data-label="{{ __('app.student') }}">
                                     <span class="student-cell">
                                         {{ $row['student']->name }}
                                         <a class="tiny-link" href="{{ route('parent.timeline', $row['student']) }}">
@@ -47,11 +59,11 @@
                                         </a>
                                     </span>
                                 </td>
-                                <td class="js-tap-status">
+                                <td class="js-tap-status" data-label="{{ __('app.status') }}">
                                     <x-stamp :status="$row['status']">{{ __('app.'.$row['status']) }}</x-stamp>
                                 </td>
-                                <td class="num js-tap-time">{{ $row['tappedAt'] ?? '—' }}</td>
-                                <td class="num">{{ $row['student']->pae_enrolled ? '✓' : '—' }}</td>
+                                <td class="num js-tap-time" data-label="{{ __('app.tapped_at') }}">{{ $row['tappedAt'] ?? '—' }}</td>
+                                <td class="num" data-label="{{ __('app.pae_enrolled') }}">{{ $row['student']->pae_enrolled ? '✓' : '—' }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="4" class="muted">{{ __('app.no_students') }}</td></tr>

@@ -12,7 +12,7 @@
     {{-- Arming table: one click per student (replaces the curl+PAT dance) --}}
     <x-panel :label="__('app.students')" rule>
         <div class="ledger-wrap">
-            <table class="ledger-table">
+            <table class="ledger-table" data-stack>
                 <thead>
                 <tr>
                     <th scope="col">{{ __('app.student') }}</th>
@@ -24,16 +24,16 @@
                 <tbody>
                 @forelse($students as $student)
                     <tr data-student-row="{{ $student->id }}">
-                        <td>{{ $student->name }}</td>
-                        <td>{{ $student->schoolClass?->name ?? '—' }}</td>
-                        <td>
+                        <td data-label="{{ __('app.student') }}">{{ $student->name }}</td>
+                        <td data-label="{{ __('app.class') }}">{{ $student->schoolClass?->name ?? '—' }}</td>
+                        <td data-label="{{ __('app.current_card') }}">
                             @forelse($student->cards as $card)
                                 <code>{{ $card->credential_uid }}</code>
                             @empty
                                 <span class="muted">{{ __('app.no_card') }}</span>
                             @endforelse
                         </td>
-                        <td>
+                        <td data-label="{{ __('app.action') }}">
                             <button type="button" class="btn btn-primary btn-small arm-btn"
                                     data-student="{{ $student->id }}"
                                     data-name="{{ $student->name }}">
@@ -65,6 +65,15 @@
                 @endif
             @endif
         </div>
+        {{-- TASK-017 — the window as a draining bar: urgency at a glance.
+             SIBLING of #pairing-state (the script rewrites that box's
+             textContent — a child would not survive it). --}}
+        <div id="pairing-countdown" class="countdown {{ $activeSession ? '' : 'hidden' }}"
+             role="progressbar" aria-label="{{ __('app.pairing_window') }}"
+             data-total="{{ $pairingWindowSeconds }}"
+             @if(! $activeSession) aria-hidden="true" @endif>
+            <div class="countdown-fill"></div>
+        </div>
         @if(! $activeSession)
             <p class="muted" id="pairing-idle">{{ __('app.pairing_no_session') }}</p>
         @endif
@@ -75,7 +84,7 @@
     {{-- History: exact card->student links this platform made --}}
     <x-panel :label="__('app.pairing_recent')">
         <div class="ledger-wrap" id="recent-wrap">
-            <table class="ledger-table">
+            <table class="ledger-table" data-stack>
                 <thead>
                 <tr>
                     <th scope="col">{{ __('app.pairing_uid') }}</th>
@@ -87,10 +96,10 @@
                 <tbody id="recent-body">
                 @forelse($recentPairings as $pairing)
                     <tr>
-                        <td><code>{{ $pairing->card?->credential_uid }}</code></td>
-                        <td>{{ $pairing->student?->name }}</td>
-                        <td>{{ $pairing->consumed_at?->format('Y-m-d H:i') }}</td>
-                        <td>{{ $pairing->reader?->label ?? '—' }}</td>
+                        <td data-label="{{ __('app.pairing_uid') }}"><code>{{ $pairing->card?->credential_uid }}</code></td>
+                        <td data-label="{{ __('app.student') }}">{{ $pairing->student?->name }}</td>
+                        <td data-label="{{ __('app.pairing_paired_at') }}">{{ $pairing->consumed_at?->format('Y-m-d H:i') }}</td>
+                        <td data-label="{{ __('app.reader_label') }}">{{ $pairing->reader?->label ?? '—' }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="4" class="muted" id="recent-empty">{{ __('app.pairing_none_yet') }}</td></tr>
@@ -119,6 +128,25 @@
         var armed = stateBox.dataset.initiallyArmed === '1';
         var secondsLeft = parseInt(stateBox.dataset.secondsLeft || '0', 10);
         var armBtns = Array.prototype.slice.call(document.querySelectorAll('.arm-btn'));
+
+        // TASK-017 — the armed window as a draining progress bar.
+        var countdown = document.getElementById('pairing-countdown');
+        var countdownFill = countdown ? countdown.querySelector('.countdown-fill') : null;
+        var WINDOW_TOTAL = countdown ? parseInt(countdown.dataset.total || '45', 10) : 45;
+
+        function showCountdown(show) {
+            if (!countdown) { return; }
+            countdown.classList.toggle('hidden', !show);
+            countdown.setAttribute('aria-hidden', show ? 'false' : 'true');
+            if (show) { renderCountdown(); }
+        }
+
+        function renderCountdown() {
+            if (!countdownFill) { return; }
+            var pct = Math.max(0, Math.min(100, Math.round((secondsLeft / WINDOW_TOTAL) * 100)));
+            countdownFill.style.width = pct + '%';
+            countdown.classList.toggle('is-low', secondsLeft <= 10);
+        }
 
         // TASK-014 — localized templates for the rejection note (session
         // locale, same convention as every other desk string).
@@ -203,6 +231,7 @@
             if (secondsLeft > 0) {
                 secondsLeft -= 1;
             }
+            renderCountdown();
             if (secondsLeft > 0) {
                 setState(armedLine(), true);
             }
@@ -224,9 +253,10 @@
                 if (!r.ok) return;
                 var pending = r.data.pending;
                 if (pending && pending.seconds_left > 0) {
-                    if (!armed) { setState(armedLine(), true); }  // armed elsewhere (other tab/phone)
+                    if (!armed) { setState(armedLine(), true); showCountdown(true); }  // armed elsewhere (other tab/phone)
                     armed = true;
                     secondsLeft = pending.seconds_left;
+                    renderCountdown();
                     stateBox.dataset.studentName = pending.student_name || '';
                     rejectionNote = noteFromFeed(pending.last_rejection);
                     if (rejectionNote) { setState(armedLine(), true); }
@@ -243,6 +273,7 @@
                     renderRecent(r.data.recent_pairings);
                     armed = false;
                     rejectionNote = null;
+                    showCountdown(false);
                     setPollInterval(IDLE_MS);
                 } else if (armed) {
                     // We were following this window and it is gone without a
@@ -250,6 +281,7 @@
                     setState({!! json_encode(__('app.pairing_expired')) !!}, false);
                     armed = false;
                     rejectionNote = null;
+                    showCountdown(false);
                     setPollInterval(IDLE_MS);
                 }
             });
@@ -259,12 +291,14 @@
         setInterval(tick, 1000);
 
         // Arm buttons -> the EXISTING TASK-010 endpoint, session-authed.
+        // TASK-017: the clicked button spins while the window arms.
         armBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 armBtns.forEach(function (b) { b.disabled = true; });
+                btn.classList.add('is-loading');
                 postJson('/api/v1/admin/students/' + btn.dataset.student + '/arm-pairing')
                     .then(function (r) {
-                        armBtns.forEach(function (b) { b.disabled = false; });
+                        armBtns.forEach(function (b) { b.disabled = false; b.classList.remove('is-loading'); });
                         if (r.ok) {
                             armed = true;
                             rejectionNote = null;   // new window, no rejections yet
@@ -273,6 +307,7 @@
                             var ms = Date.parse(r.data.expires_at) - Date.now();
                             secondsLeft = Math.max(0, Math.round(ms / 1000));
                             setState(armedLine(), true);
+                            showCountdown(true);
                             setPollInterval(ACTIVE_MS);
                             poll();
                         } else {
@@ -280,7 +315,7 @@
                         }
                     })
                     .catch(function () {
-                        armBtns.forEach(function (b) { b.disabled = false; });
+                        armBtns.forEach(function (b) { b.disabled = false; b.classList.remove('is-loading'); });
                         setState({!! json_encode(__('app.error_generic')) !!}, false);
                     });
             });
@@ -288,7 +323,8 @@
 
         // Start following immediately: ACTIVE when a window is live (page
         // load / F5 mid-window — the rejection note comes with it), else
-        // the quiet idle watch.
+        // the quiet idle watch. An SSR-armed page paints its bar at once.
+        renderCountdown();
         setPollInterval(armed ? ACTIVE_MS : IDLE_MS);
         poll();
     })();

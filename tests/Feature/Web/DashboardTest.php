@@ -236,6 +236,112 @@ class DashboardTest extends TestCase
         $this->assertArrayHasKey('state_live', $boot['strings']);
     }
 
+    #[Test]
+    public function the_live_feed_bootstrap_carries_the_relative_time_strings(): void
+    {
+        $admin = User::where('role', 'admin')->firstOrFail();
+        $html = $this->actingAs($admin)->get('/admin')->getContent();
+
+        // TASK-017: live-arrived rows age from "just now" to ":n min ago"
+        // — the strings must ride the bootstrap in the page's locale.
+        $this->assertMatchesRegularExpression('/data-realtime="([^"]*)"/', $html);
+        preg_match('/data-realtime="([^"]*)"/', $html, $match);
+        $boot = json_decode(html_entity_decode($match[1] ?? ''), true);
+
+        $this->assertIsArray($boot);
+        $this->assertArrayHasKey('rel_now', $boot['strings']);
+        $this->assertArrayHasKey('rel_min', $boot['strings']);
+        $this->assertSame('just now', $boot['strings']['rel_now']);
+    }
+
+    #[Test]
+    public function the_admin_dashboard_renders_the_hero_kpi_and_soft_cards(): void
+    {
+        $html = $this->actingAs($this->user('admin'))->get('/admin')->getContent();
+
+        // TASK-017 — Calm Ledger: hero tile, KPI icons, soft-card strip.
+        $this->assertStringContainsString('class="stat-strip"', $html);
+        $this->assertStringContainsString('kpi-icon', $html);
+        $this->assertStringContainsString('<svg', $html);
+        // the attendance hero carries the distinct larger-value rule
+        $this->assertMatchesRegularExpression(
+            '/\.stat-strip \.stat:first-child[^}]*font-size: 2\.5rem/',
+            file_get_contents(public_path('css/app.css')),
+        );
+    }
+
+    #[Test]
+    public function the_live_feed_rows_carry_avatars_and_event_chips(): void
+    {
+        PresenceEvent::create([
+            'card_id' => $this->cardOf('Maria González')->id,
+            'reader_id' => $this->reader('classroom')->id,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => now()->setTime(7, 50),
+        ]);
+
+        $html = $this->actingAs($this->user('admin'))->get('/admin')->getContent();
+
+        // TASK-017 — SSR rows and JS rows share one shape: initials
+        // avatar + event chip whose tone mapping lives in CSS only.
+        $this->assertStringContainsString('class="avatar"', $html);
+        $this->assertStringContainsString('>MG</span>', $html);
+        $this->assertStringContainsString('class="live-chip"', $html);
+        $this->assertStringContainsString('data-event-type="CLASS_ATTENDANCE"', $html);
+        // the CSS owns the chip tone mapping (one source of truth)
+        $css = file_get_contents(public_path('css/app.css'));
+        $this->assertStringContainsString('.live-chip[data-event-type^="PAE_"]', $css);
+        $this->assertStringContainsString('.live-chip[data-event-type^="RECYCLING_"]', $css);
+    }
+
+    #[Test]
+    public function the_teacher_dashboard_renders_class_summary_chips(): void
+    {
+        $html = $this->actingAs($this->user('teacher'))->get('/teacher')->getContent();
+
+        // TASK-017 — counts answer "who's here?" before any table scan.
+        // Demo seed: 4 students, no events → 4 absent, 0 present, 0 late.
+        $this->assertStringContainsString('sum-chips', $html);
+        $this->assertStringContainsString('sum-chip-present', $html);
+        $this->assertStringContainsString('sum-chip-late', $html);
+        $this->assertStringContainsString('sum-chip-absent', $html);
+        $this->assertMatchesRegularExpression('/sum-chip-present[^<]*Present 0/', $html);
+        $this->assertMatchesRegularExpression('/sum-chip-late[^<]*Late 0/', $html);
+        $this->assertMatchesRegularExpression('/sum-chip-absent[^<]*Absent 4/', $html);
+    }
+
+    #[Test]
+    public function the_dashboards_stack_their_tables_on_mobile_with_data_labels(): void
+    {
+        $teacherHtml = $this->actingAs($this->user('teacher'))->get('/teacher')->getContent();
+        $adminHtml = $this->actingAs($this->user('admin'))->get('/admin')->getContent();
+
+        // TASK-017 — phones get card-stacked rows (data-label pseudo
+        // labels), never a horizontally squeezed table.
+        $this->assertStringContainsString('ledger-table" data-stack', $teacherHtml);
+        $this->assertStringContainsString('data-label="Status"', $teacherHtml);
+        $this->assertStringContainsString('data-label="Tapped at"', $teacherHtml);
+        $this->assertStringContainsString('ledger-table" data-stack', $adminHtml);
+
+        $css = file_get_contents(public_path('css/app.css'));
+        $this->assertStringContainsString('.ledger-table[data-stack] tbody td::before', $css);
+    }
+
+    #[Test]
+    public function the_login_page_carries_smooth_sign_in_affordances(): void
+    {
+        $html = $this->get('/login')->getContent();
+
+        // TASK-017 — demo chips that fill the form + password reveal.
+        $this->assertStringContainsString('demo-chip', $html);
+        $this->assertStringContainsString('data-email="admin@presence.test"', $html);
+        $this->assertStringContainsString('data-email="teacher@presence.test"', $html);
+        $this->assertStringContainsString('id="pw-toggle"', $html);
+        $this->assertStringContainsString('class="pw-wrap"', $html);
+        // the fill-the-form script is present and vanilla
+        $this->assertStringContainsString("pass.value = 'password';", $html);
+    }
+
     private function user(string $role): User
     {
         return User::where('role', $role)->firstOrFail();

@@ -30,7 +30,14 @@ return [
 
     // Login
     'login_title' => 'Sign in to the Presence Platform',
+    'login_subtitle' => 'Sign in with your school account.',
+    'login_band_sub' => 'Attendance, meals and rewards — one school day at a time',
     'login_hint' => 'Demo users (from the seeder): admin@presence.test / teacher@presence.test — password "password".',
+    'show' => 'Show',
+    'hide' => 'Hide',
+    'role_admin' => 'Admin',
+    'role_teacher' => 'Teacher',
+    'demo_chip_hint' => 'Click to fill the sign-in form',
 
     // Teacher dashboard
     'today_attendance' => 'Today\'s attendance',
@@ -43,6 +50,7 @@ return [
     'tapped_at' => 'Tapped at',
     'late_cutoff_note' => 'Late = tapped after :cutoff',
     'no_students' => 'No students in this class yet.',
+    'class_summary' => 'Class summary',
     'pae_enrolled' => 'PAE',
     'points' => 'Points',
 
@@ -79,10 +87,11 @@ return [
     'material' => 'Material',
     'no_events' => 'No events recorded yet for this student.',
 
-    // Pairing desk (TASK-011)
+    // Pairing desk (TASK-011 + TASK-017 countdown bar)
     'action' => 'Action',
     'pairing_desk' => 'Pair cards',
     'pairing_desk_intro' => 'Arm a pairing for a student, then tap a FRESH card on the reader within the window. The card-to-student link is always an admin decision made here — never at the reader.',
+    'pairing_window' => 'Pairing window',
     'pairing_arm' => 'Arm pairing',
     'pairing_armed_for' => 'Armed for :name',
     'pairing_seconds_left' => ':s s left',
@@ -100,7 +109,7 @@ return [
     'current_card' => 'Current card',
     'no_card' => 'no card',
 
-    // Live activity feed (TASK-016)
+    // Live activity feed (TASK-016 + TASK-017 relative time)
     'live_activity' => 'Live activity',
     'live_panel_sub' => 'Every card tap, as it happens',
     'live_state_live' => 'Live',
@@ -108,6 +117,8 @@ return [
     'live_state_offline' => 'Offline',
     'live_waiting' => 'Waiting for the first tap…',
     'live_offline_hint' => 'Live feed unavailable — reload the page to see the latest taps.',
+    'live_rel_now' => 'just now',
+    'live_rel_min' => ':n min ago',
 
     // Generic statuses
     'ok' => 'OK',

@@ -504,3 +504,48 @@ per student" bench report. Repository reality updates:
   child filters env vars — the deb-extracted sandbox PHP loses
   PHPRC/LD_LIBRARY_PATH there; raw `php -S` + router, phpunit and
   e2e are fine, the owner's system PHP is immune.
+
+## RUN-2026-09-06-core-015 — appended project facts (UX overhaul, "Calm Ledger")
+
+- **The whole UI is redesigned** (TASK-017, ADR-027): same brand
+  (paper/pine/ink + IBM Plex/Space Grotesk), modern soft-card layer —
+  10 px radii, two-level elevation, sticky blurred topbar, filled pill
+  nav, initials user chip, hero attendance KPI top-left (research
+  best practice) with 5 inline stroke-SVG icons, per-class summary
+  chips, event chips + avatars in the live feed, amber Late stamps,
+  status-card answers, per-button loading spinners on every async
+  action, login password reveal + click-to-fill demo chips, pairing
+  countdown progress bar, mobile card-stacked tables (data-label),
+  44-48 px touch targets. Motion 150-280 ms, hard-off under
+  prefers-reduced-motion.
+- **The chip tone mapping lives ONLY in CSS** —
+  `.live-chip[data-event-type^="CLASS_|PAE_|RECYCLING_|CARD_"]`
+  attribute selectors; SSR rows and realtime.js rows both pass the
+  raw type through. One source of truth, zero PHP/JS duplication.
+- **Live-arrival relative time is honest**: only rows that arrived
+  live get "just now → N min ago" (client arrival clock, 15 s
+  ticker, falls back to absolute wall time after 10 min). History
+  rows keep absolute time — SSR-first, no invented timestamps.
+- **ADR-013's marketplace 1:1 token value-match is superseded for
+  Core** (ADR-027): brand values kept; radii/shadows/amber/sky/motion
+  are Core-only. The marketplace catching up is a marketplace task.
+- **All JS-facing selectors survived 1:1** (`.nl-answer` +
+  `.answer-ok/.answer-error`, `#pairing-state`, `.arm-btn`,
+  `.mode-form/.mode-select`, `.js-tap-status/.js-tap-time`,
+  `tr[data-student-row]`, `.stack[data-cutoff]`, `#live-*`,
+  `.live-row/.live-new/.live-dot`, `tr.js-row-flash`) — the new UI
+  rides on additional elements/classnames, never renamed ones. The
+  countdown bar is a SIBLING of `#pairing-state` because the desk
+  script rewrites that box's textContent.
+- **Test count is 219** (was 211): +8 UX regressions (bootstrap
+  rel-time strings, hero+icons+CSS pin, feed avatars/chips + CSS
+  tone mapping, summary chips, mobile data-stack, login
+  affordances, countdown sibling + idle-hidden). Zero existing
+  assertions changed. `./run e2e` 24/24; quality PASS.
+- **Browser-proven** (RUN record): every claim above was verified
+  live — micro-interactions, live tap with avatar/chip/relative
+  time/animation, live row flip, full countdown lifecycle, loading
+  states, mobile 390 px card-stack, reduced-motion collapse,
+  Spanish, zero console errors. Research sources recorded in the
+  RUN ledger (26 sources across dashboard/realtime/empty-state/
+  mobile/form UX).

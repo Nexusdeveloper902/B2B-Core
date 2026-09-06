@@ -206,6 +206,40 @@ class AdminPairingDeskTest extends TestCase
             ->assertSee('/admin/pairing');
     }
 
+    #[Test]
+    public function the_armed_window_renders_as_a_draining_progress_bar(): void
+    {
+        $student = Student::where('name', 'Maria González')->firstOrFail();
+        $this->app->make(PairingService::class)->arm($student);
+
+        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+
+        // TASK-017 — the window is visible at a glance: a sibling bar
+        // (the script rewrites #pairing-state's textContent, so the bar
+        // must NOT live inside it) driven by the configured window.
+        $this->assertStringContainsString('id="pairing-countdown"', $html);
+        $this->assertStringContainsString('class="countdown-fill"', $html);
+        $this->assertStringContainsString('data-total="'.(int) config('presence.pairing_window_seconds').'"', $html);
+        $this->assertStringContainsString('showCountdown(true)', $html);
+        $this->assertStringContainsString('renderCountdown()', $html);
+        // the bar is a SIBLING: it must not be nested inside the state box
+        $statePos = strpos($html, 'id="pairing-state"');
+        $stateClose = strpos($html, '</div>', $statePos);
+        $barPos = strpos($html, 'id="pairing-countdown"');
+        $this->assertGreaterThan($stateClose, $barPos, 'the countdown bar must survive the state box textContent rewrite');
+    }
+
+    #[Test]
+    public function the_idle_desk_hides_the_progress_bar(): void
+    {
+        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+
+        // No armed session: the bar exists but is hidden from the start.
+        $this->assertStringContainsString('id="pairing-countdown"', $html);
+        $this->assertStringContainsString('countdown hidden', $html);
+        $this->assertStringContainsString('aria-hidden="true"', $html);
+    }
+
     private function admin(): User
     {
         return User::where('email', 'admin@presence.test')->firstOrFail();
