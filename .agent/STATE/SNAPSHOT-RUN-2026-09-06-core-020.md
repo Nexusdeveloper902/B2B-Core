@@ -2,9 +2,12 @@
 
 ## Repository state
 
-- Branch: main at the TASK-022 merge commit (feature/
-  TASK-022-deepseek-provider-migration merged --no-ff; see `git log`
-  for the hash)
+- Branch: main at the gitleaks follow-up merge 7511bab (TASK-022
+  provider merge 0614e1a, then the CI-fix merge
+  feature/TASK-022-gitleaks-full-history-allowlist; both branches
+  pushed)
+- CI: run 34042048148 on main @ 7511bab — 12/13 success, live-llm-smoke
+  skipped by design (no DEEPSEEK_API_KEY secret yet)
 - Working tree: clean (all changes committed and pushed)
 - Test count: 238 passed / 1 skipped (was 235/1 at baseline) —
   +9-case DeepSeekClientTest, -6-case GeminiClientTest, +1 balance

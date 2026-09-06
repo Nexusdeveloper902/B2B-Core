@@ -68,9 +68,17 @@ B2B-Firmware) under the stateless-agent protocol.
       pattern added)
 - [x] CI workflow migrated (DEEPSEEK_API_KEY secret; live smoke
       probe → api.deepseek.com/chat/completions + /models listing)
-- [ ] CI green on GitHub after push — owner must add the
-      DEEPSEEK_API_KEY secret (value NOT provided this run; the
-      live-smoke job gates off until then, by design)
+- [x] CI green on GitHub after push — run 34042048148 on main @
+      7511bab: 12/13 success + 1 by-design skip (live-llm-smoke gates
+      off until the owner adds the DEEPSEEK_API_KEY secret; value NOT
+      provided this run)
+- [x] CI red root-caused and fixed en route: the first dispatch
+      (34041756796) failed ONLY in gitleaks — a full-history scan
+      landmine from TASK-016's HandshakeTest fixtures (commit a000fb6;
+      a fabricated WS token + the RFC 6455 example Sec-WebSocket-Key),
+      zero findings from TASK-022's own commits. Allowlisted in
+      .gitleaks.toml per the repo's existing convention; proven with
+      the CI-parity binary (8.24.3, 76 commits, no leaks, exit 0)
 
 ## Out of scope (recorded, not attempted)
 

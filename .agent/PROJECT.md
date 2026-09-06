@@ -734,3 +734,18 @@ per student" bench report. Repository reality updates:
   was supplied (only a GitHub PAT). First owner action: create the
   key, `./run llm-check`, add the CI secret — the live smoke job
   re-proves the pipeline the moment the secret exists.
+- **CI is green on main (run 34042048148, 12/13 + 1 by-design skip)**
+  — but getting there surfaced a scan-mode truth: PUSH-event gitleaks
+  runs scan only the pushed commit range, while workflow_dispatch
+  runs scan the FULL history — which re-found TASK-016's
+  HandshakeTest fixture literals (fabricated WS token + the RFC 6455
+  §1.3 example Sec-WebSocket-Key, commit a000fb6) and failed CI on
+  the first dispatch. Fixed by extending the .gitleaks.toml allowlist
+  per the repo's own false-positive convention (proven locally with
+  the CI-parity binary: 76 commits, no leaks, exit 0). Also: pushes
+  from THIS sandbox DO emit GitHub events — the old-sandbox half of
+  OBS-006 no longer applies here.
+- Live round-trip NOT verified this run: no DEEPSEEK_API_KEY value
+  was supplied (only a GitHub PAT). First owner action: create the
+  key, `./run llm-check`, add the CI secret — the live smoke job
+  re-proves the pipeline the moment the secret exists.
