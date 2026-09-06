@@ -44,16 +44,37 @@ class PendingPairing extends Model
         return $this->belongsTo(Card::class);
     }
 
-    /** Active = not consumed and not expired. */
+    /**
+     * Active = not consumed, not expired, and not written by a clock
+     * the machine no longer has.
+     *
+     * TASK-020 — the third clause is the clock-jump guard: created_at
+     * is stamped by the SAME now() that computed expires_at, so a
+     * legitimate row always satisfies created_at <= now (second-floor
+     * precision keeps it <=, never after). A row that fails it can
+     * only exist if the system clock moved BACKWARD after the row was
+     * written (NTP correction, VM resume, dual-boot RTC) — and that is
+     * exactly the row that used to resurface as "Armed for Maria —
+     * 12468 s left": its far-future expires_at was computed against a
+     * clock the machine has since abandoned. Such a row is stale by
+     * definition and must not arm anything, countdown anywhere, or
+     * accept a pairing tap.
+     */
     public function isActive(): bool
     {
         return $this->consumed_at === null
-            && $this->expires_at->isFuture();
+            && $this->expires_at->isFuture()
+            && $this->created_at->lte(now());
     }
 
-    /** Scope: unconsumed, unexpired rows — the pair-lookup set. */
+    /**
+     * Scope: unconsumed, unexpired, credibly-dated rows — the
+     * pair-lookup set (TASK-020 guard included; see isActive()).
+     */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->whereNull('consumed_at')->where('expires_at', '>', now());
+        return $query->whereNull('consumed_at')
+            ->where('expires_at', '>', now())
+            ->where('created_at', '<=', now());
     }
 }

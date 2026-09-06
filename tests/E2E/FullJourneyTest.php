@@ -6,6 +6,7 @@ use App\Contracts\MaterialClassifier;
 use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
 use App\Models\Reward;
+use App\Models\Student;
 use App\Services\NlQuery\GeminiClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -61,6 +62,51 @@ class FullJourneyTest extends TestCase
             ->postJson("/api/v1/admin/readers/{$readerId}/mode", ['active_event_type' => 'PAE_BREAKFAST'])
             ->assertOk()
             ->assertJsonPath('reader.active_event_type', 'PAE_BREAKFAST');
+
+        // ---- Pairing desk: arm-then-pair for a NEW student (TASK-010/020) ----
+        // The operator's real bench sequence, including the double-arm
+        // that used to leave a zombie window: arm twice (impatient
+        // double-click), tap ONE fresh card — the pairing succeeds AND
+        // the desk's status feed reports the success, not a phantom
+        // armed window counting down (TASK-020's single-window invariant).
+        $newStudent = Student::create([
+            'name' => 'Estudiante Nueva',
+            'grade' => '5°',
+            'pae_enrolled' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson("/api/v1/admin/students/{$newStudent->id}/arm-pairing")
+            ->assertOk()
+            ->assertJsonPath('status', 'ok');
+        $this->actingAs($admin)
+            ->postJson("/api/v1/admin/students/{$newStudent->id}/arm-pairing")
+            ->assertOk();
+
+        $this->postJson('/api/v1/admin/cards/pair', [
+            'credential_uid' => 'E2EFRESHCARD1',
+        ], ['Authorization' => "Bearer {$classroomKey}"])
+            ->assertOk()
+            ->assertJsonPath('paired_student_name', 'Estudiante Nueva');
+
+        $deskStatus = $this->actingAs($admin)
+            ->getJson('/api/v1/admin/pairing/status')
+            ->assertOk()
+            ->assertJsonPath('pending', null)
+            ->assertJsonPath('last_pairing.card_uid', 'E2EFRESHCARD1')
+            ->assertJsonPath('last_pairing.student_name', 'Estudiante Nueva');
+        $this->assertNotEmpty($deskStatus->json('recent_pairings'));
+
+        // The pairing desk page renders the history the same instant.
+        $this->actingAs($admin)->get('/admin/pairing')->assertOk()
+            ->assertSee('E2EFRESHCARD1')
+            ->assertSee('Estudiante Nueva');
+
+        // And the freshly paired card immediately works for taps — the
+        // whole point of pairing.
+        $this->postJson('/api/v1/events/tap', [
+            'credential_uid' => 'E2EFRESHCARD1',
+        ], ['Authorization' => "Bearer {$classroomKey}"])->assertOk();
 
         // ---- Breakfast service: the same reader, now in PAE mode ----
         foreach (['Maria González', 'Carlos Pérez', 'Diego López'] as $name) {

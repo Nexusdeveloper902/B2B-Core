@@ -240,6 +240,42 @@ class AdminPairingDeskTest extends TestCase
         $this->assertStringContainsString('aria-hidden="true"', $html);
     }
 
+    #[Test]
+    public function the_desk_is_wired_to_the_realtime_pairing_channel(): void
+    {
+        // TASK-020 — the pairing page is a realtime page: same feed
+        // client, same badge honesty, same token as the dashboards. The
+        // boot node carries the mints; realtime.js connects; the desk
+        // script applies `realtime:pairing` frames through the same
+        // applyStatus() the poll uses.
+        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+
+        // The feed client + the boot node (token + port, SSR-first). The
+        // bootstrap JSON lives in an HTML-ATTRIBUTE context, so Blade's
+        // escaped echo entity-encodes the quotes (the browser decodes
+        // them back before dataset reads it — the documented convention).
+        $this->assertStringContainsString('js/realtime.js', $html);
+        $this->assertStringContainsString('id="pairing-realtime"', $html);
+        $this->assertStringContainsString('data-realtime="', $html);
+        $this->assertStringContainsString('&quot;port&quot;:'.(int) config('realtime.port'), $html);
+        $this->assertMatchesRegularExpression('/&quot;token&quot;:&quot;1\.\d+\.[0-9a-f]{64}&quot;/', $html);
+
+        // Badge honesty: the same live/connecting/offline grammar.
+        $this->assertStringContainsString('id="live-badge"', $html);
+        $this->assertStringContainsString('id="live-badge-text"', $html);
+        $this->assertStringContainsString('data-state="connecting"', $html);
+
+        // The desk script listens and applies frames through the ONE
+        // state applier shared with the poll.
+        $this->assertStringContainsString("addEventListener('realtime:pairing'", $html);
+        $this->assertStringContainsString('applyStatus(e.detail', $html);
+        $this->assertStringContainsString('function applyStatus(data)', $html);
+
+        // The countdown can never lie beyond the configured window
+        // (browser clock skew is clamped client-side too).
+        $this->assertStringContainsString('Math.min(WINDOW_TOTAL', $html);
+    }
+
     private function admin(): User
     {
         return User::where('email', 'admin@presence.test')->firstOrFail();

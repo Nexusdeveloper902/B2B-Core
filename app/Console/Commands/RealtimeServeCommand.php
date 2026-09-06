@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\UserRole;
 use App\Services\Realtime\Handshake;
 use App\Services\Realtime\RealtimeFeed;
+use App\Services\Realtime\RealtimePairing;
 use App\Services\Realtime\RealtimeToken;
 use App\Services\Realtime\WsFrame;
 use Illuminate\Console\Command;
@@ -12,14 +14,18 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * realtime:serve — the hand-rolled WebSocket feed server (TASK-016,
- * ADR-026).
+ * ADR-026; pairing channel TASK-020, ADR-029).
  *
  * Long-running, zero-dependency (pure stream sockets + stream_select;
  * no pcntl, no event loops, no composer packages). The `events` table
  * is the broadcast source: every poll cycle pushes rows newer than the
  * last pushed id, so the web tier stays 100% decoupled — a tap written
  * by ANY process sharing the database (artisan serve, php -S, a test)
- * shows up on every connected dashboard within one poll.
+ * shows up on every connected dashboard within one poll. TASK-020 adds
+ * the pairing channel with the same rule: `pending_pairings` row
+ * changes (arm / consume / reject) broadcast the shared pairing status
+ * payload, so the pairing desk updates the instant a card is paired —
+ * no poll cadence, no F5.
  *
  * Auth: the HTTP upgrade request must carry a valid feed token
  * (HMAC-SHA256, APP_KEY-signed — see RealtimeToken). Invalid or
@@ -42,18 +48,24 @@ class RealtimeServeCommand extends Command
 
     private const SELECT_TIMEOUT_MICRO = 250000; // 250 ms — caps event latency even when idle
 
-    /** @var array<int, array{sock: resource, buf: string, handshook: bool}> keyed by (int) socket */
+    /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool}> keyed by (int) socket */
     private array $clients = [];
 
     private int $lastEventId = 0;
 
     private float $lastPollAt = 0.0;
 
+    /** TASK-020 — last-seen pairing signature (row-data fingerprint). */
+    private string $lastPairingSignature = '';
+
     private RealtimeFeed $feed;
 
-    public function handle(RealtimeFeed $feed): int
+    private RealtimePairing $pairing;
+
+    public function handle(RealtimeFeed $feed, RealtimePairing $pairing): int
     {
         $this->feed = $feed;
+        $this->pairing = $pairing;
 
         $host = (string) ($this->option('host') ?: config('realtime.host'));
         $port = (int) ($this->option('port') ?: config('realtime.port'));
@@ -73,6 +85,9 @@ class RealtimeServeCommand extends Command
         // hello frame; only genuinely new taps broadcast.
         $this->lastEventId = $feed->latestEventId();
         $this->lastPollAt = microtime(true);
+        // TASK-020 — same rule for the pairing channel: connect AFTER the
+        // current snapshot (hello carries it), broadcast only changes.
+        $this->lastPairingSignature = $pairing->signature();
 
         $this->info("realtime:serve listening on ws://{$host}:{$port} — poll {$pollMs} ms, history {$historyLimit}, head id {$this->lastEventId}.");
 
@@ -109,7 +124,7 @@ class RealtimeServeCommand extends Command
             return;
         }
         stream_set_blocking($new, false);
-        $this->clients[(int) $new] = ['sock' => $new, 'buf' => '', 'handshook' => false];
+        $this->clients[(int) $new] = ['sock' => $new, 'buf' => '', 'handshook' => false, 'admin' => false];
     }
 
     private function read($socket): void
@@ -188,17 +203,42 @@ class RealtimeServeCommand extends Command
             return;
         }
 
+        // TASK-020 — the pairing channel carries card UIDs (the exact
+        // data the admin-only REST status endpoint serves). Tap frames
+        // deliberately never do. So pairing frames are delivered to
+        // ADMIN connections only: resolve the role ONCE per connection
+        // (the token is a user id, not a session), fail closed.
+        $this->clients[$clientId]['admin'] = $this->isAdmin((int) $userId);
+
         $accept = Handshake::acceptKey($request['headers']['sec-websocket-key']);
         @fwrite($socket, Handshake::successResponse($accept));
 
         $this->clients[$clientId]['handshook'] = true;
         $this->clients[$clientId]['buf'] = $rest;
 
-        $this->sendJson($socket, [
+        $hello = [
             'type' => 'hello',
             'last_id' => $this->lastEventId,
             'events' => $this->feed->recent((int) config('realtime.history_limit')),
-        ]);
+        ];
+        if ($this->clients[$clientId]['admin']) {
+            // TASK-020 — the pairing desk's initial state rides the same
+            // hello (SSR already painted it; this reconciles the gap) —
+            // admins only (card UIDs cross this wire, same as the REST
+            // status endpoint the payload mirrors).
+            $hello['pairing'] = $this->pairing->payload();
+        }
+        $this->sendJson($socket, $hello);
+    }
+
+    /** One role lookup per connection; false on any doubt (fail closed). */
+    private function isAdmin(int $userId): bool
+    {
+        try {
+            return DB::table('users')->where('id', $userId)->value('role') === UserRole::Admin->value;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -215,7 +255,8 @@ class RealtimeServeCommand extends Command
     }
 
     /**
-     * Push any events newer than the head to every connected client.
+     * Push any events newer than the head to every connected client,
+     * and any pairing-state change as a `pairing` frame (TASK-020).
      */
     private function poll(int $pollMs): void
     {
@@ -240,6 +281,36 @@ class RealtimeServeCommand extends Command
             $frame = WsFrame::encode(json_encode(['type' => 'tap', 'event' => $row], JSON_UNESCAPED_UNICODE));
             foreach ($this->clients as $clientId => $client) {
                 if ($client['handshook']) {
+                    $this->write($clientId, $frame);
+                }
+            }
+        }
+
+        // TASK-020 — the pairing channel: same poll beat, one signature
+        // query. Arm / consume / reject mutate pending_pairings; the
+        // signature changes; every connected desk gets the fresh state
+        // (same payload as GET /api/v1/admin/pairing/status). Time-only
+        // transitions (countdown, expiry) are deliberately NOT row
+        // changes — the desk's own countdown owns those (ADR-029).
+        try {
+            $signature = $this->pairing->signature();
+        } catch (QueryException) {
+            DB::purge();
+
+            return;
+        }
+
+        if ($signature !== $this->lastPairingSignature) {
+            $this->lastPairingSignature = $signature;
+            $frame = WsFrame::encode(json_encode(
+                ['type' => 'pairing'] + $this->pairing->payload(),
+                JSON_UNESCAPED_UNICODE,
+            ));
+            foreach ($this->clients as $clientId => $client) {
+                // Admin connections only — pairing frames carry card
+                // UIDs (see handshake()); teacher dashboards never see
+                // them, exactly like the REST status endpoint.
+                if ($client['handshook'] && $client['admin']) {
                     $this->write($clientId, $frame);
                 }
             }

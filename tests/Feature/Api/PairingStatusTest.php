@@ -122,6 +122,71 @@ class PairingStatusTest extends TestCase
     }
 
     #[Test]
+    public function arming_supersedes_any_previous_active_window(): void
+    {
+        // TASK-020 — the bench race: an impatient double-arm (or a re-arm
+        // from another tab) used to leave the superseded row live; when
+        // the newer row was consumed by the card tap, that zombie
+        // resurfaced as "the" armed window and the desk NEVER showed the
+        // pairing that had just succeeded. One armed window, always.
+        $first = Student::orderBy('id')->first();
+        $second = Student::orderBy('id')->skip(1)->first();
+        $pairings = $this->pairings();
+
+        $older = $pairings->arm($first);
+        $newer = $pairings->arm($second);
+
+        // The new arm is THE window; the older row is closed, not dormant.
+        $this->assertTrue($newer->fresh()->isActive());
+        $this->assertFalse($older->fresh()->isActive(), 'arming must close the previous window');
+
+        $this->actingAs($this->admin())
+            ->getStatus()
+            ->assertOk()
+            ->assertJsonPath('pending.student_id', $second->id);
+
+        // And the operator's exact bench sequence: card tap consumes the
+        // live window -> the desk surfaces the SUCCESS, not a zombie.
+        $this->pairings()->pair($this->reader('classroom'), 'SUPERSeded001');
+
+        $this->actingAs($this->admin())
+            ->getStatus()
+            ->assertOk()
+            ->assertJsonPath('pending', null)
+            ->assertJsonPath('last_pairing.card_uid', 'SUPERSeded001')
+            ->assertJsonPath('last_pairing.student_name', $second->name);
+    }
+
+    #[Test]
+    public function a_window_written_by_a_clock_the_machine_no_longer_has_is_not_pending(): void
+    {
+        // TASK-020 — the "Armed for Maria — 12468 s left" case: a row
+        // written while the system clock ran ahead (NTP correction, VM
+        // resume, dual-boot RTC) has created_at in the "future" once the
+        // clock is corrected. Its far-future expires_at was computed
+        // against a clock the machine has abandoned — stale by
+        // definition: not pending at the desk, not pairable at the reader.
+        $student = Student::orderBy('id')->first();
+        $this->pairings()->arm($student);
+
+        PendingPairing::latest('id')->first()->forceFill([
+            'created_at' => now()->addSeconds(12600),
+            'updated_at' => now(),
+            'expires_at' => now()->addSeconds(12645),
+        ])->save();
+
+        $this->actingAs($this->admin())
+            ->getStatus()
+            ->assertOk()
+            ->assertJsonPath('pending', null);
+
+        // The stale window cannot consume a card either.
+        $result = $this->pairings()->pair($this->reader('classroom'), 'CLOCKJUMP001');
+        $this->assertFalse($result['ok']);
+        $this->assertSame('no_session', $result['reason']);
+    }
+
+    #[Test]
     public function a_completed_pairing_is_reported_with_its_card_and_reader(): void
     {
         $student = $this->studentWithoutCard();
