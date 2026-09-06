@@ -49,8 +49,29 @@
         </div>
     </x-panel>
 
-    {{-- Live status: armed window countdown + last result, polled while armed --}}
-    <x-panel :label="__('app.pairing_status')" rule>
+    {{-- Live status: armed window countdown + last result. TASK-020 —
+         now a REALTIME panel: the badge + [data-realtime] boot feed the
+         same realtime.js the dashboards use; pairing frames update the
+         desk the instant a card is paired (arm/consume/reject), and the
+         poll below stays as the honest fallback when the socket is down. --}}
+    <x-panel :label="__('app.pairing_status')" rule class="live-panel">
+        <div class="live-head">
+            <span class="live-panel-sub muted small">{{ __('app.pairing_window') }}</span>
+            <span id="live-badge" class="live-badge" data-state="connecting" role="status">
+                <span class="live-dot" aria-hidden="true"></span><span id="live-badge-text">{{ __('app.live_state_connecting') }}</span>
+            </span>
+        </div>
+        <div id="pairing-realtime" hidden data-realtime="{{ json_encode([
+            'token' => $realtimeToken,
+            'expires_at' => $realtimeTokenExpires,
+            'port' => (int) config('realtime.port'),
+            'max_rows' => (int) config('realtime.history_limit'),
+            'strings' => [
+                'state_live' => __('app.live_state_live'),
+                'state_connecting' => __('app.live_state_connecting'),
+                'state_offline' => __('app.live_state_offline'),
+            ],
+        ]) }}"></div>
         <div id="pairing-state" class="nl-answer {{ $activeSession ? 'answer-ok' : 'hidden' }}"
              aria-live="polite" data-initially-armed="{{ $activeSession ? '1' : '0' }}"
              @if($activeSession) data-student-name="{{ $activeSession->student?->name }}" @endif
@@ -110,6 +131,7 @@
     </x-panel>
 </section>
 
+<script src="{{ asset('js/realtime.js') }}"></script>
 <script>
     (function () {
         var csrf = document.querySelector('meta[name="csrf-token"]').content;
@@ -157,6 +179,8 @@
         var rejectionNote = stateBox.dataset.rejectionNote || null;
 
         var ARMED_TPL = {!! json_encode(__('app.pairing_armed_for', ['name' => ':NAME:']) . ' — ' . __('app.pairing_seconds_left', ['s' => ':S:']) . ' ' . __('app.pairing_go_tap')) !!};
+        var EXPIRED_TEXT = {!! json_encode(__('app.pairing_expired')) !!};
+        var SUCCESS_TPL = {!! json_encode(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!};
 
         var ACTIVE_MS = 2000;   // armed window: live countdown
         var IDLE_MS = 15000;    // idle: quiet watch (cross-tab arm / success)
@@ -226,66 +250,90 @@
             });
         }
 
-        function tick() {
-            if (!armed) return;
-            if (secondsLeft > 0) {
-                secondsLeft -= 1;
-            }
-            renderCountdown();
-            if (secondsLeft > 0) {
-                setState(armedLine(), true);
-            }
-        }
-
-        // One poll function, two cadences: ACTIVE while an armed window is
-        // live, IDLE otherwise. IDLE is QUIET — it only speaks when a window
-        // appears (this tab or another one) or a new completion lands, so a
-        // finished/expired session can never be re-announced (TASK-014: the
-        // old "expired" tail loop overwrote the SUCCESS line seconds after
-        // a good pairing and kept re-lying every 3 s).
         function setPollInterval(ms) {
             if (pollTimer) { clearInterval(pollTimer); }
             pollTimer = setInterval(poll, ms);
         }
 
+        function tick() {
+            if (!armed) return;
+            if (secondsLeft > 0) {
+                secondsLeft -= 1;
+                renderCountdown();
+                if (secondsLeft > 0) {
+                    setState(armedLine(), true);
+                    return;
+                }
+            }
+            // TASK-020 — the window drained on our own clock: finalize
+            // locally instead of lying at "0 s left" until the next
+            // poll. A live frame (WS or poll) that disagrees simply
+            // re-arms the UI — applyStatus is idempotent.
+            setState(EXPIRED_TEXT, false);
+            armed = false;
+            rejectionNote = null;
+            showCountdown(false);
+            setPollInterval(IDLE_MS);
+        }
+
+        // One state applier, three sources: the poll, a `realtime:pairing`
+        // frame (TASK-020 — same payload as the status endpoint, so the
+        // WebSocket path and the REST path can never disagree), and the
+        // hello frame's initial reconcile. IDLE is QUIET — it only
+        // speaks when a window appears (this tab or another one) or a
+        // new completion lands, so a finished/expired session can never
+        // be re-announced (TASK-014: the old "expired" tail loop
+        // overwrote the SUCCESS line seconds after a good pairing and
+        // kept re-lying every 3 s).
+        function applyStatus(data) {
+            var pending = data.pending;
+            if (pending && pending.seconds_left > 0) {
+                if (!armed) { setState(armedLine(), true); showCountdown(true); }  // armed elsewhere (other tab/phone)
+                armed = true;
+                secondsLeft = pending.seconds_left;
+                renderCountdown();
+                stateBox.dataset.studentName = pending.student_name || '';
+                rejectionNote = noteFromFeed(pending.last_rejection);
+                if (rejectionNote) { setState(armedLine(), true); }
+                setPollInterval(ACTIVE_MS);
+                return;
+            }
+            // No live window: a card got paired, it expired, or nothing changed.
+            var last = data.last_pairing;
+            if (last && last.card_uid && last.card_uid !== lastSeenUid) {
+                lastSeenUid = last.card_uid;
+                setState(SUCCESS_TPL
+                    .replace(':UID:', last.card_uid)
+                    .replace(':NAME:', last.student_name || ''), true);
+                renderRecent(data.recent_pairings);
+                armed = false;
+                rejectionNote = null;
+                showCountdown(false);
+                setPollInterval(IDLE_MS);
+            } else if (armed) {
+                // We were following this window and it is gone without a
+                // new completion — a REAL expiry (not a post-success lie).
+                setState(EXPIRED_TEXT, false);
+                armed = false;
+                rejectionNote = null;
+                showCountdown(false);
+                setPollInterval(IDLE_MS);
+            }
+        }
+
         function poll() {
             getJson('/api/v1/admin/pairing/status').then(function (r) {
                 if (!r.ok) return;
-                var pending = r.data.pending;
-                if (pending && pending.seconds_left > 0) {
-                    if (!armed) { setState(armedLine(), true); showCountdown(true); }  // armed elsewhere (other tab/phone)
-                    armed = true;
-                    secondsLeft = pending.seconds_left;
-                    renderCountdown();
-                    stateBox.dataset.studentName = pending.student_name || '';
-                    rejectionNote = noteFromFeed(pending.last_rejection);
-                    if (rejectionNote) { setState(armedLine(), true); }
-                    setPollInterval(ACTIVE_MS);
-                    return;
-                }
-                // No live window: a card got paired, it expired, or nothing changed.
-                var last = r.data.last_pairing;
-                if (last && last.card_uid && last.card_uid !== lastSeenUid) {
-                    lastSeenUid = last.card_uid;
-                    setState({!! json_encode(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!}
-                        .replace(':UID:', last.card_uid)
-                        .replace(':NAME:', last.student_name || ''), true);
-                    renderRecent(r.data.recent_pairings);
-                    armed = false;
-                    rejectionNote = null;
-                    showCountdown(false);
-                    setPollInterval(IDLE_MS);
-                } else if (armed) {
-                    // We were following this window and it is gone without a
-                    // new completion — a REAL expiry (not a post-success lie).
-                    setState({!! json_encode(__('app.pairing_expired')) !!}, false);
-                    armed = false;
-                    rejectionNote = null;
-                    showCountdown(false);
-                    setPollInterval(IDLE_MS);
-                }
+                applyStatus(r.data);
             });
         }
+
+        // TASK-020 — the realtime channel: a card paired at the reader
+        // (or armed at another tab) reaches this desk within one server
+        // poll beat (~300 ms) — no waiting for this page's own cadence.
+        document.addEventListener('realtime:pairing', function (e) {
+            applyStatus(e.detail || {});
+        });
 
         // ONE global 1 s ticker (started once) — tick() no-ops when not armed.
         setInterval(tick, 1000);
@@ -303,9 +351,13 @@
                             armed = true;
                             rejectionNote = null;   // new window, no rejections yet
                             stateBox.dataset.studentName = btn.dataset.name;
-                            // expires_at comes back ISO; trust the server's window.
+                            // expires_at comes back ISO; trust the server's
+                            // window. TASK-020 — clamped to the configured
+                            // window: a skewed browser clock can no longer
+                            // paint an absurd countdown (the poll/WS frame
+                            // re-syncs to server truth within 2 s anyway).
                             var ms = Date.parse(r.data.expires_at) - Date.now();
-                            secondsLeft = Math.max(0, Math.round(ms / 1000));
+                            secondsLeft = Math.min(WINDOW_TOTAL, Math.max(0, Math.round(ms / 1000)));
                             setState(armedLine(), true);
                             showCountdown(true);
                             setPollInterval(ACTIVE_MS);

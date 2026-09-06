@@ -5,20 +5,29 @@
    keep their absolute time — only the arrival moment is knowable
    client-side, and SSR-first means no lying timestamps).
 
-   No build step, no dependencies: the browser's native WebSocket API.
-   Loaded by the dashboards after the server-rendered feed panel.
+   TASK-020 — one client, two pages: the connection machinery (token,
+   badge honesty, reconnect backoff) now serves BOTH the dashboards'
+   live feed and the pairing desk. Any element carrying [data-realtime]
+   is a boot node (the dashboards' #live-list, the desk's hidden boot
+   div); the feed rendering below gates on #live-list existing, and
+   pairing frames leave as a `realtime:pairing` CustomEvent the desk's
+   script applies. Same wire, same honesty rules, no second client.
 
-   Bootstrap contract (server-rendered JSON on #live-list[data-realtime]):
+   No build step, no dependencies: the browser's native WebSocket API.
+
+   Bootstrap contract (server-rendered JSON on [data-realtime]):
      { token, expires_at, port, max_rows, strings: {…} }
 
    Honesty rules:
      - badge states are truth: live / connecting / offline;
      - offline shows the fallback hint (reload to see the latest taps)
-       instead of pretending the page is current;
+       instead of pretending the page is current — on the pairing desk
+       the poll keeps the page honest on its own, so no hint node there;
      - reconnect backs off (1 s → 15 s) and re-mints the token via the
        session-authed /realtime/token endpoint when it is near expiry;
-     - page hooks: a `realtime:tap` CustomEvent (detail = the event
-       row) so page scripts can react (teacher attendance rows).
+     - page hooks: `realtime:tap` (detail = the event row) and
+       `realtime:pairing` (detail = {pending, last_pairing,
+       recent_pairings}) CustomEvents so page scripts can react.
 
    Row DOM contract (mirrored by the SSR partial — one rendering
    path, one truth; the chip tone mapping lives in CSS only):
@@ -28,11 +37,13 @@
 (function () {
     'use strict';
 
+    var bootNode = document.querySelector('[data-realtime]');
+    if (!bootNode || typeof window.WebSocket !== 'function') { return; }
+
     var list = document.getElementById('live-list');
-    if (!list || typeof window.WebSocket !== 'function') { return; }
 
     var boot;
-    try { boot = JSON.parse(list.dataset.realtime || '{}'); } catch (e) { return; }
+    try { boot = JSON.parse(bootNode.dataset.realtime || '{}'); } catch (e) { return; }
     if (!boot.token || !boot.port) { return; }
 
     var strings = boot.strings || {};
@@ -133,6 +144,7 @@
     // "N min ago" for up to 10 minutes, then fall back to the absolute
     // wall time (kept in data-abs-time). History rows are untouched.
     function ageRelativeTimes() {
+        if (!list) { return; }
         var now = Date.now();
         Array.prototype.forEach.call(list.children, function (li) {
             if (!li.dataset || !li.dataset.arrived) { return; }
@@ -155,6 +167,16 @@
         try {
             document.dispatchEvent(new CustomEvent('realtime:tap', { detail: ev }));
         } catch (e) { /* older browsers: the feed alone is enough */ }
+    }
+
+    // TASK-020 — the pairing desk's hook: the frame carries the exact
+    // payload of GET /api/v1/admin/pairing/status; the desk script owns
+    // what it means on the page.
+    function refreshPairingState(payload) {
+        if (!payload) { return; }
+        try {
+            document.dispatchEvent(new CustomEvent('realtime:pairing', { detail: payload }));
+        } catch (e) { /* older browsers: the poll fallback still updates the desk */ }
     }
 
     function mintToken() {
@@ -198,10 +220,13 @@
             var data;
             try { data = JSON.parse(message.data); } catch (e) { return; }
             if (data.type === 'hello') {
-                renderHistory(data.events);
+                if (list) { renderHistory(data.events); }
+                refreshPairingState(data.pairing);
             } else if (data.type === 'tap' && data.event) {
-                prependTap(data.event);
+                if (list) { prependTap(data.event); }
                 refreshPageState(data.event);
+            } else if (data.type === 'pairing') {
+                refreshPairingState(data);
             }
         };
 

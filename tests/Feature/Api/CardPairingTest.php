@@ -239,14 +239,28 @@ class CardPairingTest extends TestCase
             ]);
         }
 
-        $this->armPairing($first);
+        $older = $this->armPairing($first);
         $this->armPairing($second);
+
+        // TASK-020 — "most recent wins" is now an INVARIANT, not just a
+        // lookup order: arming the second window closed the first, so a
+        // consumed pairing can never be shadowed by a stale one.
+        $firstWindow = PendingPairing::where('student_id', $first->id)->latest('id')->first();
+        $this->assertFalse($firstWindow->isActive(), 'arming a new window must close the previous one');
 
         $this->pair('LATESTWINS12')->assertOk()
             ->assertJson([
                 'student_id' => $second->id,
                 'paired_student_name' => $second->name,
             ]);
+
+        // And the desk-side view of the same instant: the pairing that
+        // just happened is what the status feed reports — no zombie.
+        $this->actingAs($this->admin())
+            ->getJson('/api/v1/admin/pairing/status')
+            ->assertOk()
+            ->assertJsonPath('pending', null)
+            ->assertJsonPath('last_pairing.card_uid', 'LATESTWINS12');
     }
 
     #[Test]

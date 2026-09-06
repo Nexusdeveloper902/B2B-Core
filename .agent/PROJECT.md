@@ -600,3 +600,53 @@ per student" bench report. Repository reality updates:
   live row flip, countdown drain, 390 px zero h-scroll on 5 pages
   (one overflow caught + fixed), reduced-motion collapse,
   Spanish, zero console errors.
+
+## TASK-020 (RUN-2026-09-06-core-018) — pairing desk liveness: zombie race fixed, websockets delivered
+
+- **Two bench bugs root-caused by reproduction** (throwaway DB, real
+  endpoints): (1) the "Armed for Maria González — 12468 s left"
+  window was a STALE far-future row — the code only ever writes
+  now()+45 s; a row can only go far-future when the machine clock
+  moved backward after arming (NTP correction, VM resume, dual-boot
+  RTC) or the browser clock runs ahead on the arm-response
+  Date.parse math. (2) The intermittent "first try broken, retry
+  fine" race was the ZOMBIE WINDOW: arming never superseded a prior
+  active window, so after a double-arm the card tap consumed the
+  newest row and the stale older one resurfaced as "the" armed
+  window — the desk kept counting down and never showed the pairing
+  that had just succeeded.
+- **Single-window invariant (ADR-029)**: `arm()` closes every other
+  active window in the same transaction (and `pair()` retires
+  pre-invariant leftovers). A success can never be shadowed again;
+  "newest active" and "the window" are the same row, always.
+- **Clock-jump guard**: active = unconsumed AND unexpired AND
+  `created_at <= now()` — a row "created in the future" was written
+  by a clock the machine abandoned; it is stale, not pending, not
+  pairable. Client-side the arm countdown is clamped to the
+  configured window; the desk ticker finalizes expiry locally at 0.
+- **Websockets on the pairing page (the ask)**: the realtime feed's
+  second channel. `RealtimePairing` md5-signatures the mutable
+  pending_pairings columns; arm/consume/reject changes broadcast
+  `{"type":"pairing", …}` frames carrying EXACTLY
+  `PairingService::statusPayload()` (the REST status endpoint now
+  serves the same array — one truth, two transports). hello carries
+  the snapshot for admins. Time-only transitions are NOT broadcasts
+  (the desk's clock owns them; the poll stays the honest fallback).
+- **Privacy floor**: pairing frames carry card UIDs (admin-only
+  data), so delivery is admin-connections-only (role resolved once
+  per connection, fail closed). Teachers keep the tap channel
+  untouched; tap frames still carry no UIDs.
+- **One client, two pages**: realtime.js boots from any
+  `[data-realtime]` node; pairing frames dispatch
+  `realtime:pairing`; the desk applies them via the same
+  `applyStatus()` its poll uses. Same badge grammar + SSR-minted
+  token on the desk page.
+- **Proven live** (7 screenshots): paired card → desk success line
+  within 250 ms (no reload); double-arm + pair → success surfaces
+  (zombie dead); WS killed → badge Offline + cross-process arm
+  arrives via the 15 s poll; window drain → local "Window expired"
+  finalize; WS restart → auto-reconnect Live; zero console errors;
+  Spanish renders.
+- Test count 232/3 (+9; `the_most_recent_armed_pairing_wins`
+  strengthened to pin the invariant); e2e 24/24; device + realtime
+  tap contracts byte-identical — firmware needs nothing.

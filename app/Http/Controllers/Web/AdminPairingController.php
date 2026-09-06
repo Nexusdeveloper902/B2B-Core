@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\PairingService;
+use App\Services\Realtime\RealtimeToken;
 use Illuminate\View\View;
 
 /**
@@ -16,6 +17,12 @@ use Illuminate\View\View;
  * (POST /api/v1/admin/students/{id}/arm-pairing) from the page's script,
  * using the admin's own session — no PAT, no curl. The write path and the
  * arm-then-pair security model are unchanged.
+ *
+ * TASK-020 — the desk is a realtime page: the page render mints the same
+ * short-lived feed token the dashboards mint (SSR-first), so realtime.js
+ * can open the pairing channel and the desk updates the instant a card
+ * is paired. The status poll in the page script stays as the honest
+ * fallback when the socket is down (ADR-029).
  */
 class AdminPairingController extends Controller
 {
@@ -51,6 +58,8 @@ class AdminPairingController extends Controller
             'recentPairings' => $this->pairings->recentCompletions(8),
             'lastCardUid' => $last?->card?->credential_uid,
             'activeRejectionNote' => $rejectionNote,
+            'realtimeToken' => RealtimeToken::issue((int) auth()->id()),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 }

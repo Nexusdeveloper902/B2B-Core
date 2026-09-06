@@ -38,12 +38,13 @@ class RealtimeServerTest extends TestCase
         config(['app.key' => self::APP_KEY]);
 
         $db = $this->freshFileDatabase();
+        $adminId = $this->seedUser($db, 'admin');
         $seededId = $this->seedTap($db, 'CLASS_ATTENDANCE', '07:50', 'LIVE TEST One');
 
         $port = $this->startServer($db);
         $this->assertNotNull($port, 'the realtime server failed to boot');
 
-        $token = RealtimeToken::issue(1, time() + 120);
+        $token = RealtimeToken::issue($adminId, time() + 120);
         [$sock] = $this->upgrade($port, $token);
 
         $hello = $this->readMessage($sock);
@@ -51,6 +52,11 @@ class RealtimeServerTest extends TestCase
         $this->assertSame('hello', $hello['type']);
         $this->assertSame($seededId, $hello['last_id']);
         $this->assertContains('LIVE TEST One', array_column($hello['events'], 'student_name'));
+        // TASK-020 — the hello carries the pairing channel's snapshot too
+        // (admins only: the payload carries card UIDs, same as the REST
+        // status endpoint; teachers get a plain hello).
+        $this->assertArrayHasKey('pairing', $hello);
+        $this->assertNull($hello['pairing']['pending']);
 
         // A tap written by ANOTHER process (the web tier's job) must
         // broadcast to the connected dashboard within a few polls.
@@ -65,6 +71,93 @@ class RealtimeServerTest extends TestCase
         $this->assertSame('12:02', $tap['event']['time']);
         $this->assertSame('Live Reader', $tap['event']['reader_label']);
         $this->assertIsInt($tap['event']['student_id']);
+
+        fclose($sock);
+    }
+
+    #[Test]
+    public function pairing_state_changes_broadcast_to_connected_desks(): void
+    {
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $adminId = $this->seedUser($db, 'admin');
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue($adminId, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertArrayHasKey('pairing', $hello);
+
+        // A pending pairing written by ANOTHER process (the desk's arm
+        // endpoint's job) must broadcast as a `pairing` frame within a
+        // few polls — this is the "desk updates the instant a card is
+        // paired" channel (TASK-020, ADR-029).
+        $this->seedPendingPairing($db, 'LIVE PAIR Student');
+
+        $armed = $this->readMessage($sock);
+        $this->assertNotNull($armed, 'no pairing frame arrived after an arm');
+        $this->assertSame('pairing', $armed['type']);
+        $this->assertSame('LIVE PAIR Student', $armed['pending']['student_name']);
+        $this->assertIsInt($armed['pending']['seconds_left']);
+        $this->assertGreaterThan(0, $armed['pending']['seconds_left']);
+
+        // Consuming the window (the reader's pair endpoint's job) is a
+        // row change too: the frame flips to the completed state.
+        $conn = DB::connection('realtime_file');
+        $conn->table('pending_pairings')->update([
+            'card_id' => $this->seedPairCard($conn, 'LIVEPAIRCARD'),
+            'consumed_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $done = $this->readMessage($sock);
+        $this->assertNotNull($done, 'no pairing frame arrived after a consume');
+        $this->assertSame('pairing', $done['type']);
+        $this->assertNull($done['pending']);
+        $this->assertSame('LIVEPAIRCARD', $done['last_pairing']['card_uid']);
+        $this->assertSame('LIVE PAIR Student', $done['last_pairing']['student_name']);
+
+        fclose($sock);
+    }
+
+    #[Test]
+    public function pairing_frames_never_reach_teacher_connections(): void
+    {
+        // TASK-020 — the privacy floor: pairing frames carry card UIDs,
+        // so they are admin-only. A teacher's feed connection still gets
+        // the tap channel (hello + taps) but NEVER a pairing frame —
+        // same data plane the admin-only REST status endpoint enforces.
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $teacherId = $this->seedUser($db, 'teacher');
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue($teacherId, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertArrayNotHasKey('pairing', $hello, 'teacher hellos carry no pairing snapshot');
+
+        // A pairing is armed and consumed while the teacher watches: no
+        // pairing frame may arrive (budget generous vs the 100 ms poll).
+        $this->seedPendingPairing($db, 'SECRET PAIR Student');
+        usleep(400000);
+
+        $silence = $this->readMessageIfAny($sock, 0.6);
+        $this->assertNull($silence, 'a teacher connection must not receive pairing frames');
+
+        // But the tap channel is untouched for the same connection: a
+        // written tap still arrives.
+        $this->seedTap($db, 'CLASS_ATTENDANCE', '07:55', 'LIVE TEST Teacher');
+        $tap = $this->readMessage($sock);
+        $this->assertNotNull($tap, 'tap frames must still reach teachers');
+        $this->assertSame('tap', $tap['type']);
 
         fclose($sock);
     }
@@ -150,6 +243,67 @@ class RealtimeServerTest extends TestCase
             'type' => $type,
             'occurred_at' => now()->toDateString()." {$time}:00",
             'metadata' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one users row with the given role; returns the id. */
+    private function seedUser(string $db, string $role): int
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        return (int) $conn->table('users')->insertGetId([
+            'name' => 'Realtime '.ucfirst($role),
+            'email' => 'realtime-'.uniqid().'@presence.test',
+            'email_verified_at' => null,
+            'password' => 'irrelevant',
+            'remember_token' => null,
+            'role' => $role,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one armed pending pairing (the arm endpoint's write). */
+    private function seedPendingPairing(string $db, string $studentName): void
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        $studentId = $conn->table('students')->insertGetId([
+            'name' => $studentName,
+            'grade' => '3°',
+            'pae_enrolled' => 0,
+            'class_id' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $conn->table('pending_pairings')->insert([
+            'student_id' => $studentId,
+            'reader_id' => null,
+            'card_id' => null,
+            'expires_at' => now()->addSeconds((int) config('presence.pairing_window_seconds'))->format('Y-m-d H:i:s'),
+            'consumed_at' => null,
+            'last_rejected_uid' => null,
+            'last_rejected_reason' => null,
+            'last_rejected_at' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one cards row (the pair endpoint's write) and return its id. */
+    private function seedPairCard($conn, string $uid): int
+    {
+        $now = now()->format('Y-m-d H:i:s');
+
+        return (int) $conn->table('cards')->insertGetId([
+            'credential_uid' => $uid,
+            'student_id' => $conn->table('students')->where('name', 'LIVE PAIR Student')->value('id'),
+            'status' => 'active',
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -255,8 +409,14 @@ class RealtimeServerTest extends TestCase
     /** Read WS text frames until a JSON message arrives (5 s budget). */
     private function readMessage($sock): ?array
     {
+        return $this->readMessageIfAny($sock, 5.0);
+    }
+
+    /** Read one JSON message within $budget seconds; null when quiet. */
+    private function readMessageIfAny($sock, float $budget): ?array
+    {
         $buffer = '';
-        $deadline = microtime(true) + 5.0;
+        $deadline = microtime(true) + $budget;
 
         while (microtime(true) < $deadline) {
             $result = WsFrame::decode($buffer);

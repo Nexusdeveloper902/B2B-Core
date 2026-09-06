@@ -22,37 +22,11 @@ class PairingStatusController extends Controller
 
     public function show(): JsonResponse
     {
-        $active = $this->pairings->activeSession();
-        $recent = $this->pairings->recentCompletions(8);
-
-        return response()->json([
-            'status' => 'ok',
-            'pending' => $active !== null ? [
-                'student_id' => $active->student_id,
-                'student_name' => $active->student?->name,
-                'expires_at' => $active->expires_at->toIso8601String(),
-                'seconds_left' => max(0, (int) now()->diffInSeconds($active->expires_at)),
-                // TASK-014 — the latest REJECTED tap on this armed window
-                // (422 already_paired): the desk shows it with the fresh-card /
-                // ./run unpair remediation instead of counting down in silence.
-                'last_rejection' => $active->last_rejected_uid !== null ? [
-                    'card_uid' => $active->last_rejected_uid,
-                    'reason' => $active->last_rejected_reason,
-                    'at' => $active->last_rejected_at?->toIso8601String(),
-                ] : null,
-            ] : null,
-            'last_pairing' => $recent->isNotEmpty() ? [
-                'card_uid' => $recent->first()->card?->credential_uid,
-                'student_name' => $recent->first()->student?->name,
-                'paired_at' => $recent->first()->consumed_at?->toIso8601String(),
-                'reader_label' => $recent->first()->reader?->label,
-            ] : null,
-            'recent_pairings' => $recent->map(fn ($p) => [
-                'card_uid' => $p->card?->credential_uid,
-                'student_name' => $p->student?->name,
-                'paired_at' => $p->consumed_at?->toIso8601String(),
-                'reader_label' => $p->reader?->label,
-            ])->values()->all(),
-        ]);
+        // TASK-020 — the payload is built by PairingService::statusPayload(),
+        // the ONE truth shared with the realtime pairing frames: the desk's
+        // poll path and its WebSocket path serialize the identical state.
+        return response()->json(
+            ['status' => 'ok'] + $this->pairings->statusPayload(),
+        );
     }
 }
