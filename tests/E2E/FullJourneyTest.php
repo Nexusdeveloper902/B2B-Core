@@ -7,7 +7,7 @@ use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
 use App\Models\Reward;
 use App\Models\Student;
-use App\Services\NlQuery\GeminiClient;
+use App\Services\NlQuery\DeepSeekClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use PHPUnit\Framework\Attributes\Test;
@@ -206,7 +206,7 @@ class FullJourneyTest extends TestCase
 
         // ---- NL query: honest blocked state when no key is configured ----
         config(['recycling.nl_query.api_key' => null]);
-        $this->app->forgetInstance(GeminiClient::class);
+        $this->app->forgetInstance(DeepSeekClient::class);
 
         $this->actingAs($admin)
             ->postJson('/api/v1/nl-query', ['question' => 'How many students attended today?'])

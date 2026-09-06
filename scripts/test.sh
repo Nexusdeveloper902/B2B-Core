@@ -8,7 +8,7 @@
 #          ./run test unit --filter=PointsServiceTest
 #          ./run test all --stop-on-failure
 # Anything after the suite name is passed through to `php artisan test`.
-# Live-LLM tests stay opt-in (RUN_LIVE_LLM_TESTS=1 + GEMINI_API_KEY).
+# Live-LLM tests stay opt-in (RUN_LIVE_LLM_TESTS=1 + DEEPSEEK_API_KEY).
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

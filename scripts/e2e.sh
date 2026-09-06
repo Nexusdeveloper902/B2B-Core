@@ -67,8 +67,8 @@ rm -f "$E2E_DB"; touch "$E2E_DB"
 
 export DB_DATABASE="$E2E_DB"
 # Deterministic blocked-state for Phase E: run the e2e server WITHOUT a
-# Gemini key regardless of what the developer's .env contains.
-export GEMINI_API_KEY=""
+# DeepSeek key regardless of what the developer's .env contains.
+export DEEPSEEK_API_KEY=""
 "$PHP_BIN" artisan migrate --seed --force >/dev/null
 
 # Extract demo credentials from the throwaway DB (seed printed them too).

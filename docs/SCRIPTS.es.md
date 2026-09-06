@@ -37,7 +37,7 @@ comando siempre se te imprime — y normalmente es `./run doctor`.
 | `./run status` | adivinar | Estado de la app: toolchain, .env, BD, servidores, clasificador |
 | `./run reset` | `migrate:fresh --seed` | BD nueva + datos demo (pregunta primero) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Servidor del modelo local: start/stop/status/run |
-| `./run llm-check` | leer un «no disponible» genérico | Una llamada en vivo a Gemini — veredicto exacto para ESTA máquina |
+| `./run llm-check` | leer un «no disponible» genérico | Una llamada en vivo a DeepSeek — veredicto exacto para ESTA máquina |
 | `./run toolchain` | instalar PHP a mano | PHP+Composer herméticos estáticos en `.tools/` |
 | `./run ci` | leer ci.yml | Todo lo que corre CI, localmente y en orden |
 
@@ -105,7 +105,7 @@ salud del canal; el contrato del protocolo vive en
 
 Todo lo que sigue al nombre de la suite se reenvía a `php artisan test`. Las
 pruebas con LLM real siguen siendo opcionales (`RUN_LIVE_LLM_TESTS=1` +
-`GEMINI_API_KEY`).
+`DEEPSEEK_API_KEY`).
 
 ## `e2e`
 
@@ -216,7 +216,7 @@ dependencias se reinstalan automáticamente solo cuando cambia
 ## `llm-check`
 
 ```bash
-./run llm-check    # una llamada directa en vivo a la API de Gemini + veredicto
+./run llm-check    # una llamada directa en vivo a la API de DeepSeek + veredicto
 ```
 
 Autodiagnóstico de conectividad para la consulta en lenguaje natural.

@@ -14,7 +14,8 @@ use App\Services\Recycling\ClassificationException;
  *   - LocalModelClassifier (local model-inference service; the intended
  *                          production driver when the platform runs fully
  *                          on local hardware — see docs/LOCAL_MODEL.md)
- *   - GeminiClassifier     (optional cloud fallback)
+ *   - DeepSeekClassifier    (optional cloud fallback — vision model
+ *                          deepseek-v4-flash-vision-exp; ADR-030)
  *
  * Swapping implementations is a .env config change
  * (RECYCLING_CLASSIFIER_DRIVER), not a code change. See ADR-003/ADR-007.

@@ -10,7 +10,13 @@ use App\Services\NlQuery\Exceptions\NlQueryException;
  * Flow: question + function schema -> LLM selects a function -> backend
  * executes the REAL query -> structured result back to the LLM -> the LLM
  * phrases a natural-language answer. The LLM never computes or fabricates
- * the answer; it only selects/phrase.
+ * the answer; it only selects/phrases.
+ *
+ * Wire format: DeepSeek Chat Completions (OpenAI-compatible messages).
+ * The assistant turn from each tool round is echoed back VERBATIM
+ * (including tool_calls and their ids) followed by one role:"tool"
+ * message per call carrying the backend result — exactly the multi-turn
+ * contract api-docs.deepseek.com/guides/tool_calls prescribes.
  *
  * Max 3 tool rounds so a confused model cannot loop forever.
  */
@@ -18,8 +24,14 @@ class NlQueryService
 {
     private const MAX_TOOL_ROUNDS = 3;
 
+    private const SYSTEM_PROMPT = 'You answer questions about a school presence platform: '
+        .'class attendance, the PAE school feeding program, and recycling points. '
+        .'When a question needs data, call one of the provided functions; the backend '
+        .'executes the real query and returns the numbers — never invent numbers. '
+        .'After receiving function results, answer concisely in the language of the question.';
+
     public function __construct(
-        private readonly GeminiClient $client,
+        private readonly DeepSeekClient $client,
         private readonly FunctionRegistry $registry,
     ) {}
 
@@ -42,17 +54,18 @@ class NlQueryService
         }
 
         $declarations = $this->registry->declarations();
-        $contents = [
-            ['role' => 'user', 'parts' => [['text' => $question]]],
+        $messages = [
+            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+            ['role' => 'user', 'content' => $question],
         ];
 
         $functionsCalled = [];
 
         for ($round = 0; $round <= self::MAX_TOOL_ROUNDS; $round++) {
-            $result = $this->client->generate($contents, $declarations);
+            $result = $this->client->generate($messages, $declarations);
 
             // Final answer?
-            if ($result['function_call'] === null) {
+            if ($result['tool_calls'] === []) {
                 $answer = trim((string) ($result['text'] ?? ''));
 
                 if ($answer === '') {
@@ -67,27 +80,24 @@ class NlQueryService
                 ];
             }
 
-            $call = $result['function_call'];
-            $functionsCalled[] = ['name' => $call['name'], 'args' => $call['args']];
+            // Echo the assistant turn VERBATIM (raw message, including
+            // tool_calls with their ids) — the documented multi-turn tool
+            // contract; rebuilding it by hand would drop the ids and break
+            // the role:"tool" replies.
+            $messages[] = $result['message'];
 
-            // Execute locally — the single source of numbers is the backend.
-            $functionResult = $this->registry->execute($call['name'], $call['args']);
+            foreach ($result['tool_calls'] as $call) {
+                $functionsCalled[] = ['name' => $call['name'], 'args' => $call['arguments']];
 
-            // Echo the model turn VERBATIM when raw parts are available
-            // (Gemini 3.x thoughtSignature contract). The fallback builds
-            // the same turn from the parsed call — keeps mocked tests and
-            // hand-rolled clients working identically.
-            $modelParts = $result['parts'] ?? [['functionCall' => [
-                'name' => $call['name'],
-                'args' => $call['args'],
-            ]]];
-            $contents[] = ['role' => 'model', 'parts' => $modelParts];
+                // Execute locally — the single source of numbers is the backend.
+                $functionResult = $this->registry->execute($call['name'], $call['arguments']);
 
-            // Continue the conversation with the function response.
-            $contents[] = ['role' => 'user', 'parts' => [['functionResponse' => [
-                'name' => $call['name'],
-                'response' => ['result' => $functionResult],
-            ]]]];
+                $messages[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $call['id'],
+                    'content' => json_encode($functionResult),
+                ];
+            }
         }
 
         throw NlQueryException::maxRoundsExceeded();

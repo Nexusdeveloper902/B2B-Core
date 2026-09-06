@@ -105,7 +105,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->user('admin'))
             ->get('/admin')
             ->assertOk()
-            ->assertSeeText('GEMINI_API_KEY');
+            ->assertSeeText('DEEPSEEK_API_KEY');
     }
 
     #[Test]

@@ -64,9 +64,11 @@ class FunctionRegistryTest extends TestCase
     #[Test]
     public function wire_format_is_lowercase_openapi_types(): void
     {
-        // Gemini 3.x models REJECT the legacy uppercase proto enum
-        // (OBJECT/STRING/INTEGER) — this contract locked by TASK-006
-        // after the live smoke surfaced a 400 on the tools schema.
+        // JSON-Schema types must be LOWERCASE ("object"/"string"/
+        // "integer") — the uppercase proto enum (OBJECT/STRING/INTEGER)
+        // is invalid schema and was rejected by the live provider back
+        // in TASK-006; the DeepSeek tools contract (ADR-030) uses plain
+        // JSON Schema and rejects it identically.
         $allowed = ['object', 'string', 'integer', 'number', 'boolean', 'array'];
 
         $types = [];
@@ -82,7 +84,7 @@ class FunctionRegistryTest extends TestCase
             $this->assertContains(
                 $type,
                 $allowed,
-                "Schema type [{$type}] must be a lowercase OpenAPI type — Gemini 3.x rejects the uppercase proto enum."
+                "Schema type [{$type}] must be a lowercase OpenAPI type — the uppercase proto enum is invalid JSON Schema."
             );
         }
     }

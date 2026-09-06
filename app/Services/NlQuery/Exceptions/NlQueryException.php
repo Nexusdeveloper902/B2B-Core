@@ -12,10 +12,10 @@ class NlQueryException extends RuntimeException
     }
 
     /**
-     * Google rejected the credential itself — the canonical body is
-     * 400 INVALID_ARGUMENT with ErrorInfo reason API_KEY_INVALID (see
-     * ai.google.dev/gemini-api/docs/generate-content/api-errors).
-     * Distinct from transport noise: the fix is a new key, not a retry.
+     * DeepSeek rejected the credential itself — 401 Authentication
+     * Fails due to a wrong API key (see api-docs.deepseek.com,
+     * "Error Codes"). Distinct from transport noise: the fix is a new
+     * key, not a retry.
      */
     public static function invalidKey(string $detail): self
     {
@@ -23,17 +23,18 @@ class NlQueryException extends RuntimeException
     }
 
     /**
-     * 400 FAILED_PRECONDITION "User location is not supported for the
-     * API use." — the key AUTHENTICATED fine; Google refuses the region
-     * the request egresses from. Nothing is wrong with the credential.
+     * 402 Insufficient Balance — the key authenticated fine, but the
+     * DeepSeek account has no remaining balance (pay-as-you-go; there
+     * is no free tier). The fix is topping up at platform.deepseek.com,
+     * not a retry.
      */
-    public static function regionUnsupported(string $detail): self
+    public static function insufficientBalance(string $detail): self
     {
-        return new self('nl_query.region_unsupported: '.$detail);
+        return new self('nl_query.insufficient_balance: '.$detail);
     }
 
-    /** 404 NOT_FOUND — the configured GEMINI_MODEL does not exist for
-     *  this account / API version. */
+    /** 404 / "Model Not Exist" — the configured DEEPSEEK_MODEL does not
+     *  exist for this account / API version. */
     public static function modelNotFound(string $detail): self
     {
         return new self('nl_query.model_not_found: '.$detail);

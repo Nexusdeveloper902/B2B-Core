@@ -106,11 +106,12 @@ class DocumentationTest extends TestCase
      * local tripwire.
      */
     #[Test]
-    public function no_real_gemini_or_github_keys_are_committed(): void
+    public function no_real_llm_or_github_keys_are_committed(): void
     {
         $patterns = [
             'Gemini API key (AIza…)' => '/AIza[0-9A-Za-z_\-]{35}/',
             'Gemini API key (AQ…)' => '/AQ\.[0-9A-Za-z_\-]{20,}/',
+            'DeepSeek API key (sk-…)' => '/sk-[0-9a-f]{32}/',
             'GitHub classic PAT (ghp_…)' => '/gh[pousr]_[0-9A-Za-z]{36,}/',
         ];
 

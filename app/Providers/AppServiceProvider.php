@@ -3,8 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\MaterialClassifier;
+use App\Services\NlQuery\DeepSeekClient;
 use App\Services\NlQuery\FunctionRegistry;
-use App\Services\NlQuery\GeminiClient;
 use App\Services\NlQuery\NlQueryService;
 use App\Services\PairingService;
 use App\Services\Recycling\ClassifierFactory;
@@ -18,24 +18,25 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // MaterialClassifier contract -> configured driver (stub | local |
-        // gemini). Swapping classifiers is a .env change, never a code
+        // deepseek). Swapping classifiers is a .env change, never a code
         // change (ADR-003/ADR-007). Tests swap this binding with a fake.
         $this->app->bind(MaterialClassifier::class, fn () => ClassifierFactory::make());
 
-        // NL-query wiring (Phase E). Gemini flash-family models only, per the
-        // free-tier constraint; the live call is entirely skipped when no
-        // API key is configured (ADR-005/ADR-006).
-        $this->app->singleton(GeminiClient::class, function () {
-            return new GeminiClient(
+        // NL-query wiring (Phase E). DeepSeek deepseek-v4-flash per
+        // ADR-030 (OpenAI-compatible Chat Completions + tool calls);
+        // the live call is entirely skipped when no API key is
+        // configured (ADR-005).
+        $this->app->singleton(DeepSeekClient::class, function () {
+            return new DeepSeekClient(
                 config('recycling.nl_query.api_key'),
-                (string) config('recycling.nl_query.model', 'gemini-3.1-flash-lite'),
+                (string) config('recycling.nl_query.model', 'deepseek-v4-flash'),
                 (float) config('recycling.nl_query.timeout', 20),
             );
         });
 
         $this->app->singleton(NlQueryService::class, function ($app) {
             return new NlQueryService(
-                $app->make(GeminiClient::class),
+                $app->make(DeepSeekClient::class),
                 $app->make(FunctionRegistry::class),
             );
         });

@@ -43,7 +43,7 @@ if [ -f "$B2B_ROOT/.env" ]; then
     if app_key_set; then row "APP_KEY" "set"; else row "APP_KEY" "${C_RED}EMPTY — ./run setup${C_RESET}"; fi
     row "APP_ENV"    "$(env_value APP_ENV)"
     row "APP_URL"    "$(env_value APP_URL)"
-    row "classifier" "$(env_value RECYCLING_CLASSIFIER_DRIVER) ${C_DIM}(stub | local | gemini)${C_RESET}"
+    row "classifier" "$(env_value RECYCLING_CLASSIFIER_DRIVER) ${C_DIM}(stub | local | deepseek)${C_RESET}"
 else
     row ".env" "${C_RED}missing — ./run setup${C_RESET}"
 fi

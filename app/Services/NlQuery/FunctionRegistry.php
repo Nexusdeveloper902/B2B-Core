@@ -14,9 +14,11 @@ use App\Services\AttendanceService;
  * Every function is independently callable (and independently tested)
  * without any LLM involvement.
  *
- * Wire format: LOWERCASE OpenAPI-style types ("object"/"string"/
- * "integer"). Gemini 3.x models reject the legacy uppercase proto enum
- * ("OBJECT"/"STRING"/...) — FunctionRegistryTest locks this contract.
+ * Wire format: provider-neutral declarations (name/description/parameters)
+ * with LOWERCASE JSON-Schema types ("object"/"string"/"integer") — exactly
+ * what the DeepSeek tools format expects; the client wraps them into
+ * {type: "function", function: {…}} envelopes (ADR-030).
+ * FunctionRegistryTest locks this contract.
  */
 class FunctionRegistry
 {
@@ -25,7 +27,7 @@ class FunctionRegistry
     ) {}
 
     /**
-     * Gemini-format function declarations (tools.schema).
+     * Provider-neutral function declarations (name/description/parameters).
      *
      * @return array<int, array<string, mixed>>
      */

@@ -28,8 +28,8 @@ Plus two AI components that close real gaps:
   a swappable interface — runs as a **local model** by design
   ([docs/LOCAL_MODEL.md](docs/LOCAL_MODEL.md))
 - A **natural-language query interface** over the event database using
-  Gemini function-calling — the LLM selects functions, the backend computes
-  the real answers
+  DeepSeek (deepseek-v4-flash) tool-calling — the LLM selects functions,
+  the backend computes the real answers
 
 The app is fully **bilingual (English / Spanish)**: UI, device-facing API
 messages (`Accept-Language`), seeder output, docs and tests.
@@ -67,10 +67,11 @@ section in docs/SCRIPTS.md).
 ### Optional configuration (never commit real keys!)
 
 ```dotenv
-GEMINI_API_KEY=               # enables live NL queries (flash-family models,
-                             # default gemini-3.1-flash-lite). After setting it,
-                             # verify from THIS machine with: ./run llm-check
-RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | gemini
+DEEPSEEK_API_KEY=             # enables live NL queries (DeepSeek
+                             # deepseek-v4-flash). Pay-as-you-go balance —
+                             # create the key at platform.deepseek.com. After
+                             # setting it, verify from THIS machine: ./run llm-check
+RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | deepseek
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
 ATTENDANCE_LATE_CUTOFF=08:15  # teacher-dashboard "late" cutoff
 ```
@@ -135,8 +136,8 @@ contract, restored).
 ```
 
 Each command accepts `--help`. Live LLM smoke tests are **skipped by
-default** (free-tier friendly); opt in with `RUN_LIVE_LLM_TESTS=1` plus a real
-`GEMINI_API_KEY`.
+default** (keeps the paid balance safe); opt in with `RUN_LIVE_LLM_TESTS=1`
+plus a real `DEEPSEEK_API_KEY`.
 
 ## CI
 

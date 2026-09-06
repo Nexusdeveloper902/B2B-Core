@@ -29,7 +29,7 @@ Más dos componentes de IA que cierran huecos reales:
   detrás de una interfaz intercambiable — se ejecuta como **modelo local**
   por diseño ([docs/LOCAL_MODEL.es.md](docs/LOCAL_MODEL.es.md))
 - Una **interfaz de consulta en lenguaje natural** sobre la base de eventos
-  usando function-calling de Gemini — el LLM selecciona funciones, el
+  usando tool-calling de DeepSeek (deepseek-v4-flash) — el LLM selecciona funciones, el
   backend calcula las respuestas reales
 
 La app es completamente **bilingüe (inglés / español)**: interfaz, mensajes
@@ -75,10 +75,11 @@ o a curl.
 ### Configuración opcional (¡nunca commitear claves reales!)
 
 ```dotenv
-GEMINI_API_KEY=               # habilita consultas NL en vivo (familia flash,
-                             # por defecto gemini-3.1-flash-lite). Tras ponerla,
-                             # verifica desde ESTA máquina con: ./run llm-check
-RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | gemini
+DEEPSEEK_API_KEY=             # habilita consultas NL en vivo (DeepSeek
+                             # deepseek-v4-flash). Saldo de pago por uso —
+                             # crea la clave en platform.deepseek.com. Tras
+                             # ponerla, verifica desde ESTA máquina: ./run llm-check
+RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | deepseek
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
 ATTENDANCE_LATE_CUTOFF=08:15  # corte de "tarde" del panel del profesor
 ```
@@ -142,7 +143,7 @@ replican por valor desde el repositorio del marketplace — ver
 
 Cada comando acepta `--help`. Las pruebas LLM en vivo se **omiten por
 defecto** (amigables con el nivel gratuito); actívalas con
-`RUN_LIVE_LLM_TESTS=1` más una `GEMINI_API_KEY` real.
+`RUN_LIVE_LLM_TESTS=1` más una `DEEPSEEK_API_KEY` real.
 
 ## CI
 

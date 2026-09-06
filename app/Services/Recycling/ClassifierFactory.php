@@ -3,7 +3,7 @@
 namespace App\Services\Recycling;
 
 use App\Contracts\MaterialClassifier;
-use App\Services\Recycling\Drivers\GeminiClassifier;
+use App\Services\Recycling\Drivers\DeepSeekClassifier;
 use App\Services\Recycling\Drivers\LocalModelClassifier;
 use App\Services\Recycling\Drivers\StubClassifier;
 use InvalidArgumentException;
@@ -24,10 +24,10 @@ class ClassifierFactory
                 (string) config('recycling.classifier.local.url'),
                 (float) config('recycling.classifier.local.timeout'),
             ),
-            'gemini' => new GeminiClassifier(
-                config('recycling.classifier.gemini.api_key'),
-                (string) config('recycling.classifier.gemini.model'),
-                (float) config('recycling.classifier.gemini.timeout'),
+            'deepseek' => new DeepSeekClassifier(
+                config('recycling.classifier.deepseek.api_key'),
+                (string) config('recycling.classifier.deepseek.model'),
+                (float) config('recycling.classifier.deepseek.timeout'),
             ),
             default => throw new InvalidArgumentException("Unknown classifier driver [{$driver}]"),
         };

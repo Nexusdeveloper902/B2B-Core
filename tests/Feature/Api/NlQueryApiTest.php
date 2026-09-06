@@ -3,8 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Models\User;
+use App\Services\NlQuery\DeepSeekClient;
 use App\Services\NlQuery\Exceptions\NlQueryException;
-use App\Services\NlQuery\GeminiClient;
 use App\Services\NlQuery\NlQueryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -21,11 +21,11 @@ class NlQueryApiTest extends TestCase
     }
 
     #[Test]
-    public function without_a_gemini_key_the_endpoint_reports_a_structured_blocker(): void
+    public function without_a_deepseek_key_the_endpoint_reports_a_structured_blocker(): void
     {
         config(['recycling.nl_query.api_key' => null]);
         // Re-resolve the singleton with the nulled key.
-        $this->app->forgetInstance(GeminiClient::class);
+        $this->app->forgetInstance(DeepSeekClient::class);
 
         $response = $this->actingAs($this->user('admin'))
             ->postJson('/api/v1/nl-query', [
@@ -46,12 +46,12 @@ class NlQueryApiTest extends TestCase
         // TASK-007: every failure class gets a DISTINCT reason + message,
         // so the owner sees "your key was rejected" instead of a generic
         // "service unavailable" that hides the actual cause.
-        $this->app->instance(GeminiClient::class, new class('stale-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        $this->app->instance(DeepSeekClient::class, new class('stale-key', 'deepseek-v4-flash') extends DeepSeekClient
         {
-            public function generate(array $contents, ?array $tools = null): array
+            public function generate(array $messages, ?array $tools = null): array
             {
                 throw NlQueryException::invalidKey(
-                    'HTTP 400 [API_KEY_INVALID] INVALID_ARGUMENT: API key not valid. Please pass a valid API key.'
+                    'HTTP 401: Authentication Fails, Your api key: ***stale is invalid'
                 );
             }
         });
@@ -70,14 +70,16 @@ class NlQueryApiTest extends TestCase
     }
 
     #[Test]
-    public function a_region_refusal_reports_its_own_actionable_blocker(): void
+    public function an_empty_account_balance_reports_its_own_actionable_blocker(): void
     {
-        $this->app->instance(GeminiClient::class, new class('valid-key', 'gemini-3.1-flash-lite') extends GeminiClient
+        // DeepSeek's documented 402 — the key is VALID, the account is out
+        // of balance (pay-as-you-go, no free tier): the fix is a top-up.
+        $this->app->instance(DeepSeekClient::class, new class('valid-key', 'deepseek-v4-flash') extends DeepSeekClient
         {
-            public function generate(array $contents, ?array $tools = null): array
+            public function generate(array $messages, ?array $tools = null): array
             {
-                throw NlQueryException::regionUnsupported(
-                    'HTTP 400 FAILED_PRECONDITION: User location is not supported for the API use.'
+                throw NlQueryException::insufficientBalance(
+                    'HTTP 402: Insufficient Balance'
                 );
             }
         });
@@ -89,9 +91,10 @@ class NlQueryApiTest extends TestCase
             ]);
 
         $json = $response->assertStatus(503)->json();
-        $this->assertSame('llm_region_unsupported', $json['blocked_reason']);
-        // Honest semantics: the refusal is about the region, not the key.
-        $this->assertStringContainsString('valid', (string) $json['message']);
+        $this->assertSame('blocked', $json['status']);
+        $this->assertSame('llm_insufficient_balance', $json['blocked_reason']);
+        // Honest semantics: the refusal is about the balance, not the key.
+        $this->assertStringContainsString('balance', (string) $json['message']);
     }
 
     #[Test]
@@ -119,15 +122,15 @@ class NlQueryApiTest extends TestCase
 
     /**
      * LIVE smoke test — only runs when a real key AND the explicit opt-in
-     * flag are both set (keeps the free tier and CI safe by default).
+     * flag are both set (keeps the paid balance and CI safe by default).
      *
-     * RUN_LIVE_LLM_TESTS=1 GEMINI_API_KEY=... php artisan test --filter=NlQueryApiTest
+     * RUN_LIVE_LLM_TESTS=1 DEEPSEEK_API_KEY=... php artisan test --filter=NlQueryApiTest
      */
     #[Test]
-    public function live_end_to_end_query_with_a_real_gemini_key(): void
+    public function live_end_to_end_query_with_a_real_deepseek_key(): void
     {
-        if (empty(env('GEMINI_API_KEY')) || env('RUN_LIVE_LLM_TESTS') !== '1') {
-            $this->markTestSkipped('Live LLM test requires GEMINI_API_KEY and RUN_LIVE_LLM_TESTS=1 (used sparingly).');
+        if (empty(env('DEEPSEEK_API_KEY')) || env('RUN_LIVE_LLM_TESTS') !== '1') {
+            $this->markTestSkipped('Live LLM test requires DEEPSEEK_API_KEY and RUN_LIVE_LLM_TESTS=1 (used sparingly).');
         }
 
         // Give the journey some real data to ask about.

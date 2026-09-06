@@ -13,11 +13,12 @@ return [
     | The material classifier is resolved through the MaterialClassifier
     | contract. Three drivers ship today:
     |
-    |   stub   — deterministic/pseudo-random stub (default; MVP contract only)
-    |   local  — calls a LOCAL model-inference HTTP endpoint (the intended
-    |            driver once the platform runs fully on local hardware; see
-    |            docs/LOCAL_MODEL.md for the JSON contract)
-    |   gemini — optional cloud fallback using the Gemini API vision models
+    |   stub     — deterministic/pseudo-random stub (default; MVP contract only)
+    |   local    — calls a LOCAL model-inference HTTP endpoint (the intended
+    |              driver once the platform runs fully on local hardware; see
+    |              docs/LOCAL_MODEL.md for the JSON contract)
+    |   deepseek — optional cloud fallback using the DeepSeek vision model
+    |              (deepseek-v4-flash-vision-exp — image-capable; ADR-030)
     |
     | Swapping drivers is a .env change only — no controller or route edits.
     | See ADR-003 and ADR-007 in .agent/DECISIONS/.
@@ -42,23 +43,24 @@ return [
             'timeout' => (float) env('LOCAL_CLASSIFIER_TIMEOUT', 10),
         ],
 
-        'gemini' => [
-            'api_key' => env('GEMINI_API_KEY'),
-            'model' => env('GEMINI_VISION_MODEL', 'gemini-3.1-flash-lite'),
-            'timeout' => (float) env('GEMINI_TIMEOUT', 15),
+        'deepseek' => [
+            'api_key' => env('DEEPSEEK_API_KEY'),
+            'model' => env('DEEPSEEK_VISION_MODEL', 'deepseek-v4-flash-vision-exp'),
+            'timeout' => (float) env('DEEPSEEK_TIMEOUT', 15),
         ],
     ],
 
     /*
      | Natural-language query interface (Phase E).
-     | Uses the Gemini API with function-calling. Free-tier friendly:
-     | flash-family models only (default: gemini-3.1-flash-lite), and
-     | the live call is skipped entirely when no API key is configured
-     | (endpoint then reports the blocker).
+     | Uses the DeepSeek API (OpenAI-compatible Chat Completions) with
+     | tool-calling. Default model deepseek-v4-flash (the legacy
+     | deepseek-chat name was discontinued 2026-07-24); the live call is
+     | skipped entirely when no API key is configured (endpoint then
+     | reports the blocker).
      */
     'nl_query' => [
-        'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
-        'timeout' => (float) env('GEMINI_TIMEOUT', 20),
+        'api_key' => env('DEEPSEEK_API_KEY'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
+        'timeout' => (float) env('DEEPSEEK_TIMEOUT', 20),
     ],
 ];
