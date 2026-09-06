@@ -1,43 +1,54 @@
+{{--
+    TASK-026 — mockup "Admin Dashboard — School Today": 5-KPI hero strip
+    (attendance black card + PAE + recycling), readers hardware table,
+    NL query panel, redemption module, student directory, shared live
+    feed. Every id/class/form contract is unchanged (nl-query-form,
+    redeem-form, mode-form…). Mockup parts with no data source are
+    omitted and documented (docs/FRONTEND.md): node/telemetry strip,
+    "Force Telemetry Poll" and "Global Thresholds" buttons, campus
+    operations summary card (gaps #A1-A3).
+--}}
 @extends('layouts.app')
 
 @section('title', __('app.admin_dashboard'))
 
 @section('content')
-<div class="page-head">
+<div class="lede">
+    <span class="kicker">{{ __('app.school_today') }}</span>
     <h1>{{ __('app.admin_dashboard') }}</h1>
-    <p class="page-meta"><span>{{ __('app.school_today') }}</span></p>
+    <p class="lede-sub">{{ __('app.admin_dashboard_sub') }}</p>
 </div>
 
 {{-- School-wide stats today: hero attendance tile + secondary KPI tiles.
-     The hero (most important number) sits top-left — dashboard best practice. --}}
+     The hero (most important number) sits first — dashboard best practice. --}}
 <section class="stat-strip" data-reveal-stagger aria-label="{{ __('app.school_today') }}">
     <x-stat :label="__('app.attendance_count')">
         <x-slot:icon>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>
+            <span class="material-symbols-outlined is-16" aria-hidden="true">how_to_reg</span>
         </x-slot:icon>
         {{ $attendanceToday }}
     </x-stat>
     <x-stat :label="__('app.pae_breakfast')">
         <x-slot:icon>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <span class="material-symbols-outlined is-16" aria-hidden="true">bakery_dining</span>
         </x-slot:icon>
         {{ $paeBreakfastToday }}
     </x-stat>
     <x-stat :label="__('app.pae_lunch')">
         <x-slot:icon>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11h18a9 9 0 0 1-9 9 9 9 0 0 1-9-9Z"/><path d="M8 7c0-1.5 1-2 1-3M13 7c0-1.5 1-2 1-3"/></svg>
+            <span class="material-symbols-outlined is-16" aria-hidden="true">lunch_dining</span>
         </x-slot:icon>
         {{ $paeLunchToday }}
     </x-stat>
     <x-stat :label="__('app.recycling_items')">
         <x-slot:icon>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2v6h-6"/><path d="M3 12a9 9 0 0 1 9-8 9 9 0 0 1 8 5"/><path d="M7 22v-6h6"/><path d="M21 12a9 9 0 0 1-9 8 9 9 0 0 1-8-5"/></svg>
+            <span class="material-symbols-outlined is-16" aria-hidden="true">recycling</span>
         </x-slot:icon>
         {{ $recyclingToday['items'] }}
     </x-stat>
     <x-stat :label="__('app.recycling_points')">
         <x-slot:icon>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 6.5 7 .8-5.2 4.7 1.5 6.9L12 17l-6.3 3.9 1.5-6.9L2 9.3l7-.8Z"/></svg>
+            <span class="material-symbols-outlined is-16" aria-hidden="true">toll</span>
         </x-slot:icon>
         {{ $recyclingToday['points'] }}
     </x-stat>
@@ -46,7 +57,7 @@
 {{-- TASK-016 — live activity: server-rendered, then WebSocket-live --}}
 @include('partials.live-feed')
 
-<section class="grid-2" data-reveal>
+<section class="grid-2 grid-2-wide-left" data-reveal>
     {{-- Reader list + mode control --}}
     <x-panel :label="__('app.readers')" rule>
         <div class="ledger-wrap">
@@ -108,7 +119,7 @@
 
 <section class="grid-2" data-reveal>
     {{-- Redemption desk --}}
-    <x-panel :label="__('app.redemption')">
+    <x-panel :label="__('app.redemption')" rule>
         <form id="redeem-form" class="tool-form">
             <select id="redeem-student" class="bare-select" required aria-label="{{ __('app.student') }}">
                 @foreach($students as $student)

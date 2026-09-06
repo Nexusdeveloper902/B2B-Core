@@ -1,18 +1,36 @@
+{{--
+    TASK-026 — mockup "Pair Cards — Pairing Desk": roster with client-side
+    search, live status panel with NFC pulse art + draining countdown,
+    recently-paired ledger. The ENTIRE realtime/poll/arm script below is
+    the TASK-020/023/024 machine, byte-identical in behavior — only the
+    markup around it changed. Mockup-only parts are documented as gaps
+    (docs/FRONTEND.md): "reassignment/replace card" row actions, status
+    state reference matrix, reader terminal telemetry, cryptographic
+    footer (gaps #D1-D4).
+--}}
 @extends('layouts.app')
 
 @section('title', __('app.pairing_desk'))
 
 @section('content')
-<div class="page-head">
+<div class="lede">
+    <span class="kicker">{{ __('app.pairing_desk') }}</span>
     <h1>{{ __('app.pairing_desk') }}</h1>
-    <p class="page-meta"><span>{{ __('app.pairing_desk_intro') }}</span></p>
+    <p class="lede-sub">{{ __('app.pairing_desk_intro') }}</p>
 </div>
 
-<section class="grid-2" data-reveal>
+<section class="grid-2 grid-2-wide-left" data-reveal>
     {{-- Arming table: one click per student (replaces the curl+PAT dance) --}}
     <x-panel :label="__('app.students')" rule>
+        <div class="filterbar" style="margin-bottom: var(--sp-sm); box-shadow:none; padding: var(--sp-2xs);">
+            <div class="searchbox" style="flex:1 1 auto;">
+                <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
+                <input type="search" id="roster-search" aria-label="{{ __('app.search_students') }}"
+                       placeholder="{{ __('app.search_students') }}" autocomplete="off">
+            </div>
+        </div>
         <div class="ledger-wrap">
-            <table class="ledger-table" data-stack>
+            <table class="ledger-table" data-stack data-roster>
                 <thead>
                 <tr>
                     <th scope="col">{{ __('app.student') }}</th>
@@ -23,7 +41,7 @@
                 </thead>
                 <tbody>
                 @forelse($students as $student)
-                    <tr data-student-row="{{ $student->id }}">
+                    <tr data-student-row="{{ $student->id }}" data-search="{{ mb_strtolower($student->name) }}">
                         <td data-label="{{ __('app.student') }}">{{ $student->name }}</td>
                         <td data-label="{{ __('app.class') }}">{{ $student->schoolClass?->name ?? '—' }}</td>
                         <td data-label="{{ __('app.current_card') }}" data-card-cell="{{ $student->id }}">
@@ -53,7 +71,9 @@
          now a REALTIME panel: the badge + [data-realtime] boot feed the
          same realtime.js the dashboards use; pairing frames update the
          desk the instant a card is paired (arm/consume/reject), and the
-         poll below stays as the honest fallback when the socket is down. --}}
+         poll below stays as the honest fallback when the socket is down.
+         TASK-026 — the mockup's NFC concentric-wave art rides under the
+         status box (pure decoration, aria-hidden). --}}
     <x-panel :label="__('app.pairing_status')" rule class="live-panel">
         <div class="live-head">
             <span class="live-panel-sub muted small">{{ __('app.pairing_window') }}</span>
@@ -72,6 +92,12 @@
                 'state_offline' => __('app.live_state_offline'),
             ],
         ]) }}"></div>
+        <div class="pulse" aria-hidden="true">
+            <span class="ring"></span>
+            <span class="ring"></span>
+            <span class="ring"></span>
+            <span class="pulse-core"><span class="material-symbols-outlined is-20">contactless</span></span>
+        </div>
         <div id="pairing-state" class="nl-answer {{ $activeSession ? 'answer-ok' : 'hidden' }}"
              aria-live="polite" data-initially-armed="{{ $activeSession ? '1' : '0' }}"
              @if($activeSession) data-student-name="{{ $activeSession->student?->name }}" @endif
@@ -103,9 +129,9 @@
     </x-panel>
 </section>
 
-<section class="grid-2" data-reveal>
+<section class="stack" data-reveal>
     {{-- History: exact card->student links this platform made --}}
-    <x-panel :label="__('app.pairing_recent')">
+    <x-panel :label="__('app.pairing_recent')" rule>
         <div class="ledger-wrap" id="recent-wrap">
             <table class="ledger-table" data-stack>
                 <thead>
@@ -121,7 +147,7 @@
                     <tr>
                         <td data-label="{{ __('app.pairing_uid') }}"><code>{{ $pairing->card?->credential_uid }}</code></td>
                         <td data-label="{{ __('app.student') }}">{{ $pairing->student?->name }}</td>
-                        <td data-label="{{ __('app.pairing_paired_at') }}">{{ $pairing->consumed_at?->format('Y-m-d H:i') }}</td>
+                        <td class="num" data-label="{{ __('app.pairing_paired_at') }}">{{ $pairing->consumed_at?->format('Y-m-d H:i') }}</td>
                         <td data-label="{{ __('app.reader_label') }}">{{ $pairing->reader?->label ?? '—' }}</td>
                     </tr>
                 @empty
@@ -398,6 +424,17 @@
                     });
             });
         });
+
+        // TASK-026 — client-side roster search (real rows only).
+        var rosterSearch = document.getElementById('roster-search');
+        if (rosterSearch) {
+            rosterSearch.addEventListener('input', function () {
+                var q = rosterSearch.value.trim().toLowerCase();
+                document.querySelectorAll('[data-roster] tr[data-student-row]').forEach(function (row) {
+                    row.hidden = q !== '' && (row.dataset.search || '').indexOf(q) === -1;
+                });
+            });
+        }
 
         // Start following immediately: ACTIVE when a window is live (page
         // load / F5 mid-window — the rejection note comes with it), else

@@ -60,6 +60,12 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:admin')
         ->name('admin.pairing');
 
+    // TASK-026 — the EcoStation hub (mockup-driven, read-only view over
+    // existing deposit/reader/config data; admin-only).
+    Route::get('/admin/ecostation', [AdminDashboardController::class, 'ecostation'])
+        ->middleware('role:admin')
+        ->name('admin.ecostation');
+
     // TASK-025 item 5 — student self-service (spec §11/§12/§30): own
     // points, history, rewards. The student row always resolves from
     // the authenticated account — never a URL parameter.
@@ -74,6 +80,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/student/rewards', [StudentDashboardController::class, 'rewards'])
         ->middleware('role:student')
         ->name('student.rewards');
+
+    // TASK-026 — the standings page (mockup "Leaderboard & Class
+    // Standings"): read-only view over LeaderboardService data.
+    Route::get('/student/leaderboard', [StudentDashboardController::class, 'leaderboard'])
+        ->middleware('role:student')
+        ->name('student.leaderboard');
 
     // Simplified parent view (admin/teacher selectable stand-in — a real
     // parent auth system is explicitly out of scope for this phase).

@@ -24,6 +24,9 @@
 <body>
 <a class="skip" href="#main">{{ __('app.skip_to_content') }}</a>
 
+{{-- TASK-026 — mockup "Architectural Ambient Layer & Top Bar": fixed,
+     blurred, pill nav, avatar chip, icon logout. Role scoping (the real
+     nav grammar) is unchanged; only the surface changed. --}}
 <header class="topbar">
     <div class="shell topbar-in">
         <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}"
@@ -35,7 +38,8 @@
         @auth
             <nav class="topnav" aria-label="{{ __('app.primary_nav') }}">
                 @if(auth()->user()->isStudent())
-                    {{-- TASK-025 — student self-service nav (own data only) --}}
+                    {{-- TASK-025 — student self-service nav (own data only);
+                         TASK-026 adds the standings page (same scoping). --}}
                     <a href="{{ route('student.dashboard') }}"
                        @class(['is-active' => request()->routeIs('student.dashboard')])>
                         {{ __('app.student_dashboard') }}
@@ -48,6 +52,10 @@
                        @class(['is-active' => request()->routeIs('student.rewards')])>
                         {{ __('app.student_rewards') }}
                     </a>
+                    <a href="{{ route('student.leaderboard') }}"
+                       @class(['is-active' => request()->routeIs('student.leaderboard')])>
+                        {{ __('app.student_standings') }}
+                    </a>
                 @else
                     @if(auth()->user()->isAdmin())
                         <a href="{{ route('admin.dashboard') }}"
@@ -57,6 +65,10 @@
                         <a href="{{ route('admin.pairing') }}"
                            @class(['is-active' => request()->routeIs('admin.pairing')])>
                             {{ __('app.pairing_desk') }}
+                        </a>
+                        <a href="{{ route('admin.ecostation') }}"
+                           @class(['is-active' => request()->routeIs('admin.ecostation')])>
+                            {{ __('app.ecostation') }}
                         </a>
                     @endif
                     <a href="{{ route('teacher.dashboard') }}"
@@ -73,12 +85,15 @@
                 @php($initials = strtoupper(mb_substr($nameParts[0] ?? '·', 0, 1) . mb_substr($nameParts[1] ?? '', 0, 1)))
                 <span class="topbar-user" title="{{ auth()->user()->email }}">
                     <span class="user-avatar" aria-hidden="true">{{ $initials }}</span>
-                    <span class="topbar-user-name">{{ __('app.welcome', ['name' => auth()->user()->name]) }}</span>
+                    <span class="topbar-user-name" data-greeting="{{ __('app.welcome_short') }}">{{ auth()->user()->name }}</span>
                 </span>
 
                 <form method="POST" action="{{ route('logout') }}" class="inline-form">
                     @csrf
-                    <button type="submit" class="linklike">{{ __('app.logout') }}</button>
+                    <button type="submit" class="logout-btn" title="{{ __('app.logout') }}">
+                        <span class="material-symbols-outlined is-18" aria-hidden="true">logout</span>
+                        <span class="logout-text">{{ __('app.logout') }}</span>
+                    </button>
                 </form>
             @endauth
 
@@ -104,10 +119,12 @@
                                 <a href="{{ route('student.dashboard') }}">{{ __('app.student_dashboard') }}</a>
                                 <a href="{{ route('student.history') }}">{{ __('app.student_history') }}</a>
                                 <a href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }}</a>
+                                <a href="{{ route('student.leaderboard') }}">{{ __('app.student_standings') }}</a>
                             @else
                                 @if(auth()->user()->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
                                     <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
+                                    <a href="{{ route('admin.ecostation') }}">{{ __('app.ecostation') }}</a>
                                 @endif
                                 <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>
                             @endif
@@ -136,14 +153,24 @@
 <footer class="footer">
     <div class="shell">
         <div class="footer-in">
-            <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}">
-                <span class="wordmark-tap" aria-hidden="true"></span>
-                <span class="wordmark-name">Presence<em>Platform</em></span>
-            </a>
-            <p class="footer-note">{{ __('app.footer_note') }}</p>
+            <div class="footer-brand">
+                <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}">
+                    <span class="wordmark-tap" aria-hidden="true"></span>
+                    <span class="wordmark-name">Presence<em>Platform</em></span>
+                </a>
+                <p class="footer-note">{{ __('app.footer_note') }}</p>
+            </div>
+            {{-- Honest ops chip: the only "status" this shell can state without
+                 lying is the environment it runs in (mockup's "All Systems
+                 Operational" would be theater — see docs/FRONTEND.md gap #F6). --}}
+            <span class="ops-chip">
+                <span class="dot" aria-hidden="true"></span>
+                {{ __('app.env') }}: <code>{{ config('app.env') }}</code>
+            </span>
         </div>
         <div class="footer-legal">
-            <p>Presence Platform — Core · EN/ES · {{ __('app.env') }} <code>{{ config('app.env') }}</code></p>
+            <p>Presence Platform — Core · EN/ES</p>
+            <p>01 // CORE RUNTIME</p>
         </div>
     </div>
 </footer>

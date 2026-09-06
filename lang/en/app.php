@@ -152,4 +152,79 @@ return [
     'ok' => 'OK',
     'saving' => 'Saving…',
     'error_generic' => 'Something went wrong, please retry.',
+
+    /* TASK-026 — mockup-driven redesign keys */
+    'welcome_short' => 'Welcome',
+    'yes' => 'Yes',
+    'no' => 'No',
+    'enrolled' => 'Enrolled',
+    'search_students' => 'Search students…',
+
+    // Shell / standings
+    'student_standings' => 'Standings',
+    'student_hub_sub' => 'Own points, history and rewards — scoped to your account.',
+
+    // Parent timeline (scope banner, profile, bento, filters)
+    'scope_tag' => 'Staff preview / Vista delegada',
+    'scope_lang_en' => 'EN:',
+    'scope_lang_es' => 'ES:',
+    'scope_note_en' => 'Simplified stand-in view (selected by school staff) — a full parent authentication portal is intentionally out of scope for this phase.',
+    'scope_note_es' => 'Vista de sustitución simplificada (seleccionada por el personal escolar) — el sistema de autenticación para padres está fuera del alcance de esta fase.',
+    'student_record' => 'Student record',
+    'student_id' => 'Student ID',
+    'record_generated' => 'Record generated',
+    'parent_metric_class_foot' => 'Assigned cohort',
+    'parent_metric_pae_foot' => 'Feeding program enrollment',
+    'pae_enrolled_yes' => 'Enrolled',
+    'pae_enrolled_no' => 'Not enrolled',
+    'parent_points_sub' => 'Total earned from recycling deposits',
+    'filter_events' => 'Filter events',
+    'filter_all' => 'All events (:n)',
+    'filter_attendance' => 'Attendance',
+    'filter_pae' => 'PAE meals',
+    'filter_recycling' => 'Recycling',
+    'search_events' => 'Search events…',
+    'no_events_filter' => 'No records match the selected criteria.',
+    'timeline_note_admin_only' => 'Read-only record — real-time modifications are restricted to campus administrators.',
+
+    // Rewards store
+    'student_reward_inactive' => 'inactive',
+    'student_redeem_at_desk' => 'Redeem at the staff desk',
+    'student_goal_locked' => 'Keep recycling to unlock',
+    'student_no_rewards' => 'No rewards in the catalog yet.',
+    'balance_after' => 'Balance after',
+    'goal_progress' => 'Goal progress',
+
+    // Leaderboard page
+    'leaderboard_title' => 'Class standings & leaderboard',
+    'leaderboard_sub' => 'The school recycling board, straight from the points ledger.',
+    'leaderboard_board' => 'School board',
+    'leaderboard_classes' => 'Class standings',
+    'leaderboard_students' => 'students',
+    'leaderboard_no_classes' => 'No class standings yet.',
+    'leaderboard_top3' => 'Top 3',
+
+    // Admin
+    'admin_dashboard_sub' => 'Campus-wide attendance, PAE meals, recycling yields and reader hardware.',
+
+    // EcoStation
+    'ecostation' => 'EcoStation',
+    'ecostation_sub' => 'Recycling station operations — deposits, material rules and reader network.',
+    'ecostation_metrics' => 'Impact metrics',
+    'ecostation_items_foot' => 'Classified deposits, all time',
+    'ecostation_materials' => 'Materials',
+    'ecostation_materials_foot' => 'Distinct material classes',
+    'ecostation_points_sub' => 'Total awarded to students',
+    'ecostation_ledger' => 'Deposit ledger',
+    'ecostation_confidence' => 'AI confidence',
+    'ecostation_no_deposits' => 'No deposits yet.',
+    'ecostation_ledger_note' => 'Ledger rows are commit-only facts from the classify-and-award transaction.',
+    'ecostation_readers' => 'Reader network',
+    'ecostation_no_readers' => 'No recycling readers registered.',
+    'ecostation_rates' => 'Material rates',
+    'ecostation_rates_note' => 'Points derive from material class + config — never from the model.',
+    'ecostation_capture' => 'Latest capture',
+    'ecostation_capture_private' => 'Image kept in private audit storage',
+    'ecostation_capture_meta' => 'Student: :student · bottle: :bottle · recyclable: :recyclable',
+    'ecostation_capture_none' => 'No capture images yet.',
 ];

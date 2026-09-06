@@ -151,4 +151,79 @@ return [
     'ok' => 'OK',
     'saving' => 'Guardando…',
     'error_generic' => 'Algo salió mal, reintenta.',
+
+    /* TASK-026 — claves del rediseño según maquetas */
+    'welcome_short' => 'Bienvenido',
+    'yes' => 'Sí',
+    'no' => 'No',
+    'enrolled' => 'Matriculados',
+    'search_students' => 'Buscar estudiantes…',
+
+    // Shell / clasificación
+    'student_standings' => 'Clasificación',
+    'student_hub_sub' => 'Puntos, historial y recompensas propios — con alcance a tu cuenta.',
+
+    // Vista de padres (banner de alcance, perfil, métricas, filtros)
+    'scope_tag' => 'Vista delegada / Staff Preview',
+    'scope_lang_en' => 'EN:',
+    'scope_lang_es' => 'ES:',
+    'scope_note_en' => 'Simplified stand-in view (selected by school staff) — a full parent authentication portal is intentionally out of scope for this phase.',
+    'scope_note_es' => 'Vista de sustitución simplificada (seleccionada por el personal escolar) — el sistema de autenticación para padres está fuera del alcance de esta fase.',
+    'student_record' => 'Expediente estudiantil',
+    'student_id' => 'ID estudiantil',
+    'record_generated' => 'Registro generado',
+    'parent_metric_class_foot' => 'Curso asignado',
+    'parent_metric_pae_foot' => 'Inscripción al programa de alimentación',
+    'pae_enrolled_yes' => 'Inscrito',
+    'pae_enrolled_no' => 'No inscrito',
+    'parent_points_sub' => 'Total ganado por depósitos de reciclaje',
+    'filter_events' => 'Filtrar eventos',
+    'filter_all' => 'Todos (:n)',
+    'filter_attendance' => 'Asistencia',
+    'filter_pae' => 'Comidas PAE',
+    'filter_recycling' => 'Reciclaje',
+    'search_events' => 'Buscar eventos…',
+    'no_events_filter' => 'Ningún registro coincide con los criterios.',
+    'timeline_note_admin_only' => 'Registro de solo lectura — las modificaciones en tiempo real están restringidas al personal administrativo.',
+
+    // Tienda de recompensas
+    'student_reward_inactive' => 'inactiva',
+    'student_redeem_at_desk' => 'Canjea en el escritorio',
+    'student_goal_locked' => 'Sigue reciclando para desbloquear',
+    'student_no_rewards' => 'Aún no hay recompensas en el catálogo.',
+    'balance_after' => 'Saldo restante',
+    'goal_progress' => 'Progreso',
+
+    // Página de clasificación
+    'leaderboard_title' => 'Clasificación y posiciones',
+    'leaderboard_sub' => 'El tablero escolar de reciclaje, directo del libro de puntos.',
+    'leaderboard_board' => 'Tablero escolar',
+    'leaderboard_classes' => 'Posiciones por curso',
+    'leaderboard_students' => 'estudiantes',
+    'leaderboard_no_classes' => 'Aún no hay posiciones por curso.',
+    'leaderboard_top3' => 'Top 3',
+
+    // Admin
+    'admin_dashboard_sub' => 'Asistencia, comidas PAE, reciclaje y hardware de lectores a nivel institucional.',
+
+    // EcoStation
+    'ecostation' => 'EcoStation',
+    'ecostation_sub' => 'Operación de la estación de reciclaje — depósitos, reglas de material y red de lectores.',
+    'ecostation_metrics' => 'Métricas de impacto',
+    'ecostation_items_foot' => 'Depósitos clasificados, histórico',
+    'ecostation_materials' => 'Materiales',
+    'ecostation_materials_foot' => 'Clases de material distintas',
+    'ecostation_points_sub' => 'Total otorgado a estudiantes',
+    'ecostation_ledger' => 'Libro de depósitos',
+    'ecostation_confidence' => 'Confianza IA',
+    'ecostation_no_deposits' => 'Aún no hay depósitos.',
+    'ecostation_ledger_note' => 'Cada fila es un hecho confirmado por la transacción de clasificación y premiación.',
+    'ecostation_readers' => 'Red de lectores',
+    'ecostation_no_readers' => 'No hay lectores de reciclaje registrados.',
+    'ecostation_rates' => 'Tarifas por material',
+    'ecostation_rates_note' => 'Los puntos derivan de clase de material + configuración — nunca del modelo.',
+    'ecostation_capture' => 'Captura más reciente',
+    'ecostation_capture_private' => 'Imagen resguardada en almacenamiento privado',
+    'ecostation_capture_meta' => 'Estudiante: :student · botella: :bottle · reciclable: :recyclable',
+    'ecostation_capture_none' => 'Aún no hay imágenes de captura.',
 ];

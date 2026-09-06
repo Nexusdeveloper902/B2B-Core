@@ -1,17 +1,62 @@
+{{--
+    TASK-026 — mockup "Teacher Dashboard — Today's Attendance": KPI
+    summary cards (real school-wide sums computed in-Blade from the
+    role-scoped class data), cohort chips, per-class ledgers with
+    client-side search, shared live feed. The realtime contract is
+    byte-identical: realtime.js + the tap-row listener below.
+    Mockup parts with no data source are omitted (documented):
+    environmental metrics widget, instructor briefing card, telemetry
+    strip (gaps #T1-T3 in docs/FRONTEND.md).
+--}}
 @extends('layouts.app')
 
 @section('title', __('app.teacher_dashboard'))
 
 @section('content')
-<div class="page-head">
+<div class="lede">
+    <span class="kicker">{{ __('app.today_attendance') }}</span>
     <h1>{{ __('app.teacher_dashboard') }} — {{ __('app.today_attendance') }}</h1>
-    <p class="page-meta">
-        <span>{{ __('app.late_cutoff_note', ['cutoff' => $cutoff]) }}</span>
-    </p>
+    <p class="lede-sub">{{ __('app.late_cutoff_note', ['cutoff' => $cutoff]) }}</p>
 </div>
+
+{{-- KPI summary (school-wide sums over the role-scoped classes) --}}
+@php($totals = ['present' => 0, 'late' => 0, 'absent' => 0, 'enrolled' => 0])
+@foreach($attendanceByClass as $rows)
+    @foreach($rows as $row)
+        @php($totals[$row['status']] = ($totals[$row['status']] ?? 0) + 1)
+        @php($totals['enrolled']++)
+    @endforeach
+@endforeach
+<section class="stat-strip" data-reveal-stagger aria-label="{{ __('app.class_summary') }}">
+    <x-stat :label="__('app.present')">
+        <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">check_circle</span></x-slot:icon>
+        {{ $totals['present'] }}
+    </x-stat>
+    <x-stat :label="__('app.late')">
+        <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">schedule</span></x-slot:icon>
+        {{ $totals['late'] }}
+    </x-stat>
+    <x-stat :label="__('app.absent')">
+        <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">cancel</span></x-slot:icon>
+        {{ $totals['absent'] }}
+    </x-stat>
+    <x-stat :label="__('app.enrolled')">
+        <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">groups</span></x-slot:icon>
+        {{ $totals['enrolled'] }}
+    </x-stat>
+</section>
 
 {{-- TASK-016 — live activity feed + live attendance rows --}}
 @include('partials.live-feed')
+
+<div class="filterbar">
+    <div class="searchbox" style="flex:1 1 320px;">
+        <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
+        <input type="search" id="student-search" aria-label="{{ __('app.search_students') }}"
+               placeholder="{{ __('app.search_students') }}" autocomplete="off">
+    </div>
+    <span class="t-label-sm muted" style="text-transform:uppercase;">{{ __('app.today_attendance') }}</span>
+</div>
 
 <div class="stack" data-reveal data-cutoff="{{ $cutoff }}"
      data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}">
@@ -39,7 +84,7 @@
                 </div>
 
                 <div class="ledger-wrap">
-                    <table class="ledger-table" data-stack>
+                    <table class="ledger-table" data-stack data-class-ledger>
                         <thead>
                         <tr>
                             <th scope="col">{{ __('app.student') }}</th>
@@ -50,7 +95,8 @@
                         </thead>
                         <tbody>
                         @forelse($rows as $row)
-                            <tr data-student-row="{{ $row['student']->id }}">
+                            <tr data-student-row="{{ $row['student']->id }}"
+                                data-search="{{ mb_strtolower($row['student']->name) }}">
                                 <td data-label="{{ __('app.student') }}">
                                     <span class="student-cell">
                                         {{ $row['student']->name }}
@@ -79,6 +125,18 @@
 <script src="{{ asset('js/realtime.js') }}"></script>
 <script>
     (function () {
+        // TASK-026 — client-side student search across the class ledgers
+        // (real rows, no backend round-trip).
+        var search = document.getElementById('student-search');
+        if (search) {
+            search.addEventListener('input', function () {
+                var q = search.value.trim().toLowerCase();
+                document.querySelectorAll('tr[data-student-row]').forEach(function (row) {
+                    row.hidden = q !== '' && (row.dataset.search || '').indexOf(q) === -1;
+                });
+            });
+        }
+
         // TASK-016 — attendance rows go live: a CLASS_ATTENDANCE tap
         // flips the student's row to Present/Late without a reload.
         // FIRST tap wins (the server keeps the day's first event as

@@ -259,13 +259,15 @@ class DashboardTest extends TestCase
     {
         $html = $this->actingAs($this->user('admin'))->get('/admin')->getContent();
 
-        // TASK-017 — Calm Ledger: hero tile, KPI icons, soft-card strip.
+        // TASK-026 (Datum, ADR-036) — hero tile, KPI icon glyphs, the
+        // 5-KPI strip; icons ride the self-hosted Material Symbols font.
         $this->assertStringContainsString('class="stat-strip"', $html);
         $this->assertStringContainsString('kpi-icon', $html);
-        $this->assertStringContainsString('<svg', $html);
+        $this->assertStringContainsString('material-symbols-outlined', $html);
+        $this->assertStringContainsString('how_to_reg', $html);
         // the attendance hero carries the distinct larger-value rule
         $this->assertMatchesRegularExpression(
-            '/\.stat-strip \.stat:first-child[^}]*font-size: 2\.5rem/',
+            '/\.stat-strip \.stat:first-child[^}]*font-size: 44px;/',
             file_get_contents(public_path('css/app.css')),
         );
     }
@@ -343,42 +345,46 @@ class DashboardTest extends TestCase
     }
 
     #[Test]
-    public function the_design_tokens_match_the_marketplace_signal_system_one_to_one(): void
+    public function the_design_tokens_match_the_owner_mockup_system_one_to_one(): void
     {
-        // TASK-019 — ADR-028 restores ADR-013's value-match contract:
-        // Core ships the SAME literal token scale as the marketplace
-        // storefront (design system "Signal"), so the two products
-        // read as one brand.
+        // TASK-026 — ADR-036: the owner-supplied mockup bundle is the
+        // design source of truth now (design system "Datum", light sage
+        // M3 tonal palette); the marketplace value-match contract
+        // (ADR-013/ADR-028) is retired for Core.
         $tokens = file_get_contents(public_path('css/tokens.css'));
 
         foreach ([
-            '--color-primary-scarlet-500', '--color-muted-teal-400',
-            '--color-shadow-grey-950', '--color-tiger-orange-400',
+            '--surface', '--primary', '--tertiary-fixed', '--error',
+            '--outline-variant', '--on-surface-variant',
         ] as $scale) {
-            $this->assertStringContainsString($scale, $tokens, "tokens.css must carry the {$scale} Signal scale");
+            $this->assertStringContainsString($scale, $tokens, "tokens.css must carry the {$scale} Datum scale");
         }
         foreach ([
-            '--bg:', '--bg-raised:', '--accent:', '--accent-solid:',
-            '--data:', '--spare:', '--text:', '--radius:', '--font-mono:',
+            '--bg:', '--text:', '--accent:', '--points:', '--radius:',
+            '--font-display:', '--font-body:', '--font-label:', '--font-mono:',
         ] as $role) {
             $this->assertStringContainsString($role, $tokens, "tokens.css must define the semantic role {$role}");
         }
-        // literal value spot-checks (the marketplace's exact hexes)
-        $this->assertMatchesRegularExpression('/--color-primary-scarlet-500:\s*#f20d2b;/', $tokens);
-        $this->assertMatchesRegularExpression('/--color-shadow-grey-950:\s*#121013;/', $tokens);
-        $this->assertMatchesRegularExpression('/--color-muted-teal-400:\s*#80b3a7;/', $tokens);
+        // literal value spot-checks (the mockups' exact hexes)
+        $this->assertMatchesRegularExpression('/--surface:\s*#f6fbed;/', $tokens);
+        $this->assertMatchesRegularExpression('/--primary:\s*#0e0f0e;/', $tokens);
+        $this->assertMatchesRegularExpression('/--tertiary-fixed:\s*#ffdf93;/', $tokens);
+        $this->assertMatchesRegularExpression('/--error:\s*#ba1a1a;/', $tokens);
+        // the mockup type scale ships verbatim
+        $this->assertMatchesRegularExpression('/--fs-display:\s*56px;/', $tokens);
+        $this->assertMatchesRegularExpression('/--fs-label-sm:\s*10px;/', $tokens);
     }
 
     #[Test]
-    public function the_ground_is_dark_and_the_keyboard_focus_floor_is_scarlet(): void
+    public function the_ground_is_light_sage_and_the_focus_floor_is_primary(): void
     {
-        // TASK-019 — Signal base: shadow-grey 950 ground, scarlet
-        // selection, and the 2px accent-soft focus floor.
+        // TASK-026 — Datum base: sage surface ground, gold selection,
+        // and the 2px primary focus floor (mockup geometry).
         $css = file_get_contents(public_path('css/app.css'));
 
         $this->assertMatchesRegularExpression('/body\s*{[^}]*background:\s*var\(--bg\);/', $css);
-        $this->assertMatchesRegularExpression('/::selection\s*{[^}]*var\(--accent-solid\);/', $css);
-        $this->assertMatchesRegularExpression('/:focus-visible\s*{[^}]*outline:\s*2px solid var\(--accent-soft\);/', $css);
+        $this->assertMatchesRegularExpression('/::selection\s*{[^}]*var\(--tertiary-fixed\);/', $css);
+        $this->assertMatchesRegularExpression('/:focus-visible\s*{[^}]*outline:\s*2px solid var\(--primary\);/', $css);
         $this->assertStringContainsString('.js-motion [data-reveal]', $css, 'reveal hidden state must be JS-gated');
         $this->assertStringContainsString('.js-motion [data-reveal].is-revealed', $css);
     }
@@ -405,18 +411,19 @@ class DashboardTest extends TestCase
     }
 
     #[Test]
-    public function stamp_and_chip_tones_stay_inside_the_signal_palette(): void
+    public function stamp_and_chip_tones_stay_inside_the_datum_palette(): void
     {
-        // TASK-019 — present/late/absent and every event-chip tone map
-        // onto the Signal roles (data / spare / accent), never onto
-        // colors outside the value-matched scales.
+        // TASK-026 — present/late/absent and every event-chip tone map
+        // onto the Datum roles (gold / dark-brown / error-container),
+        // never onto colors outside the mockup's M3 tonal scales.
         $css = file_get_contents(public_path('css/app.css'));
 
-        $this->assertMatchesRegularExpression('/\.stamp-present\s*{[^}]*var\(--data/i', $css);
-        $this->assertMatchesRegularExpression('/\.stamp-late\s*{[^}]*var\(--spare|\.stamp-late\s*{[^}]*tiger-orange/', $css);
-        $this->assertMatchesRegularExpression('/\.stamp-absent\s*{[^}]*var\(--accent-tint|\.stamp-absent\s*{[^}]*scarlet/', $css);
+        $this->assertMatchesRegularExpression('/\.stamp-present\s*{[^}]*var\(--tertiary-fixed\)/', $css);
+        $this->assertMatchesRegularExpression('/\.stamp-late\s*{[^}]*var\(--tertiary-container\)/', $css);
+        $this->assertMatchesRegularExpression('/\.stamp-absent\s*{[^}]*var\(--error-container\)/', $css);
         // the chip tone mapping rides the semantic roles too
-        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="PAE_"\]\s*{[^}]*tiger-orange/', $css);
+        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="PAE_"\]\s*{[^}]*var\(--surface-variant\)/', $css);
+        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="RECYCLING_"\]\s*{[^}]*var\(--primary\)[^}]*var\(--tertiary-fixed\)/', $css);
     }
 
     private function user(string $role): User

@@ -99,6 +99,27 @@ class DocumentationTest extends TestCase
         }
     }
 
+    #[Test]
+    public function the_frontend_guide_and_gap_ledger_exist_bilingually(): void
+    {
+        // TASK-026 — the mockup-driven redesign MUST ship its design
+        // reference + gap ledger (the owner's "document what needs
+        // functionality that doesn't exist yet") in both languages.
+        foreach (['docs/FRONTEND.md', 'docs/FRONTEND.es.md'] as $path) {
+            $doc = (string) file_get_contents(base_path($path));
+
+            $this->assertStringContainsString('Datum', $doc, "{$path} must name the design system");
+            $this->assertStringContainsString('gap ledger', $doc, "{$path} must present the gap ledger");
+            // the two new read-only pages are documented
+            $this->assertStringContainsString('/student/leaderboard', $doc);
+            $this->assertStringContainsString('/admin/ecostation', $doc);
+            // key gaps stay cataloged (honesty floor for aspirational UI)
+            $this->assertStringContainsString('R1', $doc, "{$path} must catalog the voucher/QR redemption gap");
+            $this->assertStringContainsString('E1', $doc, "{$path} must catalog the private capture-image gap");
+            $this->assertStringContainsString('P5', $doc, "{$path} must catalog the advisor-contact gap");
+        }
+    }
+
     /**
      * THE security invariant: no committed file may contain a real secret.
      * Detects CREDENTIAL PATTERNS (not literal values — the test itself must
