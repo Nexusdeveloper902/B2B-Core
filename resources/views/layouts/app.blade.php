@@ -9,6 +9,17 @@
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}">
     <link rel="stylesheet" href="{{ asset('css/tokens.css') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    {{-- Motion gate (Signal, marketplace pattern): flags motion availability
+         before first paint so reveal states never flash. Never adds the flag
+         under prefers-reduced-motion. --}}
+    <script>
+        try {
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.classList.add('js-motion');
+            }
+        } catch (e) { /* no motion flags without JS APIs */ }
+    </script>
+    <script type="module" src="{{ asset('js/motion.js') }}"></script>
 </head>
 <body>
 <a class="skip" href="#main">{{ __('app.skip_to_content') }}</a>
@@ -46,7 +57,7 @@
                 @php($initials = strtoupper(mb_substr($nameParts[0] ?? '·', 0, 1) . mb_substr($nameParts[1] ?? '', 0, 1)))
                 <span class="topbar-user" title="{{ auth()->user()->email }}">
                     <span class="user-avatar" aria-hidden="true">{{ $initials }}</span>
-                    {{ __('app.welcome', ['name' => auth()->user()->name]) }}
+                    <span class="topbar-user-name">{{ __('app.welcome', ['name' => auth()->user()->name]) }}</span>
                 </span>
 
                 <form method="POST" action="{{ route('logout') }}" class="inline-form">
@@ -64,6 +75,28 @@
                    @class(['is-active' => app()->getLocale() === 'es'])
                    @if(app()->getLocale() === 'es') aria-current="true" @endif>ES</a>
             </nav>
+
+            {{-- Mobile menu (no JS: native details — marketplace pattern) --}}
+            @auth
+                <details class="mobilenav">
+                    <summary aria-label="{{ __('app.primary_nav') }}">
+                        <span class="mobilenav-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+                    </summary>
+                    <div class="mobilenav-body">
+                        <nav class="mobilenav-links" aria-label="{{ __('app.primary_nav') }}">
+                            @if(auth()->user()->isAdmin())
+                                <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
+                                <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
+                            @endif
+                            <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>
+                        </nav>
+                        <form method="POST" action="{{ route('logout') }}" class="inline-form">
+                            @csrf
+                            <button type="submit" class="linklike">{{ __('app.logout') }}</button>
+                        </form>
+                    </div>
+                </details>
+            @endauth
         </div>
     </div>
 </header>

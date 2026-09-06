@@ -13,7 +13,7 @@
 {{-- TASK-016 — live activity feed + live attendance rows --}}
 @include('partials.live-feed')
 
-<div class="stack" data-cutoff="{{ $cutoff }}"
+<div class="stack" data-reveal data-cutoff="{{ $cutoff }}"
      data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}">
     @if($classes->isEmpty())
         <x-empty>{{ __('app.no_students') }}</x-empty>

@@ -108,15 +108,17 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 
 Language switch: `EN·ES` in the navbar (session-based).
 
-### Design system — "The Event Ledger"
+### Design system — "Signal"
 
 The dashboards share one visual identity with the marketplace storefront:
-porcelain-paper ground, hairline rules, tabular data set in mono, pine-green
-accents, sharp 2px control radii, self-hosted Space Grotesk / IBM Plex fonts.
-Tokens live in `public/css/tokens.css` (source of truth) and are
-value-matched to the marketplace repo — see
-`.agent/DECISIONS/ADR-013-design-tokens-value-matched.md` and
-`.agent/DECISIONS/ADR-014-shared-layout-components.md`.
+shadow-grey 950 ground, scarlet primary, muted-teal data, tiger-orange
+sparing accents, ruled editorial sections (2px emphasis rules + 1px
+dividers), tabular data set in IBM Plex Mono, Space Grotesk display type,
+self-hosted fonts, and anime.js scroll reveals gated behind
+`prefers-reduced-motion`. Tokens live in `public/css/tokens.css` (source of
+truth) and are value-matched 1:1 with the marketplace repo — see
+`.agent/DECISIONS/ADR-028-signal-redesign.md` (ADR-013's value-match
+contract, restored).
 
 ## Testing
 

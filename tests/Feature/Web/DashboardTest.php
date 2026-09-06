@@ -342,6 +342,83 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString("pass.value = 'password';", $html);
     }
 
+    #[Test]
+    public function the_design_tokens_match_the_marketplace_signal_system_one_to_one(): void
+    {
+        // TASK-019 — ADR-028 restores ADR-013's value-match contract:
+        // Core ships the SAME literal token scale as the marketplace
+        // storefront (design system "Signal"), so the two products
+        // read as one brand.
+        $tokens = file_get_contents(public_path('css/tokens.css'));
+
+        foreach ([
+            '--color-primary-scarlet-500', '--color-muted-teal-400',
+            '--color-shadow-grey-950', '--color-tiger-orange-400',
+        ] as $scale) {
+            $this->assertStringContainsString($scale, $tokens, "tokens.css must carry the {$scale} Signal scale");
+        }
+        foreach ([
+            '--bg:', '--bg-raised:', '--accent:', '--accent-solid:',
+            '--data:', '--spare:', '--text:', '--radius:', '--font-mono:',
+        ] as $role) {
+            $this->assertStringContainsString($role, $tokens, "tokens.css must define the semantic role {$role}");
+        }
+        // literal value spot-checks (the marketplace's exact hexes)
+        $this->assertMatchesRegularExpression('/--color-primary-scarlet-500:\s*#f20d2b;/', $tokens);
+        $this->assertMatchesRegularExpression('/--color-shadow-grey-950:\s*#121013;/', $tokens);
+        $this->assertMatchesRegularExpression('/--color-muted-teal-400:\s*#80b3a7;/', $tokens);
+    }
+
+    #[Test]
+    public function the_ground_is_dark_and_the_keyboard_focus_floor_is_scarlet(): void
+    {
+        // TASK-019 — Signal base: shadow-grey 950 ground, scarlet
+        // selection, and the 2px accent-soft focus floor.
+        $css = file_get_contents(public_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression('/body\s*{[^}]*background:\s*var\(--bg\);/', $css);
+        $this->assertMatchesRegularExpression('/::selection\s*{[^}]*var\(--accent-solid\);/', $css);
+        $this->assertMatchesRegularExpression('/:focus-visible\s*{[^}]*outline:\s*2px solid var\(--accent-soft\);/', $css);
+        $this->assertStringContainsString('.js-motion [data-reveal]', $css, 'reveal hidden state must be JS-gated');
+        $this->assertStringContainsString('.js-motion [data-reveal].is-revealed', $css);
+    }
+
+    #[Test]
+    public function the_layout_gates_motion_and_loads_the_reveal_module(): void
+    {
+        // TASK-019 — the marketplace's motion architecture: the inline
+        // head script adds .js-motion ONLY when JS is on and motion is
+        // allowed; the ESM module (with the vendored anime.js) drives
+        // scroll reveals. Without JS everything stays visible.
+        $html = $this->get('/login')->getContent();
+
+        $this->assertStringContainsString('prefers-reduced-motion: reduce', $html);
+        $this->assertStringContainsString("classList.add('js-motion')", $html);
+        $this->assertStringContainsString('js/motion.js', $html);
+        $this->assertFileExists(public_path('js/vendor/anime.esm.min.js'));
+        $this->assertStringContainsString(
+            "import { animate, stagger, onScroll } from './vendor/anime.esm.min.js';",
+            file_get_contents(public_path('js/motion.js')),
+        );
+        // reveals are progressive enhancement only
+        $this->assertStringContainsString('data-reveal', $html);
+    }
+
+    #[Test]
+    public function stamp_and_chip_tones_stay_inside_the_signal_palette(): void
+    {
+        // TASK-019 — present/late/absent and every event-chip tone map
+        // onto the Signal roles (data / spare / accent), never onto
+        // colors outside the value-matched scales.
+        $css = file_get_contents(public_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression('/\.stamp-present\s*{[^}]*var\(--data/i', $css);
+        $this->assertMatchesRegularExpression('/\.stamp-late\s*{[^}]*var\(--spare|\.stamp-late\s*{[^}]*tiger-orange/', $css);
+        $this->assertMatchesRegularExpression('/\.stamp-absent\s*{[^}]*var\(--accent-tint|\.stamp-absent\s*{[^}]*scarlet/', $css);
+        // the chip tone mapping rides the semantic roles too
+        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="PAE_"\]\s*{[^}]*tiger-orange/', $css);
+    }
+
     private function user(string $role): User
     {
         return User::where('role', $role)->firstOrFail();

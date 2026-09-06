@@ -10,7 +10,7 @@
 
 {{-- School-wide stats today: hero attendance tile + secondary KPI tiles.
      The hero (most important number) sits top-left — dashboard best practice. --}}
-<section class="stat-strip" aria-label="{{ __('app.school_today') }}">
+<section class="stat-strip" data-reveal-stagger aria-label="{{ __('app.school_today') }}">
     <x-stat :label="__('app.attendance_count')">
         <x-slot:icon>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/></svg>
@@ -46,7 +46,7 @@
 {{-- TASK-016 — live activity: server-rendered, then WebSocket-live --}}
 @include('partials.live-feed')
 
-<section class="grid-2">
+<section class="grid-2" data-reveal>
     {{-- Reader list + mode control --}}
     <x-panel :label="__('app.readers')" rule>
         <div class="ledger-wrap">
@@ -106,7 +106,7 @@
     </x-panel>
 </section>
 
-<section class="grid-2">
+<section class="grid-2" data-reveal>
     {{-- Redemption desk --}}
     <x-panel :label="__('app.redemption')">
         <form id="redeem-form" class="tool-form">

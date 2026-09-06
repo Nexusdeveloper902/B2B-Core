@@ -29,7 +29,7 @@
     intentionally out of scope for this phase. / Vista de sustitución simplificada (seleccionada por
     personal) — un sistema real de autenticación de padres está fuera del alcance de esta fase.</p>
 
-<div class="stack">
+<div class="stack" data-reveal>
     <x-panel :label="__('app.event_type')" rule>
         @if(empty($timeline))
             <x-empty>{{ __('app.no_events') }}</x-empty>
