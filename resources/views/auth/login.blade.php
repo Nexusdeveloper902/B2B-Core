@@ -45,7 +45,7 @@
         </form>
     </section>
 
-    <div class="auth-aside">
+    <div class="auth-aside" data-reveal>
         <dl>
             <dt>{{ __('app.demo_credentials') }}</dt>
             <dd>

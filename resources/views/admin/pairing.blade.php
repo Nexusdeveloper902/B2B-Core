@@ -8,7 +8,7 @@
     <p class="page-meta"><span>{{ __('app.pairing_desk_intro') }}</span></p>
 </div>
 
-<section class="grid-2">
+<section class="grid-2" data-reveal>
     {{-- Arming table: one click per student (replaces the curl+PAT dance) --}}
     <x-panel :label="__('app.students')" rule>
         <div class="ledger-wrap">
@@ -80,7 +80,7 @@
     </x-panel>
 </section>
 
-<section class="grid-2">
+<section class="grid-2" data-reveal>
     {{-- History: exact card->student links this platform made --}}
     <x-panel :label="__('app.pairing_recent')">
         <div class="ledger-wrap" id="recent-wrap">

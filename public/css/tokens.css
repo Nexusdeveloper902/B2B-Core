@@ -1,70 +1,114 @@
 /* ==========================================================================
-   Presence Platform — "Calm Ledger" design tokens (TASK-017, ADR-027)
+   Presence Platform — Core dashboards
+   Design system "Signal" (TASK-019, ADR-028) — 1:1 value-matched with the
+   marketplace storefront (B2B-Marketplace public/css/app.css :root block).
 
-   Brand values (paper/pine/ink/steel family, IBM Plex + Space Grotesk)
-   carry over from the ADR-013 value-match era; the component layer
-   (radii, elevation, tones, motion) is Core-only and supersedes the
-   1:1 marketplace value-match — see ADR-027.
+   Ground: shadow-grey 950. Accents: scarlet (primary), muted-teal
+   (secondary/data), tiger-orange (tertiary, sparing).
+   Type: Space Grotesk (display) / IBM Plex Sans (body) / IBM Plex Mono (data)
+
+   The four palette scales and the semantic roles below are the SAME
+   literal values the marketplace ships (ADR-013's value-match contract,
+   restored by ADR-028; ADR-027 "Calm Ledger" retired). Core-only extras
+   (shell width, touch target) are appended after the shared block and
+   never re-declare a shared name.
    ========================================================================== */
 
 :root {
-    /* ---- palette (brand, kept) ---- */
-    --paper:     #F4F5F1;  /* cool porcelain page ground */
-    --surface:   #FFFFFF;  /* content surfaces (cards, tables, fields) */
-    --ink:       #101D18;  /* deep green-black text + emphasis rules */
-    --pine:      #0A5C38;  /* primary brand green: CTAs, links, rules */
-    --pine-dark: #07422A;  /* CTA hover */
-    --go:        #1D9E5F;  /* signal green — sparing: live dots, success */
-    --steel:     #53615A;  /* secondary text */
-    --line:      #DCE1DA;  /* hairline rules and borders */
-    --wash:      #EBF0EB;  /* tinted alternating ground */
-    --alert:     #B3261E;  /* errors only (functional) */
+    /* primary — scarlet */
+    --color-primary-scarlet-50:  #fee7ea;
+    --color-primary-scarlet-100: #fccfd5;
+    --color-primary-scarlet-200: #fa9eaa;
+    --color-primary-scarlet-300: #f76e80;
+    --color-primary-scarlet-400: #f53d56;
+    --color-primary-scarlet-500: #f20d2b;
+    --color-primary-scarlet-600: #c20a23;
+    --color-primary-scarlet-700: #91081a;
+    --color-primary-scarlet-800: #610511;
+    --color-primary-scarlet-900: #300309;
+    --color-primary-scarlet-950: #220206;
 
-    /* ---- tones (TASK-017: semantic chips + late status) ---- */
-    --amber:      #9A5B00;  /* late / PAE chips text */
-    --amber-line: #E4C48C;
-    --amber-bg:   #FBF3E4;
-    --sky:        #175E9E;  /* recycling chips text */
-    --sky-line:   #B9D2E8;
-    --sky-bg:     #EAF2FA;
+    /* secondary — muted teal */
+    --color-muted-teal-50:  #eff5f4;
+    --color-muted-teal-100: #dfece9;
+    --color-muted-teal-200: #bfd9d3;
+    --color-muted-teal-300: #9fc6bd;
+    --color-muted-teal-400: #80b3a7;
+    --color-muted-teal-500: #609f92;
+    --color-muted-teal-600: #4d8074;
+    --color-muted-teal-700: #396057;
+    --color-muted-teal-800: #26403a;
+    --color-muted-teal-900: #13201d;
+    --color-muted-teal-950: #0d1614;
 
-    /* literal supporting values */
-    --copy:        #37453F;   /* body copy on paper */
-    --line-strong: #CBD5CC;   /* hairlines on wash */
-    --row-line:    #EEF1EC;   /* ledger table row rules */
-    --field-line:  #9AA69E;   /* input borders */
-    --row-flash:   #DCEDE2;   /* freshly-written row flash */
-    --alert-line:  #E5C0BC;   /* error border */
-    --alert-bg:    #FBEFEE;   /* error ground */
-    --ok-bg:       #E9F7EF;   /* success ground (green family) */
+    /* neutral — shadow grey */
+    --color-shadow-grey-50:  #f3f1f3;
+    --color-shadow-grey-100: #e6e3e8;
+    --color-shadow-grey-200: #cec7d1;
+    --color-shadow-grey-300: #b5acb9;
+    --color-shadow-grey-400: #9c90a2;
+    --color-shadow-grey-500: #83748b;
+    --color-shadow-grey-600: #695d6f;
+    --color-shadow-grey-700: #4f4653;
+    --color-shadow-grey-800: #352e38;
+    --color-shadow-grey-900: #1a171c;
+    --color-shadow-grey-950: #121013;
 
-    /* text + rules on ink ground */
-    --on-ink:        #E8F0EA;
-    --on-ink-mute:   #AEBAB2;
-    --on-ink-dim:    #98A8A0;
-    --on-ink-legal:  #97A69D;
-    --on-ink-line:   #263430;
+    /* tertiary — tiger orange */
+    --color-tiger-orange-50:  #fef3e7;
+    --color-tiger-orange-100: #fce7cf;
+    --color-tiger-orange-200: #facf9e;
+    --color-tiger-orange-300: #f7b76e;
+    --color-tiger-orange-400: #f59f3d;
+    --color-tiger-orange-500: #f2870d;
+    --color-tiger-orange-600: #c26c0a;
+    --color-tiger-orange-700: #915108;
+    --color-tiger-orange-800: #613605;
+    --color-tiger-orange-900: #301b03;
+    --color-tiger-orange-950: #221302;
 
-    /* ---- type ---- */
+    /* semantic roles — single source of truth for components */
+    --bg:            var(--color-shadow-grey-950);
+    --bg-raised:     var(--color-shadow-grey-900);
+    --surface:       var(--color-shadow-grey-800);
+    --surface-soft:  #2b2530; /* grey-800/900 midpoint for nested panels */
+    --border:        var(--color-shadow-grey-700);
+    --border-strong: var(--color-shadow-grey-600);
+    --border-soft:   var(--color-shadow-grey-800);
+
+    --text:          var(--color-shadow-grey-50);   /* headings */
+    --text-body:     var(--color-shadow-grey-100);  /* body copy */
+    --text-muted:    var(--color-shadow-grey-300);  /* secondary copy */
+    --text-meta:     var(--color-shadow-grey-400);  /* meta only on 950/900 */
+
+    --accent:        var(--color-primary-scarlet-500);
+    --accent-soft:   var(--color-primary-scarlet-400);
+    --accent-solid:  var(--color-primary-scarlet-600);
+    --accent-deep:   var(--color-primary-scarlet-700);
+    --accent-tint:   var(--color-primary-scarlet-950);
+
+    --data:          var(--color-muted-teal-400);   /* event labels, live states */
+    --data-strong:   var(--color-muted-teal-300);
+    --data-solid:    var(--color-muted-teal-500);
+    --data-tint:     var(--color-muted-teal-900);
+
+    --spare:         var(--color-tiger-orange-400); /* badges, hover glints */
+    --spare-strong:  var(--color-tiger-orange-500);
+    --spare-tint:    var(--color-tiger-orange-900);
+
+    --alert:         var(--color-primary-scarlet-400); /* form errors (functional) */
+
+    --radius: 10px;
+    --radius-sm: 6px;
     --font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
-    --font-body:    'IBM Plex Sans', system-ui, sans-serif;
-    --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
+    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-    /* ---- rhythm / shape (Calm Ledger: soft cards) ---- */
-    --radius-s: 6px;                     /* controls: buttons, inputs, chips */
-    --radius:   10px;                    /* cards, panels, stat tiles */
-    --shell: 1140px;                     /* content column */
-    --pad-inline: clamp(20px, 5vw, 44px);
-    --section-pad: clamp(40px, 6vw, 64px);
+    /* NOTE (contrast, marketplace-verified): grey-400 passes AA only on
+       950/900 grounds. On grey-800 surfaces the floor is grey-300.
+       scarlet-500 as TEXT is large-text-only. */
+
+    /* ---- Core-only additions (dashboard frame; no shared name above) ---- */
+    --shell: 1140px;                     /* content column (same width) */
     --tap: 44px;                         /* minimum touch target */
-
-    /* ---- elevation (two levels only) ---- */
-    --shadow-1: 0 1px 2px rgba(16, 29, 24, 0.05), 0 1px 6px rgba(16, 29, 24, 0.04);
-    --shadow-2: 0 2px 6px rgba(16, 29, 24, 0.07), 0 8px 24px rgba(16, 29, 24, 0.09);
-    --shadow-pine: 0 6px 18px rgba(10, 92, 56, 0.22);   /* primary CTA press zone */
-
-    /* ---- motion (200-400 ms sweet spot; reduced-motion kills all) ---- */
-    --t-fast: 150ms;
-    --t-med:  280ms;
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }

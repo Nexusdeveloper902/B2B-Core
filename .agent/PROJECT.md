@@ -569,3 +569,34 @@ per student" bench report. Repository reality updates:
   byte-for-byte as strict as CI's scripts-lint job.
 - Gates unchanged: tests 219/3, e2e 24/24, quality PASS (now with
   shellcheck enforced). GitHub Actions green on main post-push.
+
+## TASK-019 (RUN-2026-09-06-core-017) — Signal: the marketplace's design system, 1:1
+
+- **The UI is "Signal" now** (ADR-028): the marketplace's dark
+  editorial system — shadow-grey 950 ground, scarlet CTAs,
+  muted-teal data color, tiger-orange sparing accents, ruled
+  sections, mono data labels, blurred topbar, anime.js reveals.
+  tokens.css carries the marketplace's LITERAL token values
+  (ADR-013's value-match contract restored; ADR-027's supersession
+  reversed). "0 AI slop" by construction: no gradients, no
+  glassmorphism, no decorative emoji — rules, dividers, type.
+- **Motion is the marketplace's architecture**: the same vendored
+  anime.esm.min.js (md5 fbfdf1a7, byte-identical) + public/js/
+  motion.js; the inline .js-motion gate is NEVER added under
+  prefers-reduced-motion, so reveals are pure progressive
+  enhancement — everything visible without JS.
+- **Functional UX gains kept, restyled**: loading spinners,
+  per-class summary chips, pairing countdown bar (teal → scarlet
+  is-low), demo-chip login + pw reveal, mobile card tables,
+  honest empty states. All JS-facing selectors 1:1; realtime.js,
+  pairing desk, device + realtime protocols UNTOUCHED. The honest
+  "Live feed unavailable — reload the page to see the latest
+  taps." degrade re-proven live (badge + hint + auto-reconnect).
+- **Test count is 223** (was 219): +4 pins (value-match with hex
+  spot-checks, dark ground + focus floor + JS-gated reveals,
+  motion module wiring, Signal-palette tone mapping). Zero
+  existing assertions changed. quality PASS (shellcheck
+  enforced); e2e 24/24. Browser-proven: live tap without reload,
+  live row flip, countdown drain, 390 px zero h-scroll on 5 pages
+  (one overflow caught + fixed), reduced-motion collapse,
+  Spanish, zero console errors.
