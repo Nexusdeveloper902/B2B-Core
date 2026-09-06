@@ -1,10 +1,25 @@
 # gitleaks configuration — B2B-Core
 #
-# Extends the default ruleset (nothing weakened) and allowlists exactly one
-# literal: the deliberately-invalid bearer token "nope-invalid-key" that the
-# bilingual e2e suite (scripts/e2e.sh) sends to prove the 401 rejection path.
-# It is not a credential of any kind; without this allowlist the generic
-# `curl-auth-header` rule false-positives on it and blocks CI.
+# Extends the default ruleset (nothing weakened) and allowlists exactly
+# three literals — all deliberate NON-credentials:
+#
+#   1. "nope-invalid-key"          — the deliberately-invalid bearer token
+#      the bilingual e2e suite (scripts/e2e.sh) sends to prove the 401
+#      rejection path (not a credential of any kind; without this entry
+#      the generic `curl-auth-header` rule false-positives on it).
+#   2. "7.1893457207.abcdef"       — a fabricated format-fixture WebSocket
+#      auth token in tests/Unit/Realtime/HandshakeTest.php (matches the
+#      documented userId.expiry.sig GRAMMAR; no real token has this
+#      value).
+#   3. "dGhlIHNhbXBsZSBub25jZQ=="  — the Sec-WebSocket-Key from RFC 6455
+#      §1.3's own worked handshake example (base64 of "the sample
+#      nonce"), used verbatim by HandshakeTest to pin the RFC codec.
+#
+# Entries 2 and 3 matter only on FULL-HISTORY scans: push-event gitleaks
+# runs scan just the pushed commit range, but workflow_dispatch runs
+# scan all of `git log --full-history --all` — which re-finds the
+# TASK-016-era fixture lines in commit a000fb6 and blocks CI
+# (discovered on RUN-2026-09-06-core-020's dispatch).
 
 title = "gitleaks config — B2B-Core"
 
@@ -12,7 +27,9 @@ title = "gitleaks config — B2B-Core"
 useDefault = true
 
 [allowlist]
-  description = "Deliberately-invalid literal token used to test the 401 path in the e2e suite (not a credential)"
+  description = "Deliberately-invalid / documented-example literals, not credentials: the e2e 401-path token, the HandshakeTest fixture WS token, and the RFC 6455 example Sec-WebSocket-Key"
   regexes = [
     '''nope-invalid-key''',
+    '''7\.1893457207\.abcdef''',
+    '''dGhlIHNhbXBsZSBub25jZQ==''',
   ]
