@@ -1,114 +1,160 @@
 /* ==========================================================================
    Presence Platform — Core dashboards
-   Design system "Signal" (TASK-019, ADR-028) — 1:1 value-matched with the
-   marketplace storefront (B2B-Marketplace public/css/app.css :root block).
+   Design system "Datum" (TASK-026, ADR-036) — the owner-supplied mockup
+   set (8 HTML pages) is the design source of truth. Palette: a light
+   sage-ground Material-3 tonal set. Geometry: sharp 2px-radius
+   "architectural" corners. Accents: near-black primary, gold
+   tertiary-fixed (points/eco), error red.
 
-   Ground: shadow-grey 950. Accents: scarlet (primary), muted-teal
-   (secondary/data), tiger-orange (tertiary, sparing).
-   Type: Space Grotesk (display) / IBM Plex Sans (body) / IBM Plex Mono (data)
+   Supersedes the "Signal" value-match contract (ADR-013/ADR-028) for
+   Core only: the marketplace and Core no longer share literal token
+   values — they share a family of components instead. Local-first is
+   unchanged: every font below is self-hosted (see fonts.css).
 
-   The four palette scales and the semantic roles below are the SAME
-   literal values the marketplace ships (ADR-013's value-match contract,
-   restored by ADR-028; ADR-027 "Calm Ledger" retired). Core-only extras
-   (shell width, touch target) are appended after the shared block and
-   never re-declare a shared name.
+   Type: Epilogue (display/headline) · Manrope (body) · Space Grotesk
+   (labels/data chips) · IBM Plex Mono (mono — value-match for the
+   mockups' JetBrains Mono).
+
+   Scale (mockup tailwind.config, verbatim values):
+     display      56/64  -0.03em  600     headline-lg  40/48 -0.02em 600
+     headline-md  28/36  -0.015em 500     headline-sm  22/30 -0.01em 500
+     body-lg      18/28  -0.005em 400     body-md      15/24  0      400
+     body-sm      13/20   0.005em 400     label-lg     14/20  0.04em 600
+     label-md     12/16   0.05em  500     label-sm     10/14  0.08em 600
+   Spacing: 2xs .25 · xs .5 · sm .75 · md 1 · lg 1.5 · xl 2 · 2xl 3 ·
+   3xl 4 · 4xl 6 (rem). Grid margins: mobile 1.25 · tablet 2.5 ·
+   desktop 4 (rem). Gutters 1.5rem. Shell 1360px.
    ========================================================================== */
 
 :root {
-    /* primary — scarlet */
-    --color-primary-scarlet-50:  #fee7ea;
-    --color-primary-scarlet-100: #fccfd5;
-    --color-primary-scarlet-200: #fa9eaa;
-    --color-primary-scarlet-300: #f76e80;
-    --color-primary-scarlet-400: #f53d56;
-    --color-primary-scarlet-500: #f20d2b;
-    --color-primary-scarlet-600: #c20a23;
-    --color-primary-scarlet-700: #91081a;
-    --color-primary-scarlet-800: #610511;
-    --color-primary-scarlet-900: #300309;
-    --color-primary-scarlet-950: #220206;
+    /* ---- palette (mockup Material-3 tonal, verbatim) ---- */
+    --background:                  #f6fbed;
+    --on-background:               #181d15;
 
-    /* secondary — muted teal */
-    --color-muted-teal-50:  #eff5f4;
-    --color-muted-teal-100: #dfece9;
-    --color-muted-teal-200: #bfd9d3;
-    --color-muted-teal-300: #9fc6bd;
-    --color-muted-teal-400: #80b3a7;
-    --color-muted-teal-500: #609f92;
-    --color-muted-teal-600: #4d8074;
-    --color-muted-teal-700: #396057;
-    --color-muted-teal-800: #26403a;
-    --color-muted-teal-900: #13201d;
-    --color-muted-teal-950: #0d1614;
+    --surface:                     #f6fbed;
+    --surface-bright:              #f6fbed;
+    --surface-dim:                 #d7dcce;
+    --surface-container-lowest:    #ffffff;
+    --surface-container-low:       #f1f5e7;
+    --surface-container:           #ebf0e2;
+    --surface-container-high:      #e5eadc;
+    --surface-container-highest:   #dfe4d7;
+    --surface-variant:             #dfe4d7;
+    --on-surface:                  #181d15;
+    --on-surface-variant:          #454743;
 
-    /* neutral — shadow grey */
-    --color-shadow-grey-50:  #f3f1f3;
-    --color-shadow-grey-100: #e6e3e8;
-    --color-shadow-grey-200: #cec7d1;
-    --color-shadow-grey-300: #b5acb9;
-    --color-shadow-grey-400: #9c90a2;
-    --color-shadow-grey-500: #83748b;
-    --color-shadow-grey-600: #695d6f;
-    --color-shadow-grey-700: #4f4653;
-    --color-shadow-grey-800: #352e38;
-    --color-shadow-grey-900: #1a171c;
-    --color-shadow-grey-950: #121013;
+    --primary:                     #0e0f0e;
+    --on-primary:                  #ffffff;
+    --primary-container:           #242423;
+    --on-primary-container:        #8c8b89;
+    --primary-fixed:               #e5e2e0;
+    --primary-fixed-dim:           #c8c6c4;
+    --on-primary-fixed:            #1b1c1b;
+    --on-primary-fixed-variant:    #474745;
 
-    /* tertiary — tiger orange */
-    --color-tiger-orange-50:  #fef3e7;
-    --color-tiger-orange-100: #fce7cf;
-    --color-tiger-orange-200: #facf9e;
-    --color-tiger-orange-300: #f7b76e;
-    --color-tiger-orange-400: #f59f3d;
-    --color-tiger-orange-500: #f2870d;
-    --color-tiger-orange-600: #c26c0a;
-    --color-tiger-orange-700: #915108;
-    --color-tiger-orange-800: #613605;
-    --color-tiger-orange-900: #301b03;
-    --color-tiger-orange-950: #221302;
+    --secondary:                   #5d5f5c;
+    --on-secondary:                #ffffff;
+    --secondary-container:         #e2e3df;
+    --on-secondary-container:      #636562;
+    --secondary-fixed:             #e2e3df;
+    --secondary-fixed-dim:         #c6c7c4;
+    --on-secondary-fixed:          #1a1c1a;
+    --on-secondary-fixed-variant:  #454745;
 
-    /* semantic roles — single source of truth for components */
-    --bg:            var(--color-shadow-grey-950);
-    --bg-raised:     var(--color-shadow-grey-900);
-    --surface:       var(--color-shadow-grey-800);
-    --surface-soft:  #2b2530; /* grey-800/900 midpoint for nested panels */
-    --border:        var(--color-shadow-grey-700);
-    --border-strong: var(--color-shadow-grey-600);
-    --border-soft:   var(--color-shadow-grey-800);
+    --tertiary:                    #150d00;
+    --on-tertiary:                 #ffffff;
+    --tertiary-container:          #2f2200;
+    --on-tertiary-container:       #aa861b;
+    --tertiary-fixed:              #ffdf93;
+    --tertiary-fixed-dim:          #ebc254;
+    --on-tertiary-fixed:           #241a00;
+    --on-tertiary-fixed-variant:   #594400;
 
-    --text:          var(--color-shadow-grey-50);   /* headings */
-    --text-body:     var(--color-shadow-grey-100);  /* body copy */
-    --text-muted:    var(--color-shadow-grey-300);  /* secondary copy */
-    --text-meta:     var(--color-shadow-grey-400);  /* meta only on 950/900 */
+    --error:                       #ba1a1a;
+    --on-error:                    #ffffff;
+    --error-container:             #ffdad6;
+    --on-error-container:          #93000a;
 
-    --accent:        var(--color-primary-scarlet-500);
-    --accent-soft:   var(--color-primary-scarlet-400);
-    --accent-solid:  var(--color-primary-scarlet-600);
-    --accent-deep:   var(--color-primary-scarlet-700);
-    --accent-tint:   var(--color-primary-scarlet-950);
+    --outline:                     #767873;
+    --outline-variant:             #c6c7c1;
 
-    --data:          var(--color-muted-teal-400);   /* event labels, live states */
-    --data-strong:   var(--color-muted-teal-300);
-    --data-solid:    var(--color-muted-teal-500);
-    --data-tint:     var(--color-muted-teal-900);
+    --inverse-surface:             #2d3229;
+    --inverse-on-surface:          #eef3e5;
+    --inverse-primary:             #c8c6c4;
 
-    --spare:         var(--color-tiger-orange-400); /* badges, hover glints */
-    --spare-strong:  var(--color-tiger-orange-500);
-    --spare-tint:    var(--color-tiger-orange-900);
+    /* ---- semantic shortcuts (kept short for component authors) ---- */
+    --bg:              var(--background);
+    --text:            var(--on-surface);
+    --text-body:       var(--on-background);
+    --text-muted:      var(--on-surface-variant);
+    --text-meta:       var(--outline);
+    --accent:          var(--primary);          /* action color = near-black */
+    --accent-contrast: var(--tertiary-fixed);   /* gold on black */
+    --points:          var(--tertiary-fixed);   /* points/eco accent */
+    --points-ink:      var(--on-tertiary-fixed);
+    --alert:           var(--error);
+    --alert-tint:      var(--error-container);
+    --alert-ink:       var(--on-error-container);
+    --border:          var(--outline-variant);
+    --border-strong:   var(--outline);
+    --ok:              var(--tertiary-fixed-dim);
 
-    --alert:         var(--color-primary-scarlet-400); /* form errors (functional) */
+    /* ---- type scale (size / line-height / tracking / weight) ---- */
+    --fs-display:      56px;  --lh-display:      64px;  --ls-display:      -0.03em;  --fw-display:      600;
+    --fs-headline-lg:  40px;  --lh-headline-lg:  48px;  --ls-headline-lg:  -0.02em;  --fw-headline-lg:  600;
+    --fs-headline-md:  28px;  --lh-headline-md:  36px;  --ls-headline-md:  -0.015em; --fw-headline-md:  500;
+    --fs-headline-sm:  22px;  --lh-headline-sm:  30px;  --ls-headline-sm:  -0.01em;  --fw-headline-sm:  500;
+    --fs-body-lg:      18px;  --lh-body-lg:      28px;  --ls-body-lg:      -0.005em; --fw-body-lg:      400;
+    --fs-body-md:      15px;  --lh-body-md:      24px;  --ls-body-md:       0;       --fw-body-md:      400;
+    --fs-body-sm:      13px;  --lh-body-sm:      20px;  --ls-body-sm:       0.005em; --fw-body-sm:      400;
+    --fs-label-lg:     14px;  --lh-label-lg:     20px;  --ls-label-lg:      0.04em;  --fw-label-lg:     600;
+    --fs-label-md:     12px;  --lh-label-md:     16px;  --ls-label-md:      0.05em;  --fw-label-md:     500;
+    --fs-label-sm:     10px;  --lh-label-sm:     14px;  --ls-label-sm:      0.08em;  --fw-label-sm:     600;
 
-    --radius: 10px;
-    --radius-sm: 6px;
-    --font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
-    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
-    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    /* ---- type utility tokens ---- */
+    --font-display: 'Epilogue', 'IBM Plex Sans', system-ui, sans-serif;
+    --font-body:    'Manrope', 'IBM Plex Sans', system-ui, sans-serif;
+    --font-label:   'Space Grotesk', 'Epilogue', system-ui, sans-serif;
+    --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
 
-    /* NOTE (contrast, marketplace-verified): grey-400 passes AA only on
-       950/900 grounds. On grey-800 surfaces the floor is grey-300.
-       scarlet-500 as TEXT is large-text-only. */
+    /* ---- spacing ---- */
+    --sp-2xs: 0.25rem;
+    --sp-xs:  0.5rem;
+    --sp-sm:  0.75rem;
+    --sp-md:  1rem;
+    --sp-lg:  1.5rem;
+    --sp-xl:  2rem;
+    --sp-2xl: 3rem;
+    --sp-3xl: 4rem;
+    --sp-4xl: 6rem;
+    --gutter: var(--sp-lg);
+    --margin-mobile:  1.25rem;
+    --margin-tablet:  2.5rem;
+    --margin-desktop: 4rem;
 
-    /* ---- Core-only additions (dashboard frame; no shared name above) ---- */
-    --shell: 1140px;                     /* content column (same width) */
-    --tap: 44px;                         /* minimum touch target */
+    /* ---- geometry ---- */
+    --radius:      8px;   /* cards (mockup rounded-xl) */
+    --radius-md:   4px;   /* inner blocks (rounded-lg) */
+    --radius-sm:   2px;   /* chips/buttons (rounded-DEFAULT) */
+    --radius-pill: 999px; /* dots, pills */
+
+    /* ---- elevation (light theme: whisper-subtle) ---- */
+    --shadow-sm: 0 1px 2px rgba(24, 29, 21, 0.05), 0 1px 8px rgba(24, 29, 21, 0.04);
+    --shadow-md: 0 2px 6px rgba(24, 29, 21, 0.07), 0 8px 24px rgba(24, 29, 21, 0.06);
+    --shadow-xl: 0 4px 12px rgba(24, 29, 21, 0.10), 0 16px 40px rgba(24, 29, 21, 0.10);
+
+    /* ---- frame ---- */
+    --shell: 1360px;   /* mockup grid width */
+    --tap: 44px;       /* minimum touch target */
+    --topbar-h: 64px;  /* mockup h-16 */
+    --dur: 180ms;      /* micro-transition */
+}
+
+/* High-contrast/print guards: tokens stay, presentation adapts. */
+@media (prefers-contrast: more) {
+    :root {
+        --border:        var(--outline);
+        --border-strong: var(--on-surface-variant);
+        --outline-variant: #a8aaa4;
+    }
 }

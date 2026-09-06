@@ -1,3 +1,86 @@
+/* ==========================================================================
+   Presence Platform — Core dashboards
+   Font stack (TASK-026, ADR-036) — 100% self-hosted, zero external
+   requests at runtime. Google-hosted originals were downloaded ONCE at
+   redesign time and subsetted to latin + latin-ext (ES accents live in
+   both), then vendored here like every other project asset.
+
+   Epilogue (variable 400..700)  — display + headlines (mockup headline)
+   Manrope (variable 300..800)   — body copy (mockup body)
+   Space Grotesk (500/600/700)   — labels, data chips (mockup label —
+                                   already shipped since "Signal")
+   IBM Plex Mono (400/500)       — mono data (value-match for the
+                                   mockups' JetBrains Mono)
+   Material Symbols Outlined     — icon font, ligature-driven
+                                   (<span class="material-symbols-outlined">
+                                   eco</span>); subsetted to the icons the
+                                   views actually use (see scripts/task-026
+                                   notes in docs/FRONTEND.md).
+   IBM Plex Sans stays as the universal fallback body font.
+   ========================================================================== */
+
+/* ---- Epilogue (variable weight axis) ---- */
+@font-face {
+  font-family: 'Epilogue';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/fonts/EpilogueVar-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Epilogue';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/fonts/EpilogueVar-latinext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- Manrope (variable weight axis) ---- */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url(/fonts/ManropeVar-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url(/fonts/ManropeVar-latinext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- Material Symbols Outlined (icon font, ligatures) ---- */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url(/fonts/MaterialSymbolsOutlined-var.woff2) format('woff2');
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+
+/* ---- IBM Plex Mono (shipped since MVP) ---- */
 @font-face {
   font-family: 'IBM Plex Mono';
   font-style: normal;
@@ -12,6 +95,8 @@
   font-display: swap;
   src: url(/fonts/IBMPlexMono-500.woff2) format('woff2');
 }
+
+/* ---- IBM Plex Sans (universal fallback, shipped since MVP) ---- */
 @font-face {
   font-family: 'IBM Plex Sans';
   font-style: italic;
@@ -44,6 +129,8 @@
   font-display: swap;
   src: url(/fonts/IBMPlexSans-600.woff2) format('woff2');
 }
+
+/* ---- Space Grotesk (labels/data, shipped since MVP) ---- */
 @font-face {
   font-family: 'Space Grotesk';
   font-style: normal;

@@ -1,50 +1,68 @@
 @extends('layouts.app')
 
+{{--
+    TASK-026 — mockup "Sign In — Presence Platform": architectural auth
+    card, context band, icon inputs, seeded-credential chips. The real
+    form contract is untouched: POST /login + @csrf + #email/#password/
+    #pw-toggle + demo chips autofill + validation errors. Mockup parts
+    with no backing functionality (FORGOT KEY link, SSO gateway banner,
+    TLS/FERPA/ISO badges, build number) are deliberately absent — see
+    docs/FRONTEND.md gap ledger.
+--}}
+
 @section('title', __('app.login'))
 
 @section('content')
 <div class="auth-wrap">
-    <section class="panel panel-rule auth-card">
+    <section class="panel auth-card">
         <div class="auth-band">
             <span class="wordmark-tap" aria-hidden="true"></span>
             <div>
                 <p class="auth-band-title">{{ __('app.app_name') }}</p>
                 <p class="auth-band-sub">{{ __('app.login_band_sub') }}</p>
             </div>
+            <span class="material-symbols-outlined is-16" aria-hidden="true" style="margin-left:auto; color: var(--text-meta);">verified_user</span>
         </div>
 
-        <h1>{{ __('app.login_title') }}</h1>
-        <p class="panel-sub">{{ __('app.login_subtitle') }}</p>
+        <div class="auth-body">
+            <h1>{{ __('app.login_title') }}</h1>
+            <p class="panel-sub">{{ __('app.login_subtitle') }}</p>
 
-        <form method="POST" action="{{ route('login') }}">
-            @csrf
+            <form method="POST" action="{{ route('login') }}">
+                @csrf
 
-            <x-field :label="__('app.email')" for="email">
-                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
-                       autocomplete="email" placeholder="admin@presence.test"
-                       @error('email') aria-invalid="true" @enderror>
-                @error('email')
-                    <p class="field-error">{{ $message }}</p>
-                @enderror
-            </x-field>
+                <x-field :label="__('app.email')" for="email">
+                    <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
+                           autocomplete="email" placeholder="admin@presence.test"
+                           @error('email') aria-invalid="true" @enderror>
+                    @error('email')
+                        <p class="field-error">{{ $message }}</p>
+                    @enderror
+                </x-field>
 
-            <x-field :label="__('app.password')" for="password">
-                <div class="pw-wrap">
-                    <input id="password" type="password" name="password" required autocomplete="current-password"
-                           placeholder="••••••••"
-                           @error('password') aria-invalid="true" @enderror>
-                    <button type="button" class="pw-toggle" id="pw-toggle" data-show="{{ __('app.show') }}"
-                            data-hide="{{ __('app.hide') }}" aria-pressed="false">{{ __('app.show') }}</button>
-                </div>
-                @error('password')
-                    <p class="field-error">{{ $message }}</p>
-                @enderror
-            </x-field>
+                <x-field :label="__('app.password')" for="password">
+                    <div class="pw-wrap">
+                        <input id="password" type="password" name="password" required autocomplete="current-password"
+                               placeholder="••••••••"
+                               @error('password') aria-invalid="true" @enderror>
+                        <button type="button" class="pw-toggle" id="pw-toggle" data-show="{{ __('app.show') }}"
+                                data-hide="{{ __('app.hide') }}" aria-pressed="false">{{ __('app.show') }}</button>
+                    </div>
+                    @error('password')
+                        <p class="field-error">{{ $message }}</p>
+                    @enderror
+                </x-field>
 
-            <button type="submit" class="btn btn-primary btn-block">{{ __('app.login') }}</button>
-        </form>
+                <button type="submit" class="btn btn-primary btn-block">
+                    {{ __('app.login') }}
+                    <span class="material-symbols-outlined is-16" aria-hidden="true">arrow_forward</span>
+                </button>
+            </form>
+        </div>
     </section>
 
+    {{-- Seeded access (mockup "01 // SEEDED ACCESS"): the real demo
+         credentials, one tap to fill — same TASK-017 script below. --}}
     <div class="auth-aside" data-reveal>
         <dl>
             <dt>{{ __('app.demo_credentials') }}</dt>
@@ -60,7 +78,7 @@
                     </button>
                 </div>
             </dd>
-            <dd>{{ __('app.password') }}: password</dd>
+            <dd>{{ __('app.password') }}: <code>password</code></dd>
         </dl>
     </div>
 </div>

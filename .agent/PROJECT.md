@@ -779,3 +779,34 @@ The recycling backend now implements the owner's full spec:
 - **AI boundary schema**: `is_bottle` / `is_recyclable` returned by
   every classifier driver and persisted on deposits; business rules
   stay material_class + config.
+
+## TASK-026 additions (2026-09-07, RUN-2026-09-07-core-023)
+
+The owner's eight HTML mockups are now the design source of truth:
+
+- **Design system "Datum" (ADR-036)**: light sage M3 tonal palette
+  (verbatim mockup hexes), Epilogue/Manrope/Space Grotesk/IBM Plex
+  Mono — all self-hosted (fonts downloaded once, vendored; Material
+  Symbols subsetted + axis-instanced 3.97 MB → 283 KB, 27 icons,
+  ligature-verified). The Signal/marketplace value-match is retired
+  for Core; the honesty floor now extends to ASPIRATIONAL UI: mockup
+  elements with no data source are omitted, never faked.
+- **All 10 views + the layout shell redesigned**; realtime.js and
+  motion.js untouched; every JS hook, id and test-asserted string
+  preserved (275 tests / 33 e2e / quality green after the change).
+- **Two new read-only pages on existing data**: /student/leaderboard
+  (LeaderboardService + derived class standings) and /admin/ecostation
+  (deposit ledger, config rates, recycling readers). No new backend
+  behavior.
+- **The gap ledger** (docs/FRONTEND.md + .es.md): 35 cataloged mockup
+  elements that need functionality which does not exist yet, each with
+  the backend surface it would require (G/P/R/L/T/D/E/S/N codes).
+  Biggest product decisions waiting there: student-side redemption
+  (R1), capture-image route (E1), school identity config (G1).
+- **Durable traps recorded**: Material Symbols subsetting requires
+  instancing after pyftsubset (deltas are the bulk); ligature checks
+  must resolve ExtensionSubst; the mockup bundle splits on DOCTYPE
+  boundaries; DemoSeeder mints the 1:1 student accounts (look up,
+  never create).
+- **Pending owner actions**: PAT to push + trigger CI; DEEPSEEK_API_KEY
+  (still absent); pick gap-ledger items to turn into tasks.

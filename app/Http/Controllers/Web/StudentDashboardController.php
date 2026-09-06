@@ -68,4 +68,41 @@ class StudentDashboardController extends Controller
                 ->get(),
         ]);
     }
+
+    /**
+     * TASK-026 — the student-facing standings page (mockup "Leaderboard
+     * & Class Standings"). Read-only view over the SAME LeaderboardService
+     * the API and the student desk use; class standings are derived from
+     * the board's own class_name column (no new aggregates, no new
+     * endpoints). Every student still sees the full school board — the
+     * same data GET /api/v1/recycling/leaderboard already publishes.
+     */
+    public function leaderboard(Request $request): View
+    {
+        $student = $request->user()->student;
+
+        $board = $this->leaderboard->top(50);
+
+        $classStandings = collect($board)
+            ->filter(fn (array $entry) => ! empty($entry['class_name']))
+            ->groupBy('class_name')
+            ->map(fn ($entries, $className) => [
+                'class_name' => $className,
+                'students' => count($entries),
+                'points' => (int) $entries->sum('points'),
+            ])
+            ->sortByDesc('points')
+            ->values()
+            ->take(8)
+            ->all();
+
+        return view('student.leaderboard', [
+            'student' => $student,
+            'balance' => $student->pointBalance(),
+            'board' => $board,
+            'top3' => array_slice($board, 0, 3),
+            'myRank' => $this->leaderboard->rankOf($student),
+            'classStandings' => $classStandings,
+        ]);
+    }
 }

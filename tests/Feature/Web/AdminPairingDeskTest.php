@@ -280,22 +280,23 @@ class AdminPairingDeskTest extends TestCase
     public function the_status_box_follows_the_live_panel_full_bleed_grammar(): void
     {
         // TASK-021 — a live-panel is an UNPADDED container, so the status
-        // box is a full-bleed tone strip (18px gutters, one rule line,
+        // box is a full-bleed tone strip (live gutters, one rule line,
         // no inset card-in-card) and the draining bar meters the panel's
         // full width; the dashboards' answer boxes live in padded panels
         // and keep the inset base grammar. The idle note uses the
-        // live-empty row grammar.
+        // live-empty row grammar. TASK-026 re-pins the grammar onto the
+        // Datum tokens (the intent is unchanged).
         $css = file_get_contents(public_path('css/app.css'));
 
-        $this->assertMatchesRegularExpression('/\.live-panel \.nl-answer\s*{[^}]*margin: 0[^}]*border-radius: 0/', $css);
-        $this->assertMatchesRegularExpression('/\.live-panel \.nl-answer\s*{[^}]*padding: 13px 18px/', $css);
-        $this->assertMatchesRegularExpression('/\.live-panel \.answer-ok\s*{[^}]*var\(--data-tint\)/', $css);
-        $this->assertMatchesRegularExpression('/\.live-panel \.answer-error\s*{[^}]*var\(--accent-tint\)/', $css);
-        $this->assertMatchesRegularExpression('/\.live-panel \.countdown\s*{[^}]*margin: 0[^}]*border-radius: 0/', $css);
-        // the title shares the 18px live gutters (padding-0 panel) instead
+        $this->assertMatchesRegularExpression('/\.live-panel \.nl-answer\s*{[^}]*margin: 0 var\(--sp-lg\)[^}]*border-radius: 0;/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.answer-ok\s*{[^}]*var\(--tertiary-fixed\)/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.answer-error\s*{[^}]*var\(--error-container\)/', $css);
+        // the draining bar stays an edge-to-edge meter
+        $this->assertMatchesRegularExpression('/\.countdown\s*{[^}]*margin: 0;[^}]*border-radius: 0;/', $css);
+        // the title shares the live gutters (padding-0 panel) instead
         // of sitting flush at the edges, and the window sub carries the
         // mono uppercase label grammar instead of unstyled text
-        $this->assertMatchesRegularExpression('/\.live-panel \.panel-label\s*{[^}]*margin: 0[^}]*padding: 14px 18px 13px/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel \.panel-label\s*{[^}]*margin: 0[^}]*padding: var\(--sp-md\) var\(--sp-lg\)/', $css);
         $this->assertMatchesRegularExpression('/\.live-panel-sub\s*{[^}]*text-transform: uppercase/', $css);
         // the idle note is a live-empty row, not a bare <p> at the edges
         $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
