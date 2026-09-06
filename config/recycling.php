@@ -35,6 +35,35 @@ return [
 
     'materials' => ['plastic', 'paper', 'metal', 'glass', 'other'],
 
+    /*
+     | TASK-025 item 2 — the bottle-first capture window (spec §5/§32):
+     | how long an image captured WITHOUT a card stays resolvable before
+     | the lazy sweep expires it (no award, no leak), and how long a
+     | card-first tap event may wait for its classify call.
+     */
+    'capture' => [
+        'ttl_seconds' => (int) env('RECYCLING_CAPTURE_TTL', 300),
+        'classify_window_seconds' => (int) env('RECYCLING_CLASSIFY_WINDOW', 600),
+    ],
+
+    /*
+     | TASK-025 item 4 — leaderboard shape (spec §22/§28): default top-N
+     | served by GET /api/v1/recycling/leaderboard (client may request
+     | any 1..100).
+     */
+    'leaderboard' => [
+        'top' => (int) env('RECYCLING_LEADERBOARD_TOP', 10),
+    ],
+
+    /*
+     | TASK-025 item 7 — redemption guards (spec §20): the duplicate
+     | window for double-submit protection (same student + same reward
+     | within N seconds is a repeat click, not a new wish).
+     */
+    'redemption' => [
+        'duplicate_window_seconds' => (int) env('RECYCLING_REDEMPTION_DUPLICATE_WINDOW', 10),
+    ],
+
     'classifier' => [
         'driver' => env('RECYCLING_CLASSIFIER_DRIVER', 'stub'),
 

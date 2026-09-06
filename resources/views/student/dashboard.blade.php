@@ -1,0 +1,88 @@
+{{--
+    TASK-025 item 5 (spec §11/§12/§30) — the student self-service desk:
+    own balance, own rank, own recent movements, the shared top board.
+    Server-side authorized: $student comes from the authenticated
+    account, never a URL parameter. Live balance: a tiny WS listener
+    updates the balance stat when a points_awarded / reward_redeemed
+    frame names this student (the token route serves students now).
+--}}
+@extends('layouts.app')
+
+@section('title', __('app.student_dashboard'))
+
+@section('content')
+    <header class="page-head">
+        <h1>{{ $student->name }}</h1>
+        <p class="muted">{{ __('app.student_dashboard') }} · {{ $student->schoolClass?->name ?? '—' }}</p>
+    </header>
+
+    <div class="stat-strip stat-strip-2">
+        <x-stat :label="__('app.student_points_balance')" icon="✦">{{ $balance }}</x-stat>
+        <x-stat :label="__('app.student_rank')" icon="▲">{{ $rank ?? __('app.student_rank_none') }}</x-stat>
+    </div>
+
+    <div class="grid-2">
+        <x-panel :label="__('app.student_recent_activity')">
+            <ul class="live-list">
+                @forelse($recentLedger as $row)
+                    <li class="live-row">
+                        <span class="live-main">
+                            <span class="live-student">{{ __('app.student_ledger_reason_'.$row->reason) }}</span>
+                            <span class="live-context">{{ $row->created_at?->format('Y-m-d H:i') }}</span>
+                        </span>
+                        <span class="live-side">
+                            <span class="live-chip" data-event-type="{{ $row->delta >= 0 ? 'RECYCLING_DEPOSIT' : 'REDEMPTION' }}">
+                                {{ $row->delta >= 0 ? '+' : '' }}{{ $row->delta }}
+                            </span>
+                        </span>
+                    </li>
+                @empty
+                    <li class="live-row live-empty">{{ __('app.student_no_activity') }}</li>
+                @endforelse
+            </ul>
+            <p class="muted small"><a href="{{ route('student.history') }}">{{ __('app.student_history') }} →</a></p>
+        </x-panel>
+
+        <x-panel :label="__('app.student_leaderboard')">
+            <ol class="board-list">
+                @forelse($leaderboard as $entry)
+                    <li class="board-row {{ $entry['student_id'] === $student->id ? 'is-me' : '' }}">
+                        <span class="board-rank">{{ $entry['rank'] }}</span>
+                        <span class="board-name">{{ $entry['student_name'] }}</span>
+                        <span class="board-points">{{ $entry['points'] }}</span>
+                    </li>
+                @empty
+                    <li class="live-row live-empty">{{ __('app.student_no_activity') }}</li>
+                @endforelse
+            </ol>
+        </x-panel>
+    </div>
+
+    <p class="muted small"><a href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }} →</a></p>
+
+    {{-- Live balance: WS points_awarded / reward_redeemed frames for THIS student --}}
+    <div id="student-live" data-student-id="{{ $student->id }}" hidden></div>
+    <script>
+        (function () {
+            var el = document.getElementById('student-live');
+            if (!el || !window.fetch) { return; }
+            fetch('{{ route('realtime.token') }}', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (cfg) {
+                    if (!cfg || !window.WebSocket) { return; }
+                    var ws = new WebSocket(cfg.url + '?token=' + encodeURIComponent(cfg.token));
+                    var stat = document.querySelector('.stat-value');
+                    ws.onmessage = function (e) {
+                        try {
+                            var frame = JSON.parse(e.data);
+                            if (frame.type !== 'recycling') { return; }
+                            var p = frame.payload || {};
+                            if (p.student_id !== Number(el.dataset.studentId)) { return; }
+                            if (typeof p.new_balance === 'number' && stat) { stat.textContent = p.new_balance; }
+                        } catch (err) { /* not JSON — ignore */ }
+                    };
+                })
+                .catch(function () { /* live updates are optional polish */ });
+        })();
+    </script>
+@endsection

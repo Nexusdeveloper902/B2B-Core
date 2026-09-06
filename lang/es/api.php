@@ -23,6 +23,17 @@ return [
     // Endpoint de canje
     'insufficient_points' => 'Puntos insuficientes: faltan :shortfall',
 
+    // TASK-025 item 7 — reglas del catálogo de recompensas (spec §19/§20)
+    'reward_inactive' => 'Esta recompensa está inactiva por ahora',
+    'reward_out_of_stock' => 'Esta recompensa está agotada',
+    'duplicate_redemption' => 'Este canje ya se recibió hace un momento — no se cobraron puntos de nuevo',
+
+    // TASK-025 item 2 — endpoints de captura botella-primero (spec §3/§32)
+    'no_pending_capture' => 'No hay una captura pendiente disponible para este lector',
+    'capture_not_owned_by_reader' => 'La captura no pertenece a este lector',
+    'capture_already_associated' => 'La captura ya fue asociada a una tarjeta',
+    'event_expired' => 'El evento de tap es demasiado antiguo para clasificarlo',
+
     // Endpoint de emparejamiento de tarjetas (TASK-010)
     'pairing_no_active_session' => 'No hay ninguna sesión de emparejamiento activa',
     'pairing_card_already_paired' => 'La tarjeta ya está emparejada',

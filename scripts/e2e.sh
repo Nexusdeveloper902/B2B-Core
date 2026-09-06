@@ -233,6 +233,63 @@ fi
 kill "$WS_PID" 2>/dev/null || true
 wait "$WS_PID" 2>/dev/null || true
 WS_PID=""
+kill "$WS_PID" 2>/dev/null || true
+wait "$WS_PID" 2>/dev/null || true
+WS_PID=""
+
+# ---------------------------------------------------------------------------
+say "== Fase H - botella-primero + tablero + cuenta estudiante / bottle-first + leaderboard + student account (TASK-025) =="
+# The bottle-first flow (spec sec 3 Case B): capture WITHOUT a card, then a
+# card association resolves it. Uses a SECOND student for the
+# association so the leaderboard has two earners.
+STUDENT2_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\Student::where("name","like","%Carlos%")->first()->id;')
+CARD2_UID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\Student::find((int)$argv[1])->cards()->first()->credential_uid;' "$STUDENT2_ID")
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/recycling/capture" \
+    -H "Authorization: Bearer $RECYCLING_KEY" -H "Accept: application/json" \
+    -F "image=@${IMG}")
+check "Capture without a card is held / La captura sin tarjeta queda en espera" "$R" '"state":"awaiting_card"'
+check "Capture says present card next / La captura pide presentar tarjeta" "$R" '"next_step":"present_card"'
+CAPTURE_ID=$(grep -oE '"capture_id":[0-9]+' <<<"$R" | head -1 | grep -oE '[0-9]+')
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/recycling/captures/$CAPTURE_ID/associate" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD2_UID\"}")
+check "Another reader cannot associate / Otro lector no puede asociar" "$R" '403'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/recycling/captures/$CAPTURE_ID/associate" \
+    -H "Authorization: Bearer $RECYCLING_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD2_UID\"}")
+check "Association resolves and awards / La asociacion resuelve y otorga" "$R" '"capture_state":"accepted"'
+check "Boundary semantics surfaced / Semantica de frontera expuesta" "$R" '"is_recyclable"'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/recycling/captures/$CAPTURE_ID/associate" \
+    -H "Authorization: Bearer $RECYCLING_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD2_UID\"}")
+check "A resolved capture is terminal / Una captura resuelta es terminal" "$R" '404'
+
+# The leaderboard (spec sec 22): two earners now exist.
+R=$(curl -s -w '\n%{http_code}' -X GET "$BASE_URL/api/v1/recycling/leaderboard?limit=3" \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/json")
+check "Leaderboard ranks the earners / El tablero clasifica a los ganadores" "$R" '"rank":1'
+
+# A student logs into their self-service desk (spec sec 11/30). The
+# login POST needs the session CSRF token (session-first auth is the
+# design; curl must play the same game a browser does).
+COOKIE=$(mktemp)
+LOGIN_PAGE=$(curl -s -c "$COOKIE" "$BASE_URL/login")
+CSRF=$(grep -oE 'name="csrf-token" content="[^"]+' <<<"$LOGIN_PAGE" | sed 's/.*content="//')
+R=$(curl -s -w '\n%{http_code}' -b "$COOKIE" -c "$COOKIE" -X POST "$BASE_URL/login" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "_token=$CSRF" \
+    --data-urlencode "email=carlos@presence.test" \
+    --data-urlencode "password=password")
+check "Student login lands on /student / Login del estudiante aterriza en /student" "$R" '302'
+
+R=$(curl -s -w '\n%{http_code}' -b "$COOKIE" "$BASE_URL/student")
+check "Student desk renders / El escritorio del estudiante responde" "$R" '200'
+rm -f "$COOKIE"
+
 
 # ---------------------------------------------------------------------------
 echo ""

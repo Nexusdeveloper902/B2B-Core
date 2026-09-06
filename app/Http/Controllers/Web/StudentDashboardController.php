@@ -1,0 +1,71 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use App\Models\Reward;
+use App\Services\Recycling\LeaderboardService;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+/**
+ * TASK-025 item 5 — student self-service (spec §11/§12/§30).
+ *
+ * Server-side authorization is the whole design: the student row is
+ * resolved from the AUTHENTICATED user's account (users.student_id),
+ * never from a URL parameter — every query is scoped to that one
+ * student. Students see exactly their own points, history, rewards.
+ */
+class StudentDashboardController extends Controller
+{
+    public function __construct(
+        private readonly LeaderboardService $leaderboard,
+    ) {}
+
+    public function dashboard(Request $request): View
+    {
+        $student = $request->user()->student;
+
+        $standing = $this->leaderboard->rankOf($student);
+        $recent = $student->pointsLedger()
+            ->latest('id')
+            ->limit(5)
+            ->get();
+
+        return view('student.dashboard', [
+            'student' => $student,
+            'balance' => $student->pointBalance(),
+            'rank' => $standing['rank'],
+            'recentLedger' => $recent,
+            'leaderboard' => $this->leaderboard->top(5),
+        ]);
+    }
+
+    public function history(Request $request): View
+    {
+        $student = $request->user()->student;
+
+        return view('student.history', [
+            'student' => $student,
+            'ledger' => $student->pointsLedger()
+                ->latest('id')
+                ->paginate(25),
+            'balance' => $student->pointBalance(),
+        ]);
+    }
+
+    public function rewards(Request $request): View
+    {
+        $student = $request->user()->student;
+
+        return view('student.rewards', [
+            'student' => $student,
+            'balance' => $student->pointBalance(),
+            'rewards' => Reward::query()->orderBy('point_cost')->get(),
+            'redemptions' => $student->redemptions()
+                ->latest('id')
+                ->limit(10)
+                ->get(),
+        ]);
+    }
+}

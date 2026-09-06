@@ -410,3 +410,124 @@ Ejecuta `php artisan migrate --seed`. El seeder **imprime** (bilingüe EN/ES):
 
 Estos valores se reimprimen en cada ejecución del seeder — cópialos
 directamente a las variables de la colección de Postman.
+
+
+---
+
+## POST /api/v1/recycling/capture — captura botella-primero (TASK-025)
+
+**Aut: clave Bearer de un lector de reciclaje (la estación de cámara).**
+La petición es `multipart/form-data`:
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `image` | archivo | La imagen capturada. Se guarda como rastro de auditoría (disco `local`, `recycling-captures/`). |
+
+Spec §3 Caso B: una botella colocada ANTES de cualquier tarjeta. La imagen
+queda en estado `awaiting_card` durante `RECYCLING_CAPTURE_TTL` segundos
+(por defecto 300). **Aquí NO se llama al clasificador** — la puerta de
+costo (spec §4) prohíbe toda llamada al API de visión antes de asociar un
+estudiante.
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "capture_id": 12,
+  "state": "awaiting_card",
+  "expires_in": 300,
+  "next_step": "present_card"
+}
+```
+
+`422` — el lector no es de reciclaje / validación.
+
+---
+
+## POST /api/v1/recycling/captures/{capture}/associate — la tarjeta resuelve la captura (TASK-025)
+
+**Aut: clave Bearer del MISMO lector de reciclaje que guardó la captura.**
+La petición es JSON:
+
+```json
+{"credential_uid": "A1B2C3D4E5F6"}
+```
+
+Una sola llamada hace toda la resolución: valida la tarjeta, crea el
+evento de tap, clasifica la imagen guardada, otorga puntos y marca la
+captura `accepted`.
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "capture_id": 12,
+  "capture_state": "accepted",
+  "event_id": 88,
+  "already_classified": false,
+  "material_class": "plastic",
+  "confidence": 0.91,
+  "is_bottle": true,
+  "is_recyclable": true,
+  "points_awarded": 10,
+  "new_balance": 45
+}
+```
+
+- Una tarjeta desconocida/inactiva devuelve `404` (mensaje mostrable en el
+  dispositivo) y **mantiene la ventana abierta** — toca la tarjeta correcta
+  y reintenta.
+- `403` — la captura pertenece a otro lector. `404` — no hay captura usable
+  (expirada / ya resuelta). `503` — clasificador no disponible (la captura
+  sigue resoluble; reintenta).
+
+---
+
+## GET /api/v1/recycling/leaderboard — ranking (TASK-025)
+
+**Aut: sesión o PAT; rol admin, teacher o student.**
+Query: `?limit=N` (por defecto 10, máximo 100).
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "entries": [
+    {"rank": 1, "student_id": 3, "student_name": "Carlos Pérez", "class_name": "5° B", "points": 25}
+  ],
+  "me": {"rank": 2, "points": 10, "student_id": 1, "student_name": "Maria González"}
+}
+```
+
+`me` aparece solo para cuentas de estudiante (resuelto desde la cuenta,
+nunca desde un parámetro). El ranking deriva exclusivamente del libro de
+puntos; los empates comparten puesto (ranking de competición: 1, 2, 2, 4).
+
+---
+
+## Marcos en vivo de reciclaje (TASK-025)
+
+El canal WebSocket (`realtime:serve`) ahora emite marcos `recycling` a
+toda conexión autenticada (mismo token/handshake que los marcos de tap):
+
+```json
+{"type": "recycling", "update": {"id": 7, "type": "points_awarded",
+ "payload": {"student_id": 1, "student_name": "Maria González", "points": 10, "new_balance": 45},
+ "at": "2026-09-07 10:15:03"}}
+```
+
+Tipos de marco: `capture_created`, `validation_started`, `validated`,
+`points_awarded`, `reward_redeemed`, `leaderboard_updated`. Las filas se
+escriben dentro de la MISMA transacción de BD que el cambio de estado que
+describen, así un marco solo refleja estado confirmado. El marco hello
+lleva la instantánea reciente bajo `recycling`.
+
+Escritorio web de autoservicio del estudiante (TASK-025): los estudiantes
+inician sesión (misma página de login; cuentas demo impresas por el
+seeder, p. ej. `carlos@presence.test` / `password`) y aterrizan en
+`/student`, `/student/history`, `/student/rewards` — alcance restringido
+del lado del servidor a sus propios datos únicamente.
+

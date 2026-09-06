@@ -6,9 +6,11 @@ use App\Contracts\MaterialClassifier;
 use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
 use App\Models\RecyclingDeposit;
+use App\Models\RecyclingUpdate;
 use App\Services\Recycling\ClassificationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -177,6 +179,127 @@ class ClassificationTest extends TestCase
             'event_id' => $event->id,
             'image' => UploadedFile::fake()->image('x.jpg'),
         ], ['Authorization' => 'Bearer wrong'])->assertUnauthorized();
+    }
+
+    #[Test]
+    public function the_classified_image_is_persisted_and_referenced_on_the_deposit(): void
+    {
+        // TASK-025 item 3 (spec §14) — auditability: the exact image the
+        // classifier judged is stored, and the deposit points at it.
+        Storage::fake('local');
+
+        $this->swap(MaterialClassifier::class, new class implements MaterialClassifier
+        {
+            public function classify(string $imagePath): array
+            {
+                return ['material_class' => 'glass', 'confidence' => 0.8, 'is_bottle' => false, 'is_recyclable' => true];
+            }
+        });
+
+        $event = $this->recyclingTapFor('Maria González');
+
+        $this->post('/api/v1/recycling/classify', [
+            'event_id' => $event->id,
+            'image' => UploadedFile::fake()->image('jar.jpg'),
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])
+            ->assertOk()
+            ->assertJson([
+                'material_class' => 'glass',
+                'is_bottle' => false,
+                'is_recyclable' => true,
+            ]);
+
+        $deposit = RecyclingDeposit::where('event_id', $event->id)->firstOrFail();
+        $this->assertNotNull($deposit->image_path);
+        $this->assertStringStartsWith('recycling-captures/', $deposit->image_path);
+        Storage::disk('local')->assertExists($deposit->image_path);
+
+        // The AI boundary semantics are persisted (spec §9).
+        $this->assertFalse((bool) $deposit->is_bottle);
+        $this->assertTrue((bool) $deposit->is_recyclable);
+    }
+
+    #[Test]
+    public function a_driver_failure_cleans_up_the_stored_image(): void
+    {
+        Storage::fake('local');
+
+        $this->swap(MaterialClassifier::class, new class implements MaterialClassifier
+        {
+            public function classify(string $imagePath): array
+            {
+                throw ClassificationException::driverUnavailable('deepseek', 'http 500');
+            }
+        });
+
+        $event = $this->recyclingTapFor('Maria González');
+
+        $this->post('/api/v1/recycling/classify', [
+            'event_id' => $event->id,
+            'image' => UploadedFile::fake()->image('orphan.jpg'),
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])
+            ->assertStatus(503);
+
+        $this->assertSame(0, RecyclingDeposit::count());
+        $this->assertSame([], Storage::disk('local')->allFiles('recycling-captures'), 'no orphan image must accumulate on a driver failure');
+    }
+
+    #[Test]
+    public function a_stale_tap_event_is_rejected_by_the_classify_window(): void
+    {
+        // TASK-025 item 2 (spec §5) — the card-first timeout: a tap
+        // older than the configured window is no longer classifiable.
+        config(['recycling.capture.classify_window_seconds' => 600]);
+
+        $event = $this->recyclingTapFor('Maria González');
+
+        $this->travel(601)->seconds();
+
+        $this->post('/api/v1/recycling/classify', [
+            'event_id' => $event->id,
+            'image' => UploadedFile::fake()->image('late.jpg'),
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])
+            ->assertStatus(422)
+            ->assertJson([
+                'status' => 'error',
+                'message' => __('api.event_expired'),
+            ]);
+
+        $this->assertDatabaseCount('recycling_deposits', 0);
+        $this->assertDatabaseCount('points_ledger', 0);
+    }
+
+    #[Test]
+    public function awarding_records_the_recycling_realtime_frames(): void
+    {
+        // TASK-025 item 6 — the award transaction writes its frames in
+        // the same commit: validated + points_awarded + leaderboard_updated.
+        $this->swap(MaterialClassifier::class, new class implements MaterialClassifier
+        {
+            public function classify(string $imagePath): array
+            {
+                return ['material_class' => 'plastic', 'confidence' => 0.9, 'is_bottle' => true, 'is_recyclable' => true];
+            }
+        });
+
+        $event = $this->recyclingTapFor('Maria González');
+
+        $this->post('/api/v1/recycling/classify', [
+            'event_id' => $event->id,
+            'image' => UploadedFile::fake()->image('bottle.jpg'),
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])
+            ->assertOk();
+
+        $types = RecyclingUpdate::orderBy('id')->pluck('type')->all();
+
+        $this->assertContains('validated', $types);
+        $this->assertContains('points_awarded', $types);
+        $this->assertContains('leaderboard_updated', $types);
+
+        $pointsFrame = RecyclingUpdate::where('type', 'points_awarded')->firstOrFail();
+        $this->assertSame(10, $pointsFrame->payload['points']);
+        $this->assertSame(10, $pointsFrame->payload['new_balance']);
+        $this->assertSame('Maria González', $pointsFrame->payload['student_name']);
     }
 
     private function recyclingTapFor(string $studentName): PresenceEvent

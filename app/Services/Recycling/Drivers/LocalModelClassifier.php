@@ -66,6 +66,12 @@ class LocalModelClassifier implements MaterialClassifier
         return [
             'material_class' => $class,
             'confidence' => (float) $confidence,
+            // TASK-025 item 8 — boundary semantics; a local endpoint MAY
+            // return them, and the contract documents the stable shape
+            // (docs/LOCAL_MODEL.md). Defaults when absent: bottle => the
+            // plastic shape, recyclable => everything but 'other'.
+            'is_bottle' => (bool) ($response->json('is_bottle') ?? ($class === 'plastic')),
+            'is_recyclable' => (bool) ($response->json('is_recyclable') ?? ($class !== 'other')),
         ];
     }
 }

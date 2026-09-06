@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Student extends Model
 {
@@ -34,6 +35,18 @@ class Student extends Model
     public function pointsLedger(): HasMany
     {
         return $this->hasMany(PointsLedger::class);
+    }
+
+    /** TASK-025 item 7 — this student's reward redemptions (spend history). */
+    public function redemptions(): HasMany
+    {
+        return $this->hasMany(RewardRedemption::class);
+    }
+
+    /** TASK-025 item 5 — the 1:1 self-service account referencing this row. */
+    public function account(): HasOne
+    {
+        return $this->hasOne(User::class);
     }
 
     /** Current balance: sum of ledger deltas. */

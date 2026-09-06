@@ -398,3 +398,121 @@ Run `php artisan migrate --seed`. The seeder **prints** (bilingual EN/ES):
 
 These values are re-printed on every seed run — copy them straight into
 Postman collection variables.
+
+
+---
+
+## POST /api/v1/recycling/capture — bottle-first image intake (TASK-025)
+
+**Auth: Bearer key of a recycling reader (the camera station).**
+Request is `multipart/form-data`:
+
+| Field | Type | Notes |
+|---|---|---|
+| `image` | file | The captured image. Stored for the audit trail (storage disk `local`, `recycling-captures/`). |
+
+Spec §3 Case B: a bottle placed BEFORE any card. The image is held in
+state `awaiting_card` for `RECYCLING_CAPTURE_TTL` seconds (default 300).
+**No classifier call happens here** — the cost gate (spec §4) forbids
+any vision-API call before a student is associated.
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "capture_id": 12,
+  "state": "awaiting_card",
+  "expires_in": 300,
+  "next_step": "present_card"
+}
+```
+
+`422` — reader is not a recycling reader / validation.
+
+---
+
+## POST /api/v1/recycling/captures/{capture}/associate — card resolves the capture (TASK-025)
+
+**Auth: Bearer key of the SAME recycling reader that stored the capture.**
+Request is JSON:
+
+```json
+{"credential_uid": "A1B2C3D4E5F6"}
+```
+
+One call does the whole resolution: validates the card, creates the tap
+event, classifies the stored image, awards points, marks the capture
+`accepted`.
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "capture_id": 12,
+  "capture_state": "accepted",
+  "event_id": 88,
+  "already_classified": false,
+  "material_class": "plastic",
+  "confidence": 0.91,
+  "is_bottle": true,
+  "is_recyclable": true,
+  "points_awarded": 10,
+  "new_balance": 45
+}
+```
+
+- An unknown/inactive card returns `404` (device-displayable message) and
+  **keeps the window open** — tap the right card and retry.
+- `403` — the capture belongs to another reader. `404` — no usable capture
+  (expired / already resolved). `503` — classifier unavailable (the capture
+  stays resolvable; retry).
+
+---
+
+## GET /api/v1/recycling/leaderboard — ranking (TASK-025)
+
+**Auth: session or PAT; admin, teacher, or student role.**
+Query: `?limit=N` (default 10, max 100).
+
+`200 OK`:
+
+```json
+{
+  "status": "ok",
+  "entries": [
+    {"rank": 1, "student_id": 3, "student_name": "Carlos Pérez", "class_name": "5° B", "points": 25}
+  ],
+  "me": {"rank": 2, "points": 10, "student_id": 1, "student_name": "Maria González"}
+}
+```
+
+`me` appears only for student accounts (resolved from the account, never a
+parameter). Ranking derives exclusively from the points ledger; ties share
+a rank (competition ranking: 1, 2, 2, 4).
+
+---
+
+## Realtime recycling frames (TASK-025)
+
+The WebSocket feed (`realtime:serve`) now pushes `recycling` frames to
+every authenticated connection (same token/handshake as tap frames):
+
+```json
+{"type": "recycling", "update": {"id": 7, "type": "points_awarded",
+ "payload": {"student_id": 1, "student_name": "Maria González", "points": 10, "new_balance": 45},
+ "at": "2026-09-07 10:15:03"}}
+```
+
+Frame types: `capture_created`, `validation_started`, `validated`,
+`points_awarded`, `reward_redeemed`, `leaderboard_updated`. Rows are
+written inside the same DB transaction as the state change they describe,
+so a frame only ever reflects committed state. The hello frame carries the
+recent snapshot under `recycling`.
+
+Student self-service web desk (TASK-025): students log in (same login page;
+demo accounts printed by the seeder, e.g. `carlos@presence.test` /
+`password`) and land on `/student`, `/student/history`, `/student/rewards`
+— server-side scoped to their own data only.
+

@@ -26,7 +26,7 @@
 
 <header class="topbar">
     <div class="shell topbar-in">
-        <a class="wordmark" href="{{ auth()->check() ? route('dashboard') : route('login') }}"
+        <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}"
            aria-label="{{ __('app.app_name') }}">
             <span class="wordmark-tap" aria-hidden="true"></span>
             <span class="wordmark-name">Presence<em>Platform</em></span>
@@ -34,20 +34,36 @@
 
         @auth
             <nav class="topnav" aria-label="{{ __('app.primary_nav') }}">
-                @if(auth()->user()->isAdmin())
-                    <a href="{{ route('admin.dashboard') }}"
-                       @class(['is-active' => request()->routeIs('admin.dashboard')])>
-                        {{ __('app.admin_dashboard') }}
+                @if(auth()->user()->isStudent())
+                    {{-- TASK-025 — student self-service nav (own data only) --}}
+                    <a href="{{ route('student.dashboard') }}"
+                       @class(['is-active' => request()->routeIs('student.dashboard')])>
+                        {{ __('app.student_dashboard') }}
                     </a>
-                    <a href="{{ route('admin.pairing') }}"
-                       @class(['is-active' => request()->routeIs('admin.pairing')])>
-                        {{ __('app.pairing_desk') }}
+                    <a href="{{ route('student.history') }}"
+                       @class(['is-active' => request()->routeIs('student.history')])>
+                        {{ __('app.student_history') }}
+                    </a>
+                    <a href="{{ route('student.rewards') }}"
+                       @class(['is-active' => request()->routeIs('student.rewards')])>
+                        {{ __('app.student_rewards') }}
+                    </a>
+                @else
+                    @if(auth()->user()->isAdmin())
+                        <a href="{{ route('admin.dashboard') }}"
+                           @class(['is-active' => request()->routeIs('admin.dashboard')])>
+                            {{ __('app.admin_dashboard') }}
+                        </a>
+                        <a href="{{ route('admin.pairing') }}"
+                           @class(['is-active' => request()->routeIs('admin.pairing')])>
+                            {{ __('app.pairing_desk') }}
+                        </a>
+                    @endif
+                    <a href="{{ route('teacher.dashboard') }}"
+                       @class(['is-active' => request()->routeIs('teacher.dashboard') || request()->routeIs('dashboard')])>
+                        {{ __('app.teacher_dashboard') }}
                     </a>
                 @endif
-                <a href="{{ route('teacher.dashboard') }}"
-                   @class(['is-active' => request()->routeIs('teacher.dashboard') || request()->routeIs('dashboard')])>
-                    {{ __('app.teacher_dashboard') }}
-                </a>
             </nav>
         @endauth
 
@@ -84,11 +100,17 @@
                     </summary>
                     <div class="mobilenav-body">
                         <nav class="mobilenav-links" aria-label="{{ __('app.primary_nav') }}">
-                            @if(auth()->user()->isAdmin())
-                                <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
-                                <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
+                            @if(auth()->user()->isStudent())
+                                <a href="{{ route('student.dashboard') }}">{{ __('app.student_dashboard') }}</a>
+                                <a href="{{ route('student.history') }}">{{ __('app.student_history') }}</a>
+                                <a href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }}</a>
+                            @else
+                                @if(auth()->user()->isAdmin())
+                                    <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
+                                    <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
+                                @endif
+                                <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>
                             @endif
-                            <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>
                         </nav>
                         <form method="POST" action="{{ route('logout') }}" class="inline-form">
                             @csrf
@@ -114,7 +136,7 @@
 <footer class="footer">
     <div class="shell">
         <div class="footer-in">
-            <a class="wordmark" href="{{ auth()->check() ? route('dashboard') : route('login') }}">
+            <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}">
                 <span class="wordmark-tap" aria-hidden="true"></span>
                 <span class="wordmark-name">Presence<em>Platform</em></span>
             </a>

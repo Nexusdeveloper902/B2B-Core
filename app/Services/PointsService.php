@@ -5,8 +5,12 @@ namespace App\Services;
 use App\Enums\MaterialClass;
 use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
+use App\Models\RecyclingUpdate;
 use App\Models\Reward;
+use App\Models\RewardRedemption;
 use App\Models\Student;
+use App\Services\Realtime\RecyclingUpdateLog;
+use App\Services\Recycling\LeaderboardService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PointsService
 {
+    public function __construct(
+        private readonly LeaderboardService $leaderboard,
+    ) {}
+
     public function balance(Student $student): int
     {
         return (int) PointsLedger::where('student_id', $student->id)->sum('delta');
@@ -22,6 +30,7 @@ class PointsService
 
     /**
      * Award recycling points for a classified deposit (earn half of the loop).
+     * Called inside ClassificationService's award transaction — frames ride it.
      */
     public function awardRecyclingPoints(Student $student, PresenceEvent $event, MaterialClass $material): int
     {
@@ -42,12 +51,38 @@ class PointsService
     /**
      * Attempt to spend points on a reward (spend half of the loop).
      *
-     * @return array{ok: true, balance: int, ledger_id: int}
-     *                                                       | array{ok: false, balance: int, shortfall: int}
+     * TASK-025 item 7 (spec §19/§20): the spend transaction enforces the
+     * catalog rules — inactive rewards, limited stock (atomic decrement —
+     * the over-redemption guard), double-submit protection (a
+     * client-supplied request_id is TRUE idempotency: a replay returns
+     * the original answer, never a second charge; without one, a
+     * same-student+reward window heuristic applies) — and records the
+     * first-class reward_redemptions row plus the reward_redeemed /
+     * leaderboard_updated frames, all committed atomically.
+     *
+     * @return array{ok: true, replay: bool, balance: int, ledger_id: int, redemption_id: int}
+     *                                                                                         |array{ok: false, reason: 'insufficient'|'inactive'|'out_of_stock'|'duplicate', balance: int, shortfall?: int}
      */
-    public function spendOnReward(Student $student, Reward $reward): array
+    public function spendOnReward(Student $student, Reward $reward, ?string $requestId = null): array
     {
-        return DB::transaction(function () use ($student, $reward) {
+        // True idempotency FIRST — outside the write path: a replayed
+        // request_id must return the original answer without touching
+        // anything (the stock unit was already taken by that request).
+        if ($requestId !== null) {
+            $existing = RewardRedemption::where('request_id', $requestId)->first();
+
+            if ($existing !== null) {
+                return [
+                    'ok' => true,
+                    'replay' => true,
+                    'balance' => $this->balance($student),
+                    'ledger_id' => $existing->ledger_id,
+                    'redemption_id' => $existing->id,
+                ];
+            }
+        }
+
+        return DB::transaction(function () use ($student, $reward, $requestId) {
             // Re-read the balance inside the transaction to avoid a
             // double-spend race between two simultaneous desk redemptions.
             $balance = (int) PointsLedger::where('student_id', $student->id)
@@ -57,9 +92,52 @@ class PointsService
             if ($balance < $reward->point_cost) {
                 return [
                     'ok' => false,
+                    'reason' => 'insufficient',
                     'balance' => $balance,
                     'shortfall' => $reward->point_cost - $balance,
                 ];
+            }
+
+            if (! $reward->active) {
+                return ['ok' => false, 'reason' => 'inactive', 'balance' => $balance];
+            }
+
+            // Limited stock: the atomic decrement IS the guard — two
+            // concurrent redemption attempts cannot both take the last
+            // unit (only one UPDATE matches stock > 0).
+            if ($reward->stock !== null) {
+                $claimed = Reward::query()
+                    ->whereKey($reward->id)
+                    ->where('stock', '>', 0)
+                    ->decrement('stock');
+
+                if ($claimed === 0) {
+                    return ['ok' => false, 'reason' => 'out_of_stock', 'balance' => $balance];
+                }
+            }
+
+            // Double-submit protection (spec §20) — the FALLBACK guard:
+            // only for clients that send NO idempotency key. A
+            // request_id-bearing client already has exact protection;
+            // distinct keys are intentional repeat purchases, and the
+            // heuristic must never block those.
+            $window = max(0, (int) config('recycling.redemption.duplicate_window_seconds'));
+            if ($requestId === null && $window > 0) {
+                $recent = RewardRedemption::query()
+                    ->where('student_id', $student->id)
+                    ->where('reward_id', $reward->id)
+                    ->where('created_at', '>=', now()->subSeconds($window))
+                    ->exists();
+
+                if ($recent) {
+                    // Undo the stock decrement — no side effects on a
+                    // rejected duplicate.
+                    if ($reward->stock !== null) {
+                        Reward::query()->whereKey($reward->id)->increment('stock');
+                    }
+
+                    return ['ok' => false, 'reason' => 'duplicate', 'balance' => $balance];
+                }
             }
 
             $ledger = PointsLedger::create([
@@ -69,10 +147,34 @@ class PointsService
                 'reward_id' => $reward->id,
             ]);
 
+            $redemption = RewardRedemption::create([
+                'reward_id' => $reward->id,
+                'student_id' => $student->id,
+                'ledger_id' => $ledger->id,
+                'points_spent' => $reward->point_cost,
+                'request_id' => $requestId,
+            ]);
+
+            RecyclingUpdateLog::record(RecyclingUpdate::TYPE_REWARD_REDEEMED, [
+                'redemption_id' => $redemption->id,
+                'student_id' => $student->id,
+                'student_name' => $student->name,
+                'reward_id' => $reward->id,
+                'reward_name' => $reward->name,
+                'points_spent' => $reward->point_cost,
+                'new_balance' => $balance - $reward->point_cost,
+            ]);
+
+            RecyclingUpdateLog::record(RecyclingUpdate::TYPE_LEADERBOARD_UPDATED, [
+                'top' => $this->leaderboard->snapshot(),
+            ]);
+
             return [
                 'ok' => true,
+                'replay' => false,
                 'balance' => $balance - $reward->point_cost,
                 'ledger_id' => $ledger->id,
+                'redemption_id' => $redemption->id,
             ];
         });
     }
