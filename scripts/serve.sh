@@ -73,6 +73,8 @@ start_realtime() {
         >>"$B2B_ROOT/storage/logs/realtime.log" 2>&1 &
     WS_PID=$!
 
+    # i is the probe counter: the failure path below reports how many probes
+    # passed before giving up (10 = exhausted, <10 = the process died early).
     local i
     for i in 1 2 3 4 5 6 7 8 9 10; do
         port_open "$WS_PORT" && break
@@ -84,7 +86,7 @@ start_realtime() {
     fi
     kill "$WS_PID" 2>/dev/null || true
     WS_PID=""
-    warn "Realtime server did not come up — dashboards will show offline (see storage/logs/realtime.log) / El servidor en vivo no arrancó — el panel mostrará «Desconectado» (ver storage/logs/realtime.log)"
+    warn "Realtime server did not come up after ${i} probe(s) — dashboards will show offline (see storage/logs/realtime.log) / El servidor en vivo no arrancó tras ${i} intento(s) — el panel mostrará «Desconectado» (ver storage/logs/realtime.log)"
     return 1
 }
 
