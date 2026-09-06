@@ -84,3 +84,16 @@ B2B-Firmware TASK-008)
   B2B-Firmware TASK-008.
 - Vision-pipeline-to-backend bridge → ESP32-CAM-CV TASK-001.
 - IR sensor hardware (spec §2 explicitly postpones it).
+
+## Resolution (append 2026-09-07, RUN-2026-09-07-core-022)
+
+Status: COMPLETED — all 8 items implemented, verified, merged to main
+(commit daee0d7). Evidence: `./run ci` 3/3; 270 passed/1 skipped/4170
+assertions (31 new tests); e2e 33/33 (Fase H adds bottle-first,
+leaderboard, student login). Design decisions: ADR-031 (pending
+captures), ADR-032 (commit-only frames), ADR-033 (1:1 student
+accounts), ADR-034 (redemption idempotency), ADR-035 (ledger-derived
+leaderboard). The remaining spec halves were never backend work:
+firmware items ran as B2B-Firmware TASK-008 and ESP32-CAM-CV TASK-001
+the same date. Open limitation: live DeepSeek behavior of the extended
+prompt (is_bottle/is_recyclable) unverified until an owner-provided key.
