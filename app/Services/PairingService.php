@@ -112,12 +112,14 @@ class PairingService
             ] : null,
             'last_pairing' => $recent->isNotEmpty() ? [
                 'card_uid' => $recent->first()->card?->credential_uid,
+                'student_id' => $recent->first()->student_id,
                 'student_name' => $recent->first()->student?->name,
                 'paired_at' => $recent->first()->consumed_at?->toIso8601String(),
                 'reader_label' => $recent->first()->reader?->label,
             ] : null,
             'recent_pairings' => $recent->map(fn ($p) => [
                 'card_uid' => $p->card?->credential_uid,
+                'student_id' => $p->student_id,
                 'student_name' => $p->student?->name,
                 'paired_at' => $p->consumed_at?->toIso8601String(),
                 'reader_label' => $p->reader?->label,

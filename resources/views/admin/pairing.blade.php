@@ -26,7 +26,7 @@
                     <tr data-student-row="{{ $student->id }}">
                         <td data-label="{{ __('app.student') }}">{{ $student->name }}</td>
                         <td data-label="{{ __('app.class') }}">{{ $student->schoolClass?->name ?? '—' }}</td>
-                        <td data-label="{{ __('app.current_card') }}">
+                        <td data-label="{{ __('app.current_card') }}" data-card-cell="{{ $student->id }}">
                             @forelse($student->cards as $card)
                                 <code>{{ $card->credential_uid }}</code>
                             @empty
@@ -252,6 +252,29 @@
             });
         }
 
+        // TASK-023 — the student row's card cell follows backend truth:
+        // called ONLY from the backend-confirmed success branch below
+        // (WS pairing frame, hello reconcile, or status poll — all carry
+        // the same server payload), never from a client guess. textContent
+        // only, so a UID can never inject markup; already-shown UIDs are
+        // left alone so re-applied frames stay idempotent.
+        function renderStudentCard(last) {
+            if (!last || last.student_id === undefined || last.student_id === null || !last.card_uid) { return; }
+            var row = document.querySelector('tr[data-student-row="' + last.student_id + '"]');
+            if (!row) { return; }
+            var cell = row.querySelector('[data-card-cell]');
+            if (!cell) { return; }
+            var uid = String(last.card_uid);
+            var codes = cell.querySelectorAll('code');
+            for (var i = 0; i < codes.length; i++) {
+                if (codes[i].textContent === uid) { return; }
+            }
+            var code = document.createElement('code');
+            code.textContent = uid;
+            if (codes.length === 0) { cell.textContent = ''; cell.appendChild(code); }
+            else { cell.appendChild(document.createTextNode(' ')); cell.appendChild(code); }
+        }
+
         function setPollInterval(ms) {
             if (pollTimer) { clearInterval(pollTimer); }
             pollTimer = setInterval(poll, ms);
@@ -308,6 +331,7 @@
                     .replace(':UID:', last.card_uid)
                     .replace(':NAME:', last.student_name || ''), true);
                 renderRecent(data.recent_pairings);
+                renderStudentCard(last);
                 armed = false;
                 rejectionNote = null;
                 showCountdown(false);

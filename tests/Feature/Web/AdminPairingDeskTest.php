@@ -292,9 +292,28 @@ class AdminPairingDeskTest extends TestCase
         $this->assertMatchesRegularExpression('/\.live-panel \.answer-ok\s*{[^}]*var\(--data-tint\)/', $css);
         $this->assertMatchesRegularExpression('/\.live-panel \.answer-error\s*{[^}]*var\(--accent-tint\)/', $css);
         $this->assertMatchesRegularExpression('/\.live-panel \.countdown\s*{[^}]*margin: 0[^}]*border-radius: 0/', $css);
+        // the title shares the 18px live gutters (padding-0 panel) instead
+        // of sitting flush at the edges, and the window sub carries the
+        // mono uppercase label grammar instead of unstyled text
+        $this->assertMatchesRegularExpression('/\.live-panel \.panel-label\s*{[^}]*margin: 0[^}]*padding: 14px 18px 13px/', $css);
+        $this->assertMatchesRegularExpression('/\.live-panel-sub\s*{[^}]*text-transform: uppercase/', $css);
         // the idle note is a live-empty row, not a bare <p> at the edges
         $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
         $this->assertStringContainsString('class="live-empty" id="pairing-idle"', $html);
+    }
+
+    #[Test]
+    public function student_rows_expose_live_card_cells_for_backend_confirmed_updates(): void
+    {
+        // TASK-023 — the desk script updates the student row's card cell
+        // from the backend-confirmed pairing payload (WS frame or poll),
+        // so each row's card cell carries the marker the script targets.
+        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+
+        $student = Student::firstOrFail();
+        $this->assertStringContainsString('data-student-row="'.$student->id.'"', $html);
+        $this->assertStringContainsString('data-card-cell="'.$student->id.'"', $html);
+        $this->assertStringContainsString('function renderStudentCard(last)', $html);
     }
 
     private function admin(): User

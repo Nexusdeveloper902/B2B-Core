@@ -208,10 +208,12 @@ class PairingStatusTest extends TestCase
 
         $response->assertJsonPath('pending', null)
             ->assertJsonPath('last_pairing.card_uid', 'DESK00062041607')
+            ->assertJsonPath('last_pairing.student_id', $student->id)
             ->assertJsonPath('last_pairing.student_name', $student->name)
             ->assertJsonPath('last_pairing.reader_label', $reader->label)
             ->assertJsonCount(1, 'recent_pairings')
-            ->assertJsonPath('recent_pairings.0.card_uid', 'DESK00062041607');
+            ->assertJsonPath('recent_pairings.0.card_uid', 'DESK00062041607')
+            ->assertJsonPath('recent_pairings.0.student_id', $student->id);
     }
 
     #[Test]
