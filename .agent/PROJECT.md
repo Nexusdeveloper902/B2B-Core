@@ -810,3 +810,20 @@ The owner's eight HTML mockups are now the design source of truth:
   never create).
 - **Pending owner actions**: PAT to push + trigger CI; DEEPSEEK_API_KEY
   (still absent); pick gap-ledger items to turn into tasks.
+
+## TASK-026 delivery closed (2026-09-07, RUN-2026-09-07-core-024)
+
+- Owner supplied the push PAT in chat; main c0d8f98..c373de5 pushed
+  via per-command GIT_ASKPASS env var (never persisted; gitleaks green
+  on the pushed tree confirms).
+- Remote CI run 34068933013 on c373de5 = success (~4.5 min; live-LLM
+  smoke still skipped — no DEEPSEEK_API_KEY). The TASK-026 redesign,
+  functionality-preservation proof, and 35-item gap ledger are public.
+- New durable trap: shell prefix-assignment expansion order —
+  `TOKEN=x curl -H "...$TOKEN"` sends an EMPTY header (args expand
+  before prefix assignments land) → false "Bad credentials". Assign as
+  a separate statement, or hand the var to a child process (the
+  GIT_ASKPASS pattern).
+- Owner backlog unchanged: DEEPSEEK_API_KEY; gap-ledger item selection
+  (R1 / E1 / G1 flagged as the big three); camera-station hardware
+  bench (B2B-Firmware docs/CAMERA_STATION.md).
