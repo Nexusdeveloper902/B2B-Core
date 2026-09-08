@@ -25,3 +25,5 @@
   client-side, never raw ++; (3) `pagination::tailwind` resolves
   through resources/views/vendor/pagination/ (loadViewsFrom's
   prepend) — the override works without touching config.
+- **Remote CI**: run 34291829693 on 3de84fa SUCCESS (13/13 jobs;
+  live-LLM smoke skipped by design) — observed, loop closed.
