@@ -859,3 +859,28 @@ The owner's eight HTML mockups are now the design source of truth:
 - Pending owner actions: DEEPSEEK_API_KEY (live NL smoke still
   skipped); OBS-015 residual triage (rate limiting first); gap-ledger
   remainder (R1 / G1 flagged); camera-station hardware bench.
+
+## RUN-026 — CI observation closed, Windows flake fixed (2026-09-08)
+
+- RUN-025's last open item closed: fresh API poll found run #82 on
+  5870b07 (RUN-025's own docs commit) FAILED — Windows smoke, one
+  test (CardPairingTest happy path) off by exactly 1 s
+  (1788905697 vs 1788905698). Root cause: assertSame on a
+  now()-derived timestamp recomputed after response generation —
+  sub-second truncation makes any boundary crossing ±1 s. Slower
+  windows-latest runner lands the race. Fixed with
+  assertEqualsWithDelta(…, 1, …) — the TapEventTest tolerance
+  convention; ±1 s still fails loudly for any real window change.
+- Durable trap: NEVER assertSame a now()-derived timestamp against a
+  response generated milliseconds earlier — use ±1 s delta. (Sibling
+  of the e2e WS-timing flake guidance: single non-reproducing
+  failure = flake-suspect first.)
+- Durable trap #2: a "CI green" record is only about the commits it
+  OBSERVED — pushing a docs/record commit triggers a NEW run; verify
+  that run before calling delivery done (RUN-025's observation gap).
+- Suite after fix: 313/1 (counts identical to RUN-025; assertion
+  totals are environment-sensitive — Windows reports 2,981 on the
+  same tree — trust test counts, not assertion totals), `./run ci`
+  3/3, e2e 33/33, CardPairingTest ×3 green.
+- B2B-Firmware / ESP32-CAM-CV have no CI by design — nothing to
+  observe there; their local gates stand.
