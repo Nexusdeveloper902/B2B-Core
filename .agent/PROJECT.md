@@ -884,3 +884,28 @@ The owner's eight HTML mockups are now the design source of truth:
   3/3, e2e 33/33, CardPairingTest ×3 green.
 - B2B-Firmware / ESP32-CAM-CV have no CI by design — nothing to
   observe there; their local gates stand.
+
+### RUN-026 follow-up — the e2e flake was NOT timing (2026-09-08)
+
+- Run #83 (d10476a): Windows smoke GREEN (clock-boundary fix
+  verified on the real runner) but http-e2e failed ONE check —
+  the relabel-phase tap drew "Ana is not enrolled in the PAE
+  feeding program" (422, TASK-027 gate working as designed).
+- Root cause: e2e.sh `SELECT credential_uid FROM cards LIMIT 1` —
+  NO ORDER BY. EXPLAIN proves SQLite serves it from the
+  credential_uid COVERING UNIQUE INDEX → index order → the
+  alphabetically-first RANDOM seed UID → card owner is a per-run
+  ~1-in-4 dice roll over demo students (reproduced locally: 12
+  reseeds drew 4 different owners incl. Ana). The check predates
+  the PAE gate; the gate changed the validity contract and the
+  selection never caught up.
+- Fix: single ordered PAE-filtered query (`ORDER BY c.id`,
+  `WHERE s.pae_enrolled = 1`) — also collapses two separate
+  unordered LIMIT 1s (CARD_UID/STUDENT_ID could disagree; the
+  redemption phase spends the points the card earns) into one
+  coherent pick.
+- Durable trap: any fixture-selection query over random-keyed rows
+  MUST be ORDER BY-deterministic and semantically valid for every
+  consumer phase — unordered LIMIT 1 is planner-dependent, and
+  "lucky locals" hide it until a CI runner rolls different dice.
+  Proven deterministic: 12/12 reseeds draw Maria González.
