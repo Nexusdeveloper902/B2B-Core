@@ -24,3 +24,5 @@
 - **Secrets hygiene**: PAT only via per-command credential helper
   (store-file outside the repos); gitleaks green on prior pushed
   runs; nothing persisted this run.
+- **Remote CI**: run 34288218249 on e6869ad SUCCESS (13/13 jobs;
+  live-LLM smoke skipped by design) — observed, loop closed.
