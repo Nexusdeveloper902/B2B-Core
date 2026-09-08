@@ -3,10 +3,12 @@
     search, live status panel with NFC pulse art + draining countdown,
     recently-paired ledger. The ENTIRE realtime/poll/arm script below is
     the TASK-020/023/024 machine, byte-identical in behavior — only the
-    markup around it changed. Mockup-only parts are documented as gaps
-    (docs/FRONTEND.md): "reassignment/replace card" row actions, status
-    state reference matrix, reader terminal telemetry, cryptographic
-    footer (gaps #D1-D4).
+    markup around it changed. TASK-027 — each paired card in the roster
+    gains its own Unpair button (gap D1's web half, on top of the
+    DELETE /api/v1/admin/cards/{card} endpoint). Remaining mockup-only
+    parts are documented as gaps (docs/FRONTEND.md): status state
+    reference matrix, reader terminal telemetry, cryptographic footer
+    (gaps #D2-D4).
 --}}
 @extends('layouts.app')
 
@@ -46,7 +48,20 @@
                         <td data-label="{{ __('app.class') }}">{{ $student->schoolClass?->name ?? '—' }}</td>
                         <td data-label="{{ __('app.current_card') }}" data-card-cell="{{ $student->id }}">
                             @forelse($student->cards as $card)
-                                <code>{{ $card->credential_uid }}</code>
+                                {{-- TASK-027 — the per-card unpair surface: one
+                                      chip per credential, each with its own
+                                      server-backed Unpair action (D1). --}}
+                                <span class="card-chip" data-card-chip="{{ $card->id }}">
+                                    <code>{{ $card->credential_uid }}</code>
+                                    <button type="button" class="btn btn-quiet btn-small unpair-btn"
+                                            data-unpair="{{ $card->id }}"
+                                            data-uid="{{ $card->credential_uid }}"
+                                            data-name="{{ $student->name }}"
+                                            data-student="{{ $student->id }}"
+                                            aria-label="{{ __('app.unpair') }} {{ $card->credential_uid }}">
+                                        {{ __('app.unpair') }}
+                                    </button>
+                                </span>
                             @empty
                                 <span class="muted">{{ __('app.no_card') }}</span>
                             @endforelse
@@ -179,6 +194,14 @@
         var secondsLeft = parseInt(stateBox.dataset.secondsLeft || '0', 10);
         var armBtns = Array.prototype.slice.call(document.querySelectorAll('.arm-btn'));
 
+        // TASK-027 — per-card unpair (gap D1, GUI half): each card chip in
+        // the roster carries an Unpair button backed by DELETE
+        // /api/v1/admin/cards/{card}. The confirm copy and the empty-cell
+        // text come from the same lang files the server renders with.
+        var unpairBtns = Array.prototype.slice.call(document.querySelectorAll('.unpair-btn'));
+        var UNPAIRED_TEXT = {!! json_encode(__('app.unpaired')) !!};
+        var NO_CARD_TEXT = {!! json_encode(__('app.no_card')) !!};
+
         // TASK-017 — the armed window as a draining progress bar.
         var countdown = document.getElementById('pairing-countdown');
         var countdownFill = countdown ? countdown.querySelector('.countdown-fill') : null;
@@ -233,6 +256,23 @@
             return fetch(url, {
                 credentials: 'same-origin',
                 headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': csrf}
+            }).then(function (r) {
+                return r.json().then(function (data) {
+                    return {ok: r.ok, status: r.status, data: data};
+                });
+            });
+        }
+
+        // TASK-027 — same-origin, session-authed DELETE with the CSRF
+        // header (mirrors postJson's contract for the destructive verb).
+        function deleteJson(url) {
+            return fetch(url, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrf
+                }
             }).then(function (r) {
                 return r.json().then(function (data) {
                     return {ok: r.ok, status: r.status, data: data};
@@ -435,6 +475,43 @@
                 });
             });
         }
+
+        // TASK-027 — per-card unpair buttons (gap D1). Confirm first (the
+        // action deletes the card's tap history — the copy says so), then
+        // DELETE and repaint ONLY from the confirmed server answer: the
+        // chip leaves the cell, the roster truth stays server-driven
+        // (textContent everywhere — a UID can never inject markup).
+        unpairBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var confirmTpl = {!! json_encode(__('app.unpair_confirm', ['uid' => ':UID:', 'student' => ':NAME:'])) !!};
+                var really = window.confirm(
+                    confirmTpl.replace(':UID:', btn.dataset.uid || '').replace(':NAME:', btn.dataset.name || '')
+                );
+                if (!really) { return; }
+
+                btn.disabled = true;
+                deleteJson('/api/v1/admin/cards/' + btn.dataset.unpair)
+                    .then(function (r) {
+                        btn.disabled = false;
+                        if (r.ok) {
+                            var row = document.querySelector('tr[data-student-row="' + btn.dataset.student + '"]');
+                            var chip = row ? row.querySelector('[data-card-chip="' + btn.dataset.unpair + '"]') : null;
+                            if (chip) { chip.remove(); }
+                            var cell = row ? row.querySelector('[data-card-cell]') : null;
+                            if (cell && !cell.querySelector('[data-card-chip]')) {
+                                cell.textContent = NO_CARD_TEXT;
+                            }
+                            setState(UNPAIRED_TEXT, true);
+                        } else {
+                            setState((r.data && r.data.message) || {!! json_encode(__('app.error_generic')) !!}, false);
+                        }
+                    })
+                    .catch(function () {
+                        btn.disabled = false;
+                        setState({!! json_encode(__('app.error_generic')) !!}, false);
+                    });
+            });
+        });
 
         // Start following immediately: ACTIVE when a window is live (page
         // load / F5 mid-window — the rejection note comes with it), else

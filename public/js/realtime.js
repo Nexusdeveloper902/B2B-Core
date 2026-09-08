@@ -93,7 +93,10 @@
         var chip = document.createElement('span');
         chip.className = 'live-chip';
         chip.setAttribute('data-event-type', ev.type || '');
-        chip.textContent = ev.type || '';
+        // TASK-027 — i18n: the raw enum value stays in data-event-type (the
+        // CSS tone mapping depends on it); the visible label is localized
+        // via the server-rendered strings map, falling back to the raw type.
+        chip.textContent = (strings.event_types && strings.event_types[ev.type]) || ev.type || '';
 
         var time = document.createElement('span');
         time.className = 'live-time';
@@ -179,6 +182,18 @@
         } catch (e) { /* older browsers: the poll fallback still updates the desk */ }
     }
 
+    // TASK-027 — the recycling channel's hook: every committed state
+    // change (capture created, validated, points awarded, reward
+    // redeemed, leaderboard) leaves as a `realtime:recycling` CustomEvent
+    // carrying {id, type, payload, at} — the EcoStation page and the
+    // student balance desk own what it means there.
+    function dispatchRecyclingUpdate(update) {
+        if (!update) { return; }
+        try {
+            document.dispatchEvent(new CustomEvent('realtime:recycling', { detail: update }));
+        } catch (e) { /* older browsers: SSR rows remain the truth */ }
+    }
+
     function mintToken() {
         return fetch('/realtime/token', {
             credentials: 'same-origin',
@@ -227,6 +242,8 @@
                 refreshPageState(data.event);
             } else if (data.type === 'pairing') {
                 refreshPairingState(data);
+            } else if (data.type === 'recycling' && data.update) {
+                dispatchRecyclingUpdate(data.update);
             }
         };
 

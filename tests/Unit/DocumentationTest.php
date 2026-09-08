@@ -39,6 +39,23 @@ class DocumentationTest extends TestCase
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");
         }
+
+        // TASK-027 — the admin management surface must stay documented in
+        // BOTH languages (readers settings, students + CSV import, the
+        // per-card unpair, the capture-image door, the PAE gate).
+        foreach ([
+            'PUT /api/v1/admin/readers/{id}',
+            'POST /api/v1/admin/students/import',
+            'DELETE /api/v1/admin/cards/{id}',
+            'GET /api/v1/admin/captures/{deposit}/image',
+            'student_not_pae',
+            'get_repeatedly_absent_students',
+            'get_student_time_in_school',
+            'markdown.js',
+        ] as $needle) {
+            $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
+            $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");
+        }
     }
 
     #[Test]

@@ -58,6 +58,23 @@
     <span class="t-label-sm muted" style="text-transform:uppercase;">{{ __('app.today_attendance') }}</span>
 </div>
 
+{{-- TASK-027 — the teacher's own NL query desk: same endpoint as the
+      admin box, but every function execution is fenced server-side to
+      THIS teacher's classes (StudentScope — never a prompt-side promise).
+      Answers render light Markdown via markdown.js (escaped-first). --}}
+@if(isset($nlQueryConfigured) && $nlQueryConfigured)
+    <x-panel :label="__('app.nl_query')" rule>
+        <p class="panel-sub">{{ __('app.nl_query_teacher_hint') }}</p>
+        <form id="nl-query-form" class="tool-form">
+            <input type="text" class="bare-input" id="nl-question"
+                   placeholder="{{ __('app.nl_query_placeholder') }}" autocomplete="off"
+                   aria-label="{{ __('app.nl_query') }}">
+            <button type="submit" class="btn btn-primary">{{ __('app.ask') }}</button>
+        </form>
+        <div id="nl-answer" class="nl-answer hidden" aria-live="polite"></div>
+    </x-panel>
+@endif
+
 <div class="stack" data-reveal data-cutoff="{{ $cutoff }}"
      data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}">
     @if($classes->isEmpty())
@@ -123,6 +140,7 @@
 </div>
 
 <script src="{{ asset('js/realtime.js') }}"></script>
+<script src="{{ asset('js/markdown.js') }}"></script>
 <script>
     (function () {
         // TASK-026 — client-side student search across the class ledgers
@@ -133,6 +151,51 @@
                 var q = search.value.trim().toLowerCase();
                 document.querySelectorAll('tr[data-student-row]').forEach(function (row) {
                     row.hidden = q !== '' && (row.dataset.search || '').indexOf(q) === -1;
+                });
+            });
+        }
+
+        // TASK-027 — the teacher's NL query box (same wire as the admin
+        // box; the server fences every function to this teacher's classes).
+        var nlForm = document.getElementById('nl-query-form');
+        if (nlForm) {
+            var csrf = document.querySelector('meta[name="csrf-token"]').content;
+            nlForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var question = document.getElementById('nl-question').value.trim();
+                if (!question) return;
+                var btn = nlForm.querySelector('button');
+                var box = document.getElementById('nl-answer');
+                btn.disabled = true;
+                btn.classList.add('is-loading');
+                box.classList.remove('hidden');
+                box.className = 'nl-answer';
+                box.textContent = '{{ __('app.nl_query_processing') }}';
+                fetch('/api/v1/nl-query', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf
+                    },
+                    body: JSON.stringify({question: question})
+                }).then(function (r) {
+                    return r.json().then(function (data) { return {ok: r.ok, data: data}; });
+                }).then(function (r) {
+                    btn.disabled = false;
+                    btn.classList.remove('is-loading');
+                    box.classList.remove('hidden');
+                    box.className = 'nl-answer ' + (r.ok ? 'answer-ok' : 'answer-error');
+                    var text = (r.data && (r.data.answer || r.data.message)) || '{{ __('app.error_generic') }}';
+                    if (r.ok && window.renderMarkdown) {
+                        box.innerHTML = window.renderMarkdown(text);
+                    } else {
+                        box.textContent = text;
+                    }
+                }).catch(function () {
+                    btn.disabled = false;
+                    btn.classList.remove('is-loading');
                 });
             });
         }

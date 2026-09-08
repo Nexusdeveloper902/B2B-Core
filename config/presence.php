@@ -28,6 +28,9 @@ return [
         'PAE_LUNCH',
         'RECYCLING_DEPOSIT',
         'ENTRY',
+        // TASK-027 — the exit half of the entry/exit pair (time-in-school
+        // derivations pair ENTRY with the following EXIT per day).
+        'EXIT',
     ],
 
     /*

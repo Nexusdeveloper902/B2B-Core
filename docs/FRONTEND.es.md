@@ -49,11 +49,13 @@ barra de cuenta regresiva, tarjeta de login, chips demo, estados vacíos.
 | EcoStation & Recycling Hub | `/admin/ecostation` **(nueva)** | `admin/ecostation` |
 | Rewards & Perks Store | `/student/rewards` | `student/rewards` |
 | Leaderboard & Class Standings | `/student/leaderboard` **(nueva)** | `student/leaderboard` |
+| Estudiantes — escritorio de inscripción | `/admin/students` **(nueva, TASK-027)** | `admin/students` |
+| Lectores — escritorio de gestión | `/admin/readers` **(nueva, TASK-027)** | `admin/readers` |
 
-Las dos páginas **nuevas** son vistas de solo lectura sobre datos que ya
-existían (ver §4). El nav sigue con alcance por rol exactamente igual —
-los estudiantes ven el hub estudiantil (ahora 4 items), el personal ve
-sus páginas.
+Las dos páginas de TASK-026 y los dos escritorios de TASK-027 son vistas
+sobre datos que ya existían más nuevos endpoints admin de escritura
+(ver §4). El nav sigue con alcance por rol exactamente igual — los
+estudiantes ven el hub estudiantil, el personal ve sus páginas.
 
 ## 3. Qué se añadió deliberadamente (datos reales, sin backend nuevo)
 
@@ -129,21 +131,22 @@ de maqueta pueda publicarse con verdad.
 
 ### Escritorio de emparejamiento
 
-| # | Elemento | Por qué no está | Necesita |
-|---|---|---|---|
-| D1 | Acciones por fila "reassignment / replace card" | Desemparejar es un CLI del servidor (`./run unpair`) por diseño | Un endpoint web de unpair |
+| # | Elemento | Estado |
+|---|---|---|
+| D1 | Acciones por fila "reassignment / replace card" | **CERRADO (TASK-027)** — cada credencial emparejada del roster es un chip con su propio botón **Desvincular**, respaldado por `DELETE /api/v1/admin/cards/{card}` (semánticas del comando masivo `cards:unpair`; el diálogo de confirmación avisa que el historial de toques se borra) |
 | D2 | Matriz de referencia de estados | Los estados reales ya renderizan en vivo | — |
 | D3 | Telemetría del terminal + estado de firmware | No hay reporte de firmware | Endpoint de estado de dispositivo + frame WS |
 | D4 | Pie cripto del ledger | Ver G6 | — |
 
 ### EcoStation
 
-| # | Elemento | Por qué no está | Necesita |
-|---|---|---|---|
-| E1 | Despliegue de imágenes de captura | Las imágenes viven en disco **privado** como artefactos de auditoría (spec §14) — mostrarlas requiere una ruta autorizada (pueden contener estudiantes) | Ruta de streaming autenticada para `recycling-captures/*`; la tarjeta muestra la metadata REAL (material, confianza, booleanos de frontera) con la nota honesta |
+| # | Elemento | Estado |
+|---|---|---|
+| E1 | Despliegue de imágenes de captura | **CERRADO (TASK-027)** — la imagen REAL se transmite por la ruta admin `GET /api/v1/admin/captures/{deposit}/image` (el disco privado sigue privado); un depósito sin imagen mantiene la nota honesta de almacenamiento privado |
 | E2 | Telemetría / snippet de firmware / caja de cumplimiento | No hay reporte de hardware | Ver D3 |
 | E3 | Modal de simulación de terminal | Herramienta de demo, no feature | — |
 | E4 | "Directivas" de material por lector | Las tarifas son config global hoy (renderizadas con verdad) | Overrides por lector (cambio de schema) |
+| E5 | Actualizaciones en vivo (sin recargar) | **CERRADO (TASK-027)** — el hub arranca `[data-realtime]` (badge en vivo + CustomEvents `realtime:recycling`): las filas del libro se anteponen, las métricas de impacto suben, el panel de última captura se refresca |
 
 ### Login
 

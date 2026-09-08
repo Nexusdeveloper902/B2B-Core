@@ -226,4 +226,73 @@ return [
     'ecostation_capture_private' => 'Imagen resguardada en almacenamiento privado',
     'ecostation_capture_meta' => 'Estudiante: :student · botella: :bottle · reciclable: :recyclable',
     'ecostation_capture_none' => 'Aún no hay imágenes de captura.',
+
+    /* TASK-027 — ronda 2 del backlog del dueño (etiquetas i18n + nuevos escritorios) */
+    // Etiquetas de tipos de evento / lector / material (los valores crudos
+    // del enum dejan de filtrarse a la UI en cada idioma)
+    'event_type_CLASS_ATTENDANCE' => 'Asistencia a clase',
+    'event_type_PAE_BREAKFAST' => 'Desayuno PAE',
+    'event_type_PAE_LUNCH' => 'Almuerzo PAE',
+    'event_type_RECYCLING_DEPOSIT' => 'Depósito de reciclaje',
+    'event_type_ENTRY' => 'Entrada',
+    'event_type_EXIT' => 'Salida',
+    'reader_type_classroom' => 'Aula',
+    'reader_type_pae' => 'Programa alimentario',
+    'reader_type_recycling' => 'Reciclaje',
+    'reader_type_entry' => 'Puerta de entrada',
+    'material_plastic' => 'Plástico',
+    'material_paper' => 'Papel',
+    'material_metal' => 'Metal',
+    'material_glass' => 'Vidrio',
+    'material_other' => 'Otro',
+    'card_status_active' => 'Activa',
+    'card_status_lost' => 'Perdida',
+    'card_status_revoked' => 'Revocada',
+
+    // Escritorio de gestión de lectores (/admin/readers)
+    'readers_page' => 'Lectores',
+    'readers_page_sub' => 'Gestión de lectores — renombra un lector o cambia su modo activo.',
+    'reader_name' => 'Nombre del lector',
+    'save_reader' => 'Guardar',
+    'reader_updated' => 'Lector actualizado.',
+    'no_readers' => 'Aún no hay lectores registrados.',
+
+    // Escritorio de gestión de estudiantes (/admin/students)
+    'students_page' => 'Estudiantes',
+    'students_page_sub' => 'Matricula estudiantes uno a uno o importa un roster CSV — sin consola de base de datos.',
+    'create_student' => 'Crear estudiante',
+    'student_name' => 'Nombre',
+    'student_grade' => 'Grado',
+    'student_class' => 'Clase',
+    'student_pae' => 'Matriculado en PAE',
+    'search' => 'Buscar',
+    'clear' => 'Limpiar',
+    'import_students' => 'Importar roster CSV',
+    'import_students_hint' => 'Encabezado: name, grade, class, pae_enrolled (yes/no). Hasta 500 filas; las fallas se reportan por fila.',
+    'choose_file' => 'Elegir archivo CSV',
+    'import_file' => 'Importar',
+    'import_result' => 'Resultado de la importación',
+    'created_count' => ':n creados',
+    'failed_count' => ':n fallidas',
+    'card' => 'Tarjeta',
+    'pair_card_hint' => 'Vincula una tarjeta desde el escritorio de emparejamiento.',
+    'no_students_found' => 'Ningún estudiante coincide.',
+    'created' => 'Creado',
+
+    // Desvinculación por tarjeta (escritorio de emparejamiento)
+    'unpair' => 'Desvincular',
+    'unpair_confirm' => '¿Desvincular la tarjeta :uid de :student? El historial de toques de esta tarjeta se borra y la tarjeta vuelve a ser vinculable.',
+    'unpaired' => 'Tarjeta desvinculada — la credencial vuelve a estar fresca.',
+
+    // Consulta en lenguaje natural (superficie docente + respuestas markdown)
+    'nl_query_teacher_hint' => 'Las respuestas se limitan a las clases que dictas.',
+    'nl_query_processing' => 'Pensando…',
+
+    // Sesiones entrada/salida (línea de tiempo de padres)
+    'time_in_school' => 'Tiempo en el colegio',
+    'entries' => 'Entradas',
+    'exits' => 'Salidas',
+    'open_session' => 'Todavía dentro',
+    'session_minutes' => ':n min en el colegio',
+    'no_sessions' => 'Aún no hay toques de entrada/salida para este estudiante.',
 ];

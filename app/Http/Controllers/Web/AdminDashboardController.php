@@ -45,13 +45,12 @@ class AdminDashboardController extends Controller
      * TASK-026 — the EcoStation hub (mockup "EcoStation & Recycling
      * Hub"). READ-ONLY view over existing data: the deposit ledger (with
      * per-event reader + student via the event spine), the config-driven
-     * material rate table, and the recycling readers. No new endpoints,
-     * no writes. Mockup parts with no backing data are omitted and
-     * documented in docs/FRONTEND.md: terminal telemetry, hardware
-     * firmware status, compliance box, interactive terminal simulation,
-     * cryptographic footers, capture image display (the images are
-     * private-disk audit artifacts — showing them needs an authorized
-     * image route; gap #E1).
+     * material rate table, and the recycling readers.
+     *
+     * TASK-027 — the hub is LIVE now: the page boots the realtime client
+     * (recycling frames prepend ledger rows and bump the metrics without
+     * a reload), and the latest capture displays the REAL image through
+     * the admin-authed streaming route (gap #E1 closed).
      */
     public function ecostation(): View
     {
@@ -82,6 +81,8 @@ class AdminDashboardController extends Controller
                 ->latest('id')
                 ->with(['event.reader', 'event.card.student'])
                 ->first(),
+            'realtimeToken' => RealtimeToken::issue((int) auth()->id()),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\RecyclingDeposit;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\NlQuery\DeepSeekClient;
 use App\Services\Realtime\RealtimeToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -106,6 +107,33 @@ class DashboardTest extends TestCase
             ->get('/admin')
             ->assertOk()
             ->assertSeeText('DEEPSEEK_API_KEY');
+    }
+
+    #[Test]
+    public function the_teacher_dashboard_gets_its_own_nl_query_desk(): void
+    {
+        // TASK-027 — the teacher's questions ride the SAME endpoint as the
+        // admin box, with the scope fence applied server-side; the desk
+        // renders only when the LLM credential exists (same honesty rule).
+        config(['recycling.nl_query.api_key' => 'test-key']);
+
+        $response = $this->actingAs($this->user('teacher'))->get('/teacher');
+
+        $response->assertOk()
+            ->assertSee(__('app.nl_query'))
+            ->assertSee(__('app.nl_query_teacher_hint'))
+            ->assertSee(__('app.ask'))
+            ->assertSee('/api/v1/nl-query')
+            ->assertSee('js/markdown.js');   // answers render light Markdown
+
+        // Without the credential the box stays hidden (no dead form).
+        config(['recycling.nl_query.api_key' => null]);
+        $this->app->forgetInstance(DeepSeekClient::class);
+
+        $this->actingAs($this->user('teacher'))
+            ->get('/teacher')
+            ->assertOk()
+            ->assertDontSeeText(__('app.nl_query_teacher_hint'));
     }
 
     #[Test]

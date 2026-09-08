@@ -736,6 +736,11 @@ img { max-width: 100%; }
 .ledger-table tbody td.num { font-variant-numeric: tabular-nums; }
 .ledger-table code { background: var(--surface-container); color: var(--primary); font-weight: 600; }
 
+/* TASK-027 — one chip per paired credential in the pairing roster:
+   the UID code + its quiet Unpair button, wrapping on narrow desks. */
+.card-chip { display: inline-flex; align-items: center; gap: var(--sp-2xs); flex-wrap: nowrap; margin-right: var(--sp-xs); }
+.card-chip .btn-small { min-height: 24px; padding: 2px var(--sp-xs); }
+
 .student-cell { display: inline-flex; align-items: baseline; gap: var(--sp-sm); flex-wrap: wrap; }
 .tiny-link {
     font: 600 10px/1.4 var(--font-label);

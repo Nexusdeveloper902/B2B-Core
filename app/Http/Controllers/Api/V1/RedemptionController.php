@@ -7,6 +7,7 @@ use App\Http\Requests\RedeemRequest;
 use App\Models\Reward;
 use App\Models\Student;
 use App\Services\PointsService;
+use App\Services\StudentScope;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -18,6 +19,9 @@ use Illuminate\Http\JsonResponse;
  * TASK-025 item 7: rejections are now reason-shaped — insufficient /
  * inactive / out_of_stock / duplicate — and every success records a
  * first-class reward_redemptions row (see PointsService::spendOnReward).
+ *
+ * TASK-027 — the data wall: teachers may only redeem for students in
+ * the classes they teach (admins stay school-wide).
  */
 class RedemptionController extends Controller
 {
@@ -27,6 +31,9 @@ class RedemptionController extends Controller
 
     public function store(RedeemRequest $request, Student $student): JsonResponse
     {
+        $scope = StudentScope::forUser($request->user());
+        abort_unless($scope->allowsStudent($student), 403, __('api.forbidden_role'));
+
         $reward = Reward::findOrFail($request->validated('reward_id'));
 
         $result = $this->points->spendOnReward($student, $reward, $request->validated('request_id'));

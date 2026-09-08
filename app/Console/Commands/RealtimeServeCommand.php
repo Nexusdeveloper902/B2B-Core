@@ -57,7 +57,7 @@ class RealtimeServeCommand extends Command
 
     private const SELECT_TIMEOUT_MICRO = 250000; // 250 ms — caps event latency even when idle
 
-    /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool}> keyed by (int) socket */
+    /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null}> keyed by (int) socket */
     private array $clients = [];
 
     private int $lastEventId = 0;
@@ -142,7 +142,19 @@ class RealtimeServeCommand extends Command
             return;
         }
         stream_set_blocking($new, false);
-        $this->clients[(int) $new] = ['sock' => $new, 'buf' => '', 'handshook' => false, 'admin' => false];
+        $this->clients[(int) $new] = [
+            'sock' => $new,
+            'buf' => '',
+            'handshook' => false,
+            'admin' => false,
+            // TASK-027 — per-connection tap-channel scope, resolved once
+            // at handshake (fail closed). Teachers see only taps of
+            // students in their classes; student accounts see only their
+            // own taps; admins see the whole school.
+            'role' => '',
+            'class_ids' => null,
+            'student_id' => null,
+        ];
     }
 
     private function read($socket): void
@@ -226,7 +238,14 @@ class RealtimeServeCommand extends Command
         // deliberately never do. So pairing frames are delivered to
         // ADMIN connections only: resolve the role ONCE per connection
         // (the token is a user id, not a session), fail closed.
-        $this->clients[$clientId]['admin'] = $this->isAdmin((int) $userId);
+        //
+        // TASK-027 — the same lookup also resolves the tap-channel scope
+        // (teacher class ids / student account id) for this connection.
+        $scope = $this->resolveScope((int) $userId);
+        $this->clients[$clientId]['admin'] = $scope['admin'];
+        $this->clients[$clientId]['role'] = $scope['role'];
+        $this->clients[$clientId]['class_ids'] = $scope['class_ids'];
+        $this->clients[$clientId]['student_id'] = $scope['student_id'];
 
         $accept = Handshake::acceptKey($request['headers']['sec-websocket-key']);
         @fwrite($socket, Handshake::successResponse($accept));
@@ -237,7 +256,13 @@ class RealtimeServeCommand extends Command
         $hello = [
             'type' => 'hello',
             'last_id' => $this->lastEventId,
-            'events' => $this->feed->recent((int) config('realtime.history_limit')),
+            // TASK-027 — the hello snapshot honors the same per-connection
+            // scope as live tap frames (a teacher's history is their own
+            // classes' history, not the school's).
+            'events' => \array_values(\array_filter(
+                $this->feed->recent((int) config('realtime.history_limit')),
+                fn (array $row): bool => $this->clientSeesRow($this->clients[$clientId], $row),
+            )),
             // TASK-025 — the recycling channel's initial snapshot rides the
             // same hello (student names + points, same exposure level as
             // tap frames — no card UIDs, so every role may receive it).
@@ -253,7 +278,7 @@ class RealtimeServeCommand extends Command
         $this->sendJson($socket, $hello);
     }
 
-    /** One role lookup per connection; false on any doubt (fail closed). */
+    /** One role/scope lookup per connection; fail closed on any doubt. */
     private function isAdmin(int $userId): bool
     {
         try {
@@ -261,6 +286,68 @@ class RealtimeServeCommand extends Command
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * TASK-027 — resolve the tap-channel scope for one connection.
+     *
+     * @return array{admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null}
+     */
+    private function resolveScope(int $userId): array
+    {
+        $scope = ['admin' => false, 'role' => '', 'class_ids' => null, 'student_id' => null];
+
+        try {
+            $user = DB::table('users')->where('id', $userId)->first(['id', 'role', 'student_id']);
+        } catch (\Throwable) {
+            return $scope; // fail closed — an unreadable user serves nothing
+        }
+
+        if ($user === null) {
+            return $scope;
+        }
+
+        $scope['role'] = (string) $user->role;
+
+        if ($user->role === UserRole::Admin->value) {
+            $scope['admin'] = true;
+
+            return $scope; // school-wide
+        }
+
+        if ($user->role === UserRole::Student->value) {
+            $scope['student_id'] = $user->student_id !== null ? (int) $user->student_id : null;
+
+            return $scope;
+        }
+
+        if ($user->role === UserRole::Teacher->value) {
+            try {
+                $scope['class_ids'] = DB::table('classes')
+                    ->where('teacher_user_id', $userId)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+            } catch (\Throwable) {
+                $scope['class_ids'] = []; // fail closed — no classes resolvable
+            }
+        }
+
+        return $scope;
+    }
+
+    /** TASK-027 — does this connection's scope cover this feed row? */
+    private function clientSeesRow(array $client, array $row): bool
+    {
+        if ($client['student_id'] !== null) {
+            return (int) $row['student_id'] === (int) $client['student_id'];
+        }
+
+        if ($client['class_ids'] !== null) {
+            return $row['class_id'] !== null && in_array((int) $row['class_id'], $client['class_ids'], true);
+        }
+
+        return true; // admin / unrestricted
     }
 
     /**
@@ -304,7 +391,10 @@ class RealtimeServeCommand extends Command
             $this->lastEventId = $row['id'];
             $frame = WsFrame::encode(json_encode(['type' => 'tap', 'event' => $row], JSON_UNESCAPED_UNICODE));
             foreach ($this->clients as $clientId => $client) {
-                if ($client['handshook']) {
+                // TASK-027 — the tap channel honors the per-connection
+                // scope resolved at handshake: teachers get only their
+                // classes' taps, student accounts only their own.
+                if ($client['handshook'] && $this->clientSeesRow($client, $row)) {
                     $this->write($clientId, $frame);
                 }
             }
@@ -343,8 +433,9 @@ class RealtimeServeCommand extends Command
         // TASK-025 — the recycling channel: same poll beat, same rule as
         // the tap feed — rows newer than the head, oldest first, to
         // every authenticated connection (payloads carry student names
-        // and points — the same exposure level as tap frames; no card
-        // UIDs). Reads ONLY: the writers were the transactions.
+        // and points — the same exposure level as the deliberately
+        // school-wide recycling leaderboard, spec §22; no card UIDs).
+        // Reads ONLY: the writers were the transactions.
         try {
             $updates = $this->recycling->updatesAfter($this->lastRecyclingId);
         } catch (QueryException) {

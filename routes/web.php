@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Web\AdminDashboardController;
 use App\Http\Controllers\Web\AdminPairingController;
+use App\Http\Controllers\Web\AdminReadersController;
+use App\Http\Controllers\Web\AdminStudentsController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\ParentViewController;
 use App\Http\Controllers\Web\RealtimeTokenController;
@@ -65,6 +67,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/ecostation', [AdminDashboardController::class, 'ecostation'])
         ->middleware('role:admin')
         ->name('admin.ecostation');
+
+    // TASK-027 — the student management desk: roster + single creation
+    // + CSV bulk import (admin-only; writes go through the admin API).
+    Route::get('/admin/students', [AdminStudentsController::class, 'page'])
+        ->middleware('role:admin')
+        ->name('admin.students');
+
+    // TASK-027 — the reader management desk: rename + switch mode
+    // (admin-only; the write goes through the admin settings API).
+    Route::get('/admin/readers', [AdminReadersController::class, 'page'])
+        ->middleware('role:admin')
+        ->name('admin.readers');
 
     // TASK-025 item 5 — student self-service (spec §11/§12/§30): own
     // points, history, rewards. The student row always resolves from

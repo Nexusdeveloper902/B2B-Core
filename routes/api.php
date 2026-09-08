@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\V1\ArmPairingController;
+use App\Http\Controllers\Api\V1\CaptureImageController;
 use App\Http\Controllers\Api\V1\CardPairingController;
+use App\Http\Controllers\Api\V1\CardUnpairController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\NlQueryController;
 use App\Http\Controllers\Api\V1\PairingStatusController;
 use App\Http\Controllers\Api\V1\ReaderModeController;
+use App\Http\Controllers\Api\V1\ReaderSettingsController;
 use App\Http\Controllers\Api\V1\RecyclingCaptureController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
 use App\Http\Controllers\Api\V1\RedemptionController;
+use App\Http\Controllers\Api\V1\StudentController;
 use App\Http\Controllers\Api\V1\TapEventController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -70,6 +74,38 @@ Route::prefix('v1')->group(function () {
     Route::post('/admin/readers/{reader}/mode', [ReaderModeController::class, 'update'])
         ->middleware(['auth:sanctum', 'role:admin']);
 
+    // TASK-027 — reader management (admin-only): label (name) + active
+    // mode in one settings update, backing /admin/readers. The mode-only
+    // endpoint above stays untouched (its contract is pinned by tests).
+    Route::put('/admin/readers/{reader}', [ReaderSettingsController::class, 'update'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.readers.update');
+
+    // TASK-027 — student management (admin-only): create single students
+    // and bulk-import a CSV from the /admin/students desk (no more
+    // hand-written SQL).
+    Route::post('/admin/students', [StudentController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.students.store');
+
+    Route::post('/admin/students/import', [StudentController::class, 'import'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.students.import');
+
+    // TASK-027 — per-card unpair (admin-only, GUI side of ADR-023's
+    // freshness semantics: deleting the row makes the credential fresh
+    // again; tap events cascade with the card, exactly like cards:unpair).
+    Route::delete('/admin/cards/{card}', [CardUnpairController::class, 'destroy'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.cards.unpair');
+
+    // TASK-027 (gap E1) — authorized streaming of a stored capture
+    // image (admin-only; images may contain students, so the private
+    // disk stays private behind this route).
+    Route::get('/admin/captures/{deposit}/image', [CaptureImageController::class, 'show'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.captures.image');
+
     // TASK-010 (firmware TASK-001 Phase E1) — dashboard side of card
     // pairing: arm a short-lived pending pairing for a student.
     Route::post('/admin/students/{student}/arm-pairing', [ArmPairingController::class, 'store'])
@@ -94,8 +130,10 @@ Route::prefix('v1')->group(function () {
         ->middleware(['auth:sanctum', 'role:admin,teacher'])
         ->name('api.v1.students.redeem');
 
-    // Phase E — natural-language query (admin-only).
+    // Phase E — natural-language query. TASK-027 — admin AND teacher
+    // (the teacher's questions are server-side scoped to their classes;
+    // see NlQueryController + StudentScope).
     Route::post('/nl-query', [NlQueryController::class, 'store'])
-        ->middleware(['auth:sanctum', 'role:admin'])
+        ->middleware(['auth:sanctum', 'role:admin,teacher'])
         ->name('api.v1.nl-query');
 });

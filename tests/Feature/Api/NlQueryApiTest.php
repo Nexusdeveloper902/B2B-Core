@@ -98,9 +98,30 @@ class NlQueryApiTest extends TestCase
     }
 
     #[Test]
-    public function teachers_are_forbidden(): void
+    public function teachers_reach_the_endpoint_but_are_scope_fenced(): void
     {
+        // TASK-027 — teachers get their own NL interface now: the role
+        // wall OPENS for them (the missing-credential blocker below proves
+        // the request passed role:admin,teacher and reached the service —
+        // the data wall itself is pinned by the scope tests).
+        config(['recycling.nl_query.api_key' => null]);
+        $this->app->forgetInstance(DeepSeekClient::class);
+
         $this->actingAs($this->user('teacher'))
+            ->postJson('/api/v1/nl-query', ['question' => 'attendance?'])
+            ->assertStatus(503)
+            ->assertJson([
+                'status' => 'blocked',
+                'blocked_reason' => 'missing_llm_credential',
+            ]);
+    }
+
+    #[Test]
+    public function students_are_forbidden(): void
+    {
+        // TASK-027 — the NL surface stays staff-only: a student account
+        // never crosses the role wall.
+        $this->actingAs(User::where('role', 'student')->firstOrFail())
             ->postJson('/api/v1/nl-query', ['question' => 'attendance?'])
             ->assertForbidden();
     }

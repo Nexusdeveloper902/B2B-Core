@@ -33,11 +33,17 @@ class TapEventController extends Controller
         );
 
         if (! $result['ok']) {
-            // Device-displayable, 404 with a clear error shape.
+            // Device-displayable, clear error shape. Unknown/inactive
+            // cards stay 404 (nothing to act on); the PAE enrollment
+            // rejection (TASK-027) is 422 — the card is valid, the
+            // request is just not acceptable for this reader's program.
+            $status = $result['reason'] === 'student_not_pae' ? 422 : 404;
+
             return response()->json([
                 'status' => 'error',
+                'reason' => $result['reason'],
                 'message' => $result['message'],
-            ], 404);
+            ], $status);
         }
 
         $event = $result['event'];

@@ -46,6 +46,29 @@ return [
     'nlq_rate_limited' => 'La cuota del modelo de lenguaje se agotó, reintenta más tarde.',
     'nlq_unavailable' => 'El servicio del modelo de lenguaje no está disponible, reintenta más tarde.',
 
+    // TASK-027 — puerta de matrícula PAE (los lectores del programa
+    // alimentario rechazan estudiantes no matriculados; mensaje para
+    // el dispositivo, localizado por Accept-Language).
+    'pae_not_enrolled' => ':student no está matriculado en el programa alimentario PAE',
+    'pae_unknown_student' => 'este estudiante',
+
+    // TASK-027 — gestión de estudiantes (crear + importar CSV)
+    'student_duplicate' => 'Ya existe un estudiante llamado :name en :class',
+    'student_created' => 'Estudiante :name creado',
+    'students_import_unreadable' => 'No se pudo leer el archivo subido como CSV',
+    'students_import_bad_header' => 'Faltan columnas obligatorias en el encabezado (name, grade, class)',
+    'students_import_no_rows' => 'El CSV no contiene filas de datos',
+    'students_import_too_many_rows' => 'El CSV supera el máximo de :max filas',
+    'students_import_row_incomplete' => 'A la fila le falta nombre o grado',
+    'students_import_unknown_class' => 'La clase :class no existe',
+    'students_import_summary' => ':created estudiante(s) creados, :failed fila(s) fallidas',
+
+    // TASK-027 — desvinculación por tarjeta
+    'card_unpaired' => 'Tarjeta desvinculada de :student — la credencial vuelve a estar fresca',
+
+    // TASK-027 (brecha E1) — ruta de imagen de captura
+    'capture_image_missing' => 'No hay imagen almacenada para esta captura',
+
     // Genérico
     'forbidden_role' => 'No tienes permiso para realizar esta acción.',
     'not_found' => 'Recurso no encontrado',

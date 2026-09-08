@@ -227,4 +227,73 @@ return [
     'ecostation_capture_private' => 'Image kept in private audit storage',
     'ecostation_capture_meta' => 'Student: :student · bottle: :bottle · recyclable: :recyclable',
     'ecostation_capture_none' => 'No capture images yet.',
+
+    /* TASK-027 — owner backlog round 2 (i18n labels + new desks) */
+    // Event-type / reader-type / material labels (raw enum values stop
+    // leaking into the UI in every language)
+    'event_type_CLASS_ATTENDANCE' => 'Class attendance',
+    'event_type_PAE_BREAKFAST' => 'PAE breakfast',
+    'event_type_PAE_LUNCH' => 'PAE lunch',
+    'event_type_RECYCLING_DEPOSIT' => 'Recycling deposit',
+    'event_type_ENTRY' => 'Entry',
+    'event_type_EXIT' => 'Exit',
+    'reader_type_classroom' => 'Classroom',
+    'reader_type_pae' => 'Feeding program',
+    'reader_type_recycling' => 'Recycling',
+    'reader_type_entry' => 'Entry gate',
+    'material_plastic' => 'Plastic',
+    'material_paper' => 'Paper',
+    'material_metal' => 'Metal',
+    'material_glass' => 'Glass',
+    'material_other' => 'Other',
+    'card_status_active' => 'Active',
+    'card_status_lost' => 'Lost',
+    'card_status_revoked' => 'Revoked',
+
+    // Readers management desk (/admin/readers)
+    'readers_page' => 'Readers',
+    'readers_page_sub' => 'Reader management — rename a reader or switch its active mode.',
+    'reader_name' => 'Reader name',
+    'save_reader' => 'Save',
+    'reader_updated' => 'Reader updated.',
+    'no_readers' => 'No readers registered yet.',
+
+    // Students management desk (/admin/students)
+    'students_page' => 'Students',
+    'students_page_sub' => 'Enroll students one by one or import a CSV roster — no database console needed.',
+    'create_student' => 'Create student',
+    'student_name' => 'Name',
+    'student_grade' => 'Grade',
+    'student_class' => 'Class',
+    'student_pae' => 'PAE enrolled',
+    'search' => 'Search',
+    'clear' => 'Clear',
+    'import_students' => 'Import CSV roster',
+    'import_students_hint' => 'Header: name, grade, class, pae_enrolled (yes/no). Up to 500 rows; row-level failures are reported per row.',
+    'choose_file' => 'Choose CSV file',
+    'import_file' => 'Import',
+    'import_result' => 'Import result',
+    'created_count' => ':n created',
+    'failed_count' => ':n failed',
+    'card' => 'Card',
+    'pair_card_hint' => 'Pair a card from the pairing desk.',
+    'no_students_found' => 'No students match.',
+    'created' => 'Created',
+
+    // Per-card unpair (pairing desk)
+    'unpair' => 'Unpair',
+    'unpair_confirm' => 'Unpair card :uid from :student? This card\'s tap history is deleted and the card becomes pairable again.',
+    'unpaired' => 'Card unpaired — the credential is fresh again.',
+
+    // NL query (teacher surface + markdown answers)
+    'nl_query_teacher_hint' => 'Answers are scoped to the classes you teach.',
+    'nl_query_processing' => 'Thinking…',
+
+    // Entry/exit sessions (parent timeline)
+    'time_in_school' => 'Time in school',
+    'entries' => 'Entries',
+    'exits' => 'Exits',
+    'open_session' => 'Still inside',
+    'session_minutes' => ':n min in school',
+    'no_sessions' => 'No entry/exit taps recorded yet for this student.',
 ];

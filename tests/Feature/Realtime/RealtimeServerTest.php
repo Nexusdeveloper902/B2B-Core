@@ -130,10 +130,14 @@ class RealtimeServerTest extends TestCase
         // so they are admin-only. A teacher's feed connection still gets
         // the tap channel (hello + taps) but NEVER a pairing frame —
         // same data plane the admin-only REST status endpoint enforces.
+        // TASK-027 — the tap channel itself is scope-fenced now: the tap
+        // below is seeded on a student IN the teacher's class, so it
+        // arrives (out-of-scope silence is pinned by the dedicated test).
         config(['app.key' => self::APP_KEY]);
 
         $db = $this->freshFileDatabase();
         $teacherId = $this->seedUser($db, 'teacher');
+        $classId = $this->seedClass($db, $teacherId);
         $port = $this->startServer($db);
         $this->assertNotNull($port, 'the realtime server failed to boot');
 
@@ -152,12 +156,127 @@ class RealtimeServerTest extends TestCase
         $silence = $this->readMessageIfAny($sock, 0.6);
         $this->assertNull($silence, 'a teacher connection must not receive pairing frames');
 
-        // But the tap channel is untouched for the same connection: a
-        // written tap still arrives.
-        $this->seedTap($db, 'CLASS_ATTENDANCE', '07:55', 'LIVE TEST Teacher');
+        // But the tap channel is open for the same connection: a tap on a
+        // student of the teacher's own class still arrives.
+        $this->seedTap($db, 'CLASS_ATTENDANCE', '07:55', 'LIVE TEST Teacher', $classId);
         $tap = $this->readMessage($sock);
-        $this->assertNotNull($tap, 'tap frames must still reach teachers');
+        $this->assertNotNull($tap, 'tap frames must still reach teachers (for their own classes)');
         $this->assertSame('tap', $tap['type']);
+
+        fclose($sock);
+    }
+
+    #[Test]
+    public function teacher_connections_only_receive_taps_of_their_own_classes(): void
+    {
+        // TASK-027 — the teacher data wall on the realtime channel: a tap
+        // on a student OUTSIDE the teacher's classes never crosses their
+        // wire (an admin connection on the same server still receives
+        // it — the school-wide plane is untouched).
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $teacherId = $this->seedUser($db, 'teacher');
+        $adminId = $this->seedUser($db, 'admin');
+        $classId = $this->seedClass($db, $teacherId);
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $teacherToken = RealtimeToken::issue($teacherId, time() + 120);
+        [$teacherSock] = $this->upgrade($port, $teacherToken);
+        $this->readMessage($teacherSock); // drain hello
+
+        $adminToken = RealtimeToken::issue($adminId, time() + 120);
+        [$adminSock] = $this->upgrade($port, $adminToken);
+        $this->readMessage($adminSock); // drain hello
+
+        // Out-of-scope tap: student with no class at all.
+        $outsideId = $this->seedTap($db, 'CLASS_ATTENDANCE', '07:50', 'OUT OF SCOPE Student', null);
+
+        $adminTap = $this->readMessage($adminSock);
+        $this->assertNotNull($adminTap, 'the admin still receives the school-wide tap');
+        $this->assertSame('tap', $adminTap['type']);
+        $this->assertSame($outsideId, $adminTap['event']['id']);
+
+        usleep(400000);
+        $teacherSilence = $this->readMessageIfAny($teacherSock, 0.6);
+        $this->assertNull($teacherSilence, 'a teacher must not receive taps of students outside their classes');
+
+        // In-scope tap: same teacher's class — arrives on both planes.
+        $insideId = $this->seedTap($db, 'CLASS_ATTENDANCE', '07:55', 'IN SCOPE Student', $classId);
+
+        $teacherTap = $this->readMessage($teacherSock);
+        $this->assertNotNull($teacherTap, 'the in-scope tap must reach the teacher');
+        $this->assertSame($insideId, $teacherTap['event']['id']);
+
+        $adminTap2 = $this->readMessage($adminSock);
+        $this->assertNotNull($adminTap2, 'the in-scope tap also reaches the admin');
+
+        fclose($teacherSock);
+        fclose($adminSock);
+    }
+
+    #[Test]
+    public function student_connections_only_receive_their_own_taps(): void
+    {
+        // TASK-027 — a student account's realtime connection is scoped to
+        // their own student row: other students' taps never cross the
+        // wire, their own taps do (the balance/self-service plane).
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+
+        // The student account needs its student_id link (1:1 account layer).
+        $conn = DB::connection('realtime_file');
+        $ownStudentId = $conn->table('students')->insertGetId([
+            'name' => 'OWN STUDENT',
+            'grade' => '3°',
+            'pae_enrolled' => 0,
+            'class_id' => null,
+            'created_at' => now()->format('Y-m-d H:i:s'),
+            'updated_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+        $studentUserId = $this->seedUser($db, 'student', $ownStudentId);
+
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue($studentUserId, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+
+        // Someone else's tap: never delivered to the student connection.
+        $this->seedTap($db, 'CLASS_ATTENDANCE', '07:50', 'SOMEONE ELSE', null);
+        usleep(400000);
+
+        $silence = $this->readMessageIfAny($sock, 0.6);
+        $this->assertNull($silence, 'a student connection must not receive other students\' taps');
+
+        // Their own tap: delivered.
+        $readerId = (int) $conn->table('readers')->where('label', 'Live Reader')->value('id');
+        $ownCardId = $conn->table('cards')->insertGetId([
+            'credential_uid' => 'OWN'.strtoupper(bin2hex(random_bytes(4))),
+            'student_id' => $ownStudentId,
+            'status' => 'active',
+            'created_at' => now()->format('Y-m-d H:i:s'),
+            'updated_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+        $ownEventId = (int) $conn->table('events')->insertGetId([
+            'card_id' => $ownCardId,
+            'reader_id' => $readerId,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => now()->toDateString().' 07:56:00',
+            'metadata' => null,
+            'created_at' => now()->format('Y-m-d H:i:s'),
+            'updated_at' => now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $ownTap = $this->readMessage($sock);
+        $this->assertNotNull($ownTap, 'the student\'s own tap must be delivered');
+        $this->assertSame($ownEventId, $ownTap['event']['id']);
+        $this->assertSame('OWN STUDENT', $ownTap['event']['student_name']);
 
         fclose($sock);
     }
@@ -242,7 +361,7 @@ class RealtimeServerTest extends TestCase
     }
 
     /** Insert one complete tap (reader + student + card + event) and return the event id. */
-    private function seedTap(string $db, string $type, string $time, string $studentName): int
+    private function seedTap(string $db, string $type, string $time, string $studentName, ?int $classId = null): int
     {
         $conn = DB::connection('realtime_file');
         $now = now()->format('Y-m-d H:i:s');
@@ -263,7 +382,7 @@ class RealtimeServerTest extends TestCase
             'name' => $studentName,
             'grade' => '3°',
             'pae_enrolled' => 0,
-            'class_id' => null,
+            'class_id' => $classId,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -288,7 +407,7 @@ class RealtimeServerTest extends TestCase
     }
 
     /** Insert one users row with the given role; returns the id. */
-    private function seedUser(string $db, string $role): int
+    private function seedUser(string $db, string $role, ?int $studentId = null): int
     {
         $conn = DB::connection('realtime_file');
         $now = now()->format('Y-m-d H:i:s');
@@ -300,6 +419,21 @@ class RealtimeServerTest extends TestCase
             'password' => 'irrelevant',
             'remember_token' => null,
             'role' => $role,
+            'student_id' => $studentId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one class owned by the given teacher; returns the id. */
+    private function seedClass(string $db, int $teacherUserId): int
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        return (int) $conn->table('classes')->insertGetId([
+            'name' => 'Scope Test '.uniqid(),
+            'teacher_user_id' => $teacherUserId,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
