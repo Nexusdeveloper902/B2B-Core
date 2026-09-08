@@ -87,10 +87,17 @@ class CardPairingTest extends TestCase
                 'student_id' => $student->id,
             ]);
 
-        // The window is real (45 s by default) and ISO 8601.
-        $this->assertSame(
+        // The window is real (45 s by default) and ISO 8601. One second of
+        // tolerance: the endpoint stamps expires_at at T1 and this re-check
+        // runs at T2 — when a second boundary falls between the two, the
+        // truncated timestamps differ by exactly 1 s (observed on the slower
+        // windows-latest runner, CI run 34284718012). Anything but ~45 s
+        // (0, 30, 60, expired) still fails loudly. Same tolerance pattern
+        // as TapEventTest's client-timestamp assertion.
+        $this->assertEqualsWithDelta(
             now()->addSeconds(45)->getTimestamp(),
             $arm->json('expires_at') ? strtotime($arm->json('expires_at')) : 0,
+            1,
             'expires_at should be ~45 s in the future'
         );
 
