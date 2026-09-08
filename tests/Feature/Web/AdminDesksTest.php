@@ -92,4 +92,32 @@ class AdminDesksTest extends TestCase
         $studentUser = User::where('role', 'student')->firstOrFail();
         $this->actingAs($studentUser)->get('/admin/readers')->assertForbidden();
     }
+
+    #[Test]
+    public function the_layout_nav_links_both_desks_for_admins_only(): void
+    {
+        // TASK-028 regression: the desks shipped reachable ONLY by URL
+        // (owner: "I dont see the new GUI's"). The top nav — desktop and
+        // the no-JS mobile menu — must carry both links for admins.
+        $admin = $this->actingAs($this->admin())->get('/admin');
+
+        $admin->assertOk()
+            ->assertSee('/admin/students')
+            ->assertSee('/admin/readers')
+            ->assertSeeText(__('app.students_page'))
+            ->assertSeeText(__('app.readers_page'));
+
+        // Role wall: staff-without-admin and students never get the links
+        // (the routes 403 for them — the nav must not advertise them).
+        $teacher = $this->actingAs($this->teacher())->get('/teacher');
+        $teacher->assertOk()
+            ->assertDontSee('/admin/students')
+            ->assertDontSee('/admin/readers');
+
+        $studentUser = User::where('role', 'student')->firstOrFail();
+        $student = $this->actingAs($studentUser)->get('/student');
+        $student->assertOk()
+            ->assertDontSee('/admin/students')
+            ->assertDontSee('/admin/readers');
+    }
 }

@@ -53,7 +53,10 @@ drain bar, login auth card, demo chips, empty states.
 The two TASK-026 pages and the two TASK-027 desks are views over data
 that already existed plus new admin write endpoints (see §4). Nav stays
 role-scoped exactly as before — students see the student hub, staff see
-staff pages.
+staff pages. TASK-028 closes a discoverability hole the owner hit
+directly: the two TASK-027 desks shipped reachable ONLY by typing their
+URLs — the admin top nav (desktop and the no-JS mobile menu) now links
+both, pinned by a regression test.
 
 ## 3. What was deliberately added (real data, no new backend behavior)
 

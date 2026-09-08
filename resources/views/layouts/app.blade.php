@@ -62,6 +62,17 @@
                            @class(['is-active' => request()->routeIs('admin.dashboard')])>
                             {{ __('app.admin_dashboard') }}
                         </a>
+                        {{-- TASK-028 — the TASK-027 desks were reachable only
+                             by URL; the nav now links them (workflow order:
+                             people, hardware, card links, eco monitor). --}}
+                        <a href="{{ route('admin.students') }}"
+                           @class(['is-active' => request()->routeIs('admin.students')])>
+                            {{ __('app.students_page') }}
+                        </a>
+                        <a href="{{ route('admin.readers') }}"
+                           @class(['is-active' => request()->routeIs('admin.readers')])>
+                            {{ __('app.readers_page') }}
+                        </a>
                         <a href="{{ route('admin.pairing') }}"
                            @class(['is-active' => request()->routeIs('admin.pairing')])>
                             {{ __('app.pairing_desk') }}
@@ -123,6 +134,8 @@
                             @else
                                 @if(auth()->user()->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
+                                    <a href="{{ route('admin.students') }}">{{ __('app.students_page') }}</a>
+                                    <a href="{{ route('admin.readers') }}">{{ __('app.readers_page') }}</a>
                                     <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
                                     <a href="{{ route('admin.ecostation') }}">{{ __('app.ecostation') }}</a>
                                 @endif

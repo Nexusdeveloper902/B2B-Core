@@ -56,6 +56,10 @@ Las dos páginas de TASK-026 y los dos escritorios de TASK-027 son vistas
 sobre datos que ya existían más nuevos endpoints admin de escritura
 (ver §4). El nav sigue con alcance por rol exactamente igual — los
 estudiantes ven el hub estudiantil, el personal ve sus páginas.
+TASK-028 cierra un agujero de descubribilidad que el dueño encontró de
+frente: los dos escritorios de TASK-027 se lanzaron alcanzables SOLO
+tecleando sus URLs — el nav admin superior (escritorio y el menú móvil
+sin JS) ahora enlaza ambos, fijado por un test de regresión.
 
 ## 3. Qué se añadió deliberadamente (datos reales, sin backend nuevo)
 

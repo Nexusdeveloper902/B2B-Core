@@ -909,3 +909,21 @@ The owner's eight HTML mockups are now the design source of truth:
   consumer phase — unordered LIMIT 1 is planner-dependent, and
   "lucky locals" hide it until a CI runner rolls different dice.
   Proven deterministic: 12/12 reseeds draw Maria González.
+
+## RUN-027 — TASK-028: nav wiring for the orphaned TASK-027 desks (2026-09-09)
+
+- Owner: "I dont see the new GUI's". The TASK-027 desks
+  (/admin/students, /admin/readers) were complete, pushed, CI-green —
+  but the layout's admin nav (desktop + mobile) never linked them,
+  and the dashboard had no quick-links: URL-only orphans. Classic
+  wiring gap: tests pinned each desk's own render, never the nav
+  that reaches it.
+- Fixed in layouts/app.blade.php (both navs, isAdmin() gate, existing
+  bilingual keys reused — zero new keys); regression test added to
+  AdminDesksTest (asserts hrefs for admin, absence for
+  teacher/student); FRONTEND.md/.es.md record the hole honestly.
+- Durable rule: when a page ships, pin its NAVIGATION too — a
+  feature the owner can't click is a feature that didn't ship.
+- Suite: 314/1-skip (new test included), quality PASS, e2e 33/33.
+- Remote CI verdict for this run's pushes: recorded in
+  RUN-2026-09-09-core-027 (observed per the observation-loop rule).
