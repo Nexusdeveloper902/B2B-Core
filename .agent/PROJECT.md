@@ -827,3 +827,35 @@ The owner's eight HTML mockups are now the design source of truth:
 - Owner backlog unchanged: DEEPSEEK_API_KEY; gap-ledger item selection
   (R1 / E1 / G1 flagged as the big three); camera-station hardware
   bench (B2B-Firmware docs/CAMERA_STATION.md).
+
+## TASK-027 delivery closed (2026-09-08, RUN-2026-09-08-core-025)
+
+- Owner's 15-item punch list + older backlog ALL resolved: NL
+  analytical half (7 scope-fenced functions incl. absences, repeat
+  absentees, trends, time-in-school), teacher NL desk, StudentScope
+  data wall (ADR-037), login intended-URL fix, +184 lang lines,
+  /admin/students desk (single + CSV import), /admin/readers desk,
+  per-card Unpair GUI (ADR-039), capture-image door (ADR-040, E1
+  closed), EcoStation realtime hub (E5 closed), PAE enrollment gate
+  (422 + log), ENTRY/EXIT sessions (ADR-038), escape-first markdown
+  (ADR-041), B2B-Firmware LED fix (TASK-010/ADR-011 there).
+- Security audit OBS-015: fixed-in-task vs sound-by-construction vs
+  RESIDUAL (no rate limiting anywhere incl. login — top residual
+  item; plain-LAN HTTP; static device keys; no read auditing). Future
+  tasks should start from that ledger.
+- Durable trap (session continuity): a prior session's uncommitted
+  1,667-line working tree tested GREEN but was INCOMPLETE (unpair GUI
+  unwired, zero tests on 5 new endpoints/2 new desks, no docs, no
+  .agent records) — a green suite on an uncommitted tree is NOT a
+  delivered task; wire the GUI, pin the contracts, write the records,
+  THEN commit.
+- Toolchain successor to OBS-001: the static-php "common" bundle no
+  longer ships gd (18 image tests LogicException); use the "bulk"
+  bundle (PHP 8.4.8 bulk verified: full suite + e2e + quality green).
+- Verification: 313/1/4,642 · e2e 33/33 ×3 (one transient WS-timing
+  32/1 blip observed once, never reproduced — the e2e WS checks are
+  timing-sensitive by design; treat a single non-reproducing e2e
+  failure as flake-suspect FIRST, re-run before debugging).
+- Pending owner actions: DEEPSEEK_API_KEY (live NL smoke still
+  skipped); OBS-015 residual triage (rate limiting first); gap-ledger
+  remainder (R1 / G1 flagged); camera-station hardware bench.
