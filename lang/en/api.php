@@ -68,6 +68,10 @@ return [
     // TASK-027 (gap E1) — capture image route
     'capture_image_missing' => 'No stored image for this capture',
 
+    // TASK-029 — class creation (the students desk)
+    'class_created' => 'Class :name created',
+    'class_duplicate' => 'A class named :name already exists',
+
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',
     'not_found' => 'Resource not found',

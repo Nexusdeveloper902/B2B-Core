@@ -927,3 +927,28 @@ The owner's eight HTML mockups are now the design source of truth:
 - Suite: 314/1-skip (new test included), quality PASS, e2e 33/33.
 - Remote CI verdict for this run's pushes: recorded in
   RUN-2026-09-09-core-027 (observed per the observation-loop rule).
+
+## RUN-028 — TASK-029: realtime passover + class creation (2026-09-09)
+
+- Owner's passover: "everything that could change needs websockets."
+  Delivered as ADR-042 — a fourth WS channel (`roster`): append-only
+  `roster_updates` rows written in the SAME transaction as the change
+  (student_created / students_imported / class_created /
+  reader_updated), admin-only delivery, hello snapshot replay. Class
+  creation shipped (POST /api/v1/admin/classes + desk form); grade is
+  a SELECT (no more typing °); every mutable page now boots realtime
+  (coverage table in docs/FRONTEND.md §3b) — including the teacher
+  class-panel chips/KPI (tap frames they already receive) and the
+  admin KPI strip (distinct-student Sets).
+- Fixed latent bug found during the passover: the student dashboard's
+  balance listener read `frame.payload` while the server sends
+  `frame.update.payload` — the balance NEVER went live since TASK-025.
+- UI consistency: design-system paginator (pagination::tailwind
+  vendor override — the stock Tailwind markup never matched app.css;
+  students desk + history were unstyled), styled file input, .ta-right
+  replacing scattered inline styles.
+- Suite: 330/1-skip (+16 tests), quality PASS, e2e 33/33; real-socket
+  proof that roster frames reach admins only.
+- Durable rule: a live page has THREE arrival paths (SSR, fetch
+  response, WS frame) — idempotent update-or-prepend handlers are not
+  optional polish, they are the correctness condition.

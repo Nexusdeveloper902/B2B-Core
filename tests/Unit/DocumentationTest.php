@@ -46,12 +46,15 @@ class DocumentationTest extends TestCase
         foreach ([
             'PUT /api/v1/admin/readers/{id}',
             'POST /api/v1/admin/students/import',
+            'POST /api/v1/admin/classes',
             'DELETE /api/v1/admin/cards/{id}',
             'GET /api/v1/admin/captures/{deposit}/image',
             'student_not_pae',
             'get_repeatedly_absent_students',
             'get_student_time_in_school',
             'markdown.js',
+            'class_created',
+            'reader_updated',
         ] as $needle) {
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");
@@ -105,7 +108,7 @@ class DocumentationTest extends TestCase
         $this->assertFileExists($doc);
 
         $contents = (string) file_get_contents($doc);
-        foreach (['realtime:serve', 'realtime:tap', 'hello', 'token', '8081'] as $needle) {
+        foreach (['realtime:serve', 'realtime:tap', 'realtime:roster', 'hello', 'token', '8081'] as $needle) {
             $this->assertStringContainsString($needle, $contents, "realtime contract must document [{$needle}]");
         }
 
@@ -130,6 +133,10 @@ class DocumentationTest extends TestCase
             // the two new read-only pages are documented
             $this->assertStringContainsString('/student/leaderboard', $doc);
             $this->assertStringContainsString('/admin/ecostation', $doc);
+            // TASK-029 — the realtime passover coverage table + GUI completion
+            $this->assertStringContainsString('roster', $doc, "{$path} must document the roster channel");
+            $this->assertStringContainsString('students_imported', $doc, "{$path} must document the import frame");
+            $this->assertStringContainsString('pagination', $doc, "{$path} must document the design-system paginator");
             // key gaps stay cataloged (honesty floor for aspirational UI)
             $this->assertStringContainsString('R1', $doc, "{$path} must catalog the voucher/QR redemption gap");
             $this->assertStringContainsString('E1', $doc, "{$path} must catalog the private capture-image gap");

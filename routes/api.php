@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\ArmPairingController;
 use App\Http\Controllers\Api\V1\CaptureImageController;
 use App\Http\Controllers\Api\V1\CardPairingController;
 use App\Http\Controllers\Api\V1\CardUnpairController;
+use App\Http\Controllers\Api\V1\ClassController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\NlQueryController;
 use App\Http\Controllers\Api\V1\PairingStatusController;
@@ -91,6 +92,12 @@ Route::prefix('v1')->group(function () {
     Route::post('/admin/students/import', [StudentController::class, 'import'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.students.import');
+
+    // TASK-029 — class creation (admin-only): the students desk's class
+    // select needed a writer; roster frames make it live.
+    Route::post('/admin/classes', [ClassController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.classes.store');
 
     // TASK-027 — per-card unpair (admin-only, GUI side of ADR-023's
     // freshness semantics: deleting the row makes the credential fresh

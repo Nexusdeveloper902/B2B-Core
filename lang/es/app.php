@@ -295,4 +295,16 @@ return [
     'open_session' => 'Todavía dentro',
     'session_minutes' => ':n min en el colegio',
     'no_sessions' => 'Aún no hay toques de entrada/salida para este estudiante.',
+
+    // Creación de clases (TASK-029 — el primer paso que faltaba en el escritorio de estudiantes)
+    'create_class' => 'Crear clase',
+    'class_name' => 'Nombre de la clase',
+    'class_teacher_optional' => 'Profesor titular (opcional)',
+    'class_teacher_none' => 'Sin profesor',
+
+    // Paginación (TASK-029 — la vista de paginador del sistema de diseño)
+    'pagination_nav' => 'Paginación',
+    'pagination_prev' => 'Página anterior',
+    'pagination_next' => 'Página siguiente',
+    'pagination_page' => 'Página :page',
 ];

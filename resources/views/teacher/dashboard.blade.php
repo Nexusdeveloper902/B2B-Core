@@ -28,19 +28,19 @@
     @endforeach
 @endforeach
 <section class="stat-strip" data-reveal-stagger aria-label="{{ __('app.class_summary') }}">
-    <x-stat :label="__('app.present')">
+    <x-stat :label="__('app.present')" stat="present">
         <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">check_circle</span></x-slot:icon>
         {{ $totals['present'] }}
     </x-stat>
-    <x-stat :label="__('app.late')">
+    <x-stat :label="__('app.late')" stat="late">
         <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">schedule</span></x-slot:icon>
         {{ $totals['late'] }}
     </x-stat>
-    <x-stat :label="__('app.absent')">
+    <x-stat :label="__('app.absent')" stat="absent">
         <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">cancel</span></x-slot:icon>
         {{ $totals['absent'] }}
     </x-stat>
-    <x-stat :label="__('app.enrolled')">
+    <x-stat :label="__('app.enrolled')" stat="enrolled">
         <x-slot:icon><span class="material-symbols-outlined is-16" aria-hidden="true">groups</span></x-slot:icon>
         {{ $totals['enrolled'] }}
     </x-stat>
@@ -50,7 +50,7 @@
 @include('partials.live-feed')
 
 <div class="filterbar">
-    <div class="searchbox" style="flex:1 1 320px;">
+    <div class="searchbox">
         <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
         <input type="search" id="student-search" aria-label="{{ __('app.search_students') }}"
                placeholder="{{ __('app.search_students') }}" autocomplete="off">
@@ -76,7 +76,7 @@
 @endif
 
 <div class="stack" data-reveal data-cutoff="{{ $cutoff }}"
-     data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}">
+     data-label-present="{{ __('app.present') }}" data-label-late="{{ __('app.late') }}" data-label-absent="{{ __('app.absent') }}">
     @if($classes->isEmpty())
         <x-empty>{{ __('app.no_students') }}</x-empty>
     @else
@@ -94,10 +94,10 @@
                     <p class="panel-sub">{{ $class->teacher->name }}</p>
                 @endif
 
-                <div class="sum-chips" aria-label="{{ __('app.class_summary') }}">
-                    <span class="sum-chip sum-chip-present">{{ __('app.present') }} {{ $counts['present'] }}</span>
-                    <span class="sum-chip sum-chip-late">{{ __('app.late') }} {{ $counts['late'] }}</span>
-                    <span class="sum-chip sum-chip-absent">{{ __('app.absent') }} {{ $counts['absent'] }}</span>
+                <div class="sum-chips" data-class-panel="{{ $class->id }}" aria-label="{{ __('app.class_summary') }}">
+                    <span class="sum-chip sum-chip-present" data-count="{{ $counts['present'] }}">{{ __('app.present') }} {{ $counts['present'] }}</span>
+                    <span class="sum-chip sum-chip-late" data-count="{{ $counts['late'] }}">{{ __('app.late') }} {{ $counts['late'] }}</span>
+                    <span class="sum-chip sum-chip-absent" data-count="{{ $counts['absent'] }}">{{ __('app.absent') }} {{ $counts['absent'] }}</span>
                 </div>
 
                 <div class="ledger-wrap">
@@ -205,11 +205,42 @@
         // FIRST tap wins (the server keeps the day's first event as
         // the attendance one) — later taps never overwrite an earlier
         // time, matching classAttendanceToday's semantics.
+        //
+        // TASK-029 — the class PANEL is live too: the per-class summary
+        // chips and the KPI strip move with every tap (row → chips →
+        // totals, all from the same backend-confirmed frame; a tap for
+        // a student whose row already shows a time is a duplicate and
+        // moves nothing — first tap wins, same rule at every level).
         var stack = document.querySelector('.stack[data-cutoff]');
         if (!stack) return;
         var cutoff = stack.dataset.cutoff || '08:15';
         var labelPresent = stack.dataset.labelPresent || 'Present';
         var labelLate = stack.dataset.labelLate || 'Late';
+        var labelAbsent = stack.dataset.labelAbsent || 'Absent';
+
+        function bumpStat(name, delta) {
+            var stat = document.querySelector('[data-stat="' + name + '"]');
+            if (!stat) { return; }
+            var value = stat.querySelector('.stat-value');
+            var n = parseInt(value.textContent, 10);
+            if (isNaN(n)) { return; }
+            value.textContent = String(Math.max(0, n + delta));
+        }
+
+        function bumpChips(panel, oldStatus, newStatus) {
+            if (oldStatus === newStatus) { return; }
+            var chips = panel.querySelector('[data-class-panel]');
+            if (!chips) { return; }
+            [oldStatus, newStatus].forEach(function (status, i) {
+                if (status !== 'present' && status !== 'late' && status !== 'absent') { return; }
+                var chip = chips.querySelector('.sum-chip-' + status);
+                if (!chip) { return; }
+                var n = parseInt(chip.dataset.count || '0', 10);
+                n = Math.max(0, n + (i === 0 ? -1 : 1));
+                chip.dataset.count = String(n);
+                chip.textContent = (status === 'present' ? labelPresent : (status === 'late' ? labelLate : labelAbsent)) + ' ' + n;
+            });
+        }
 
         document.addEventListener('realtime:tap', function (e) {
             var ev = e.detail || {};
@@ -223,8 +254,17 @@
                 if ((ev.time || '99:99') >= timeCell.textContent) return; // first tap wins
             }
 
-            var late = (ev.time || '') > cutoff;
             var statusCell = row.querySelector('.js-tap-status');
+            var oldStamp = statusCell ? statusCell.querySelector('[class*="stamp-"]') : null;
+            var oldStatus = null;
+            if (oldStamp) {
+                ['present', 'late', 'absent'].forEach(function (s) {
+                    if (oldStamp.classList.contains('stamp-' + s)) { oldStatus = s; }
+                });
+            }
+
+            var late = (ev.time || '') > cutoff;
+            var newStatus = late ? 'late' : 'present';
             if (statusCell) {
                 statusCell.textContent = '';
                 var stamp = document.createElement('span');
@@ -233,6 +273,12 @@
                 statusCell.appendChild(stamp);
             }
             if (timeCell) { timeCell.textContent = ev.time || '—'; }
+
+            bumpChips(row.closest('.panel'), oldStatus, newStatus);
+            if (oldStatus !== newStatus) {
+                if (oldStatus) { bumpStat(oldStatus, -1); }
+                bumpStat(newStatus, 1);
+            }
 
             row.classList.remove('js-row-flash');
             void row.offsetWidth; // restart the animation

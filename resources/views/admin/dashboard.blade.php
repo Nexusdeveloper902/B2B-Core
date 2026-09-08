@@ -22,31 +22,31 @@
 {{-- School-wide stats today: hero attendance tile + secondary KPI tiles.
      The hero (most important number) sits first — dashboard best practice. --}}
 <section class="stat-strip" data-reveal-stagger aria-label="{{ __('app.school_today') }}">
-    <x-stat :label="__('app.attendance_count')">
+    <x-stat :label="__('app.attendance_count')" stat="attendance">
         <x-slot:icon>
             <span class="material-symbols-outlined is-16" aria-hidden="true">how_to_reg</span>
         </x-slot:icon>
         {{ $attendanceToday }}
     </x-stat>
-    <x-stat :label="__('app.pae_breakfast')">
+    <x-stat :label="__('app.pae_breakfast')" stat="pae_breakfast">
         <x-slot:icon>
             <span class="material-symbols-outlined is-16" aria-hidden="true">bakery_dining</span>
         </x-slot:icon>
         {{ $paeBreakfastToday }}
     </x-stat>
-    <x-stat :label="__('app.pae_lunch')">
+    <x-stat :label="__('app.pae_lunch')" stat="pae_lunch">
         <x-slot:icon>
             <span class="material-symbols-outlined is-16" aria-hidden="true">lunch_dining</span>
         </x-slot:icon>
         {{ $paeLunchToday }}
     </x-stat>
-    <x-stat :label="__('app.recycling_items')">
+    <x-stat :label="__('app.recycling_items')" stat="recycling_items">
         <x-slot:icon>
             <span class="material-symbols-outlined is-16" aria-hidden="true">recycling</span>
         </x-slot:icon>
         {{ $recyclingToday['items'] }}
     </x-stat>
-    <x-stat :label="__('app.recycling_points')">
+    <x-stat :label="__('app.recycling_points')" stat="recycling_points">
         <x-slot:icon>
             <span class="material-symbols-outlined is-16" aria-hidden="true">toll</span>
         </x-slot:icon>
@@ -71,8 +71,8 @@
                 </thead>
                 <tbody>
                 @forelse($readers as $reader)
-                    <tr>
-                        <td data-label="{{ __('app.reader') }}">{{ $reader->label }}</td>
+                    <tr data-reader-row="{{ $reader->id }}">
+                        <td data-label="{{ __('app.reader') }}" class="reader-label-cell">{{ $reader->label }}</td>
                         <td data-label="{{ __('app.reader_type') }}"><code>{{ __('app.reader_type_'.$reader->type->value) }}</code></td>
                         <td data-label="{{ __('app.active_mode') }}">
                             <form class="mode-form tool-form" data-reader="{{ $reader->id }}">
@@ -259,6 +259,67 @@
                             (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
                     }
                 }).catch(function () { busy(btn, false); });
+        });
+
+        // ---- TASK-029 — the KPI strip is LIVE. Attendance and the PAE
+        // meals are DISTINCT-STUDENT counts, so a per-student Set keeps
+        // a second tap from double-counting; recycling totals ride the
+        // recycling channel's committed frames; the readers table follows
+        // roster frames (a mode/label change made anywhere repaints here). ----
+        function bumpStat(name, delta) {
+            var stat = document.querySelector('[data-stat="' + name + '"]');
+            if (!stat) { return; }
+            var value = stat.querySelector('.stat-value');
+            var n = parseInt(value.textContent, 10);
+            if (isNaN(n)) { return; }
+            value.textContent = String(Math.max(0, n + delta));
+        }
+
+        var seen = {attendance: {}, breakfast: {}, lunch: {}};
+
+        document.addEventListener('realtime:tap', function (e) {
+            var ev = e.detail || {};
+            if (ev.student_id === undefined) { return; }
+            var id = String(ev.student_id);
+
+            if (ev.type === 'CLASS_ATTENDANCE' && !seen.attendance[id]) {
+                seen.attendance[id] = true;
+                bumpStat('attendance', 1);
+            }
+            if (ev.type === 'PAE_BREAKFAST' && !seen.breakfast[id]) {
+                seen.breakfast[id] = true;
+                bumpStat('pae_breakfast', 1);
+            }
+            if (ev.type === 'PAE_LUNCH' && !seen.lunch[id]) {
+                seen.lunch[id] = true;
+                bumpStat('pae_lunch', 1);
+            }
+        });
+
+        document.addEventListener('realtime:recycling', function (e) {
+            var update = e.detail || {};
+            var payload = update.payload || {};
+            if (update.type === 'validated') { bumpStat('recycling_items', 1); }
+            if (update.type === 'points_awarded' && typeof payload.points === 'number') {
+                bumpStat('recycling_points', payload.points);
+            }
+        });
+
+        document.addEventListener('realtime:roster', function (e) {
+            var update = e.detail || {};
+            if (update.type !== 'reader_updated') { return; }
+            var r = update.payload || {};
+            if (r.id === undefined) { return; }
+            var row = document.querySelector('tr[data-reader-row="' + r.id + '"]');
+            if (!row) { return; }
+            var label = row.querySelector('.reader-label-cell');
+            if (label && r.label !== undefined && document.activeElement !== label) {
+                label.textContent = r.label;
+            }
+            var mode = document.getElementById('mode-' + r.id);
+            if (mode && document.activeElement !== mode && r.active_event_type !== undefined) {
+                mode.value = r.active_event_type;
+            }
         });
     })();
 </script>

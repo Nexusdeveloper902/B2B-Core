@@ -128,6 +128,23 @@ the `pairing` frames — and identical to the REST status endpoint):
   (detail = the pairing payload) — the pairing desk listens and
   applies it instantly.
 
+## The roster channel (TASK-029)
+
+A fourth frame type rides the same wire: **`roster`** — committed
+roster changes (student created, students imported, class created,
+reader updated). Source: the append-only `roster_updates` table,
+written INSIDE the same DB transaction as the change it describes
+(the recycling channel's rule); `realtime:serve` polls rows newer than
+its head and pushes `{"type":"roster","update":{id,type,payload,at}}`.
+Delivery: ADMIN connections only (the payloads mirror the admin REST
+endpoints' exposure — same discipline as pairing frames); the admin
+hello carries the recent snapshot under `roster` so a freshly
+connected page replays it through the same idempotent handlers live
+frames use. Page hook: `document` CustomEvent **`realtime:roster`**
+(detail = the update) — the students desk prepends roster rows and
+adds class options, the readers desk and the admin dashboard's
+readers table repaint reader changes.
+
 ## Degradation honesty
 
 | Failure | Behavior |

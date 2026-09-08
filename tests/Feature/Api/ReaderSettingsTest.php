@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Reader;
+use App\Models\RosterUpdate;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -139,5 +140,35 @@ class ReaderSettingsTest extends TestCase
                 'active_event_type' => 'ENTRY',
             ])
             ->assertNotFound();
+    }
+
+    #[Test]
+    public function every_reader_change_writes_a_roster_frame_in_the_same_transaction(): void
+    {
+        // TASK-029 — BOTH write surfaces (the settings endpoint AND the
+        // mode-only endpoint) log one reader_updated frame: whichever
+        // surface changed the reader, every surface showing it goes live.
+        $reader = Reader::firstOrFail();
+
+        $this->actingAs($this->admin())
+            ->putJson("/api/v1/admin/readers/{$reader->id}", [
+                'label' => 'Live Reader — Puerta',
+                'active_event_type' => 'ENTRY',
+            ])->assertOk();
+
+        $frame = RosterUpdate::where('type', 'reader_updated')->latest('id')->first();
+        $this->assertNotNull($frame, 'no reader_updated roster frame was written');
+        $this->assertSame($reader->id, $frame->payload['id']);
+        $this->assertSame('Live Reader — Puerta', $frame->payload['label']);
+        $this->assertSame('ENTRY', $frame->payload['active_event_type']);
+
+        $this->actingAs($this->admin())
+            ->postJson("/api/v1/admin/readers/{$reader->id}/mode", [
+                'active_event_type' => 'EXIT',
+            ])->assertOk();
+
+        $modeFrame = RosterUpdate::where('type', 'reader_updated')->latest('id')->first();
+        $this->assertNotSame($frame->id, $modeFrame->id, 'the mode-only endpoint logs its own frame');
+        $this->assertSame('EXIT', $modeFrame->payload['active_event_type']);
     }
 }

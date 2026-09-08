@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
@@ -515,6 +515,38 @@ file).
 
 ---
 
+## POST /api/v1/admin/classes — create one class (TASK-029, admin-only)
+
+The roster workflow's missing first step: the `/admin/students` desk's
+class SELECT was read-only before — creating a class needed hand-written
+SQL. **Admin role required.** Teacher assignment is OPTIONAL (a class
+can exist before its homeroom teacher is chosen; only `role: teacher`
+users may be assigned).
+
+**Request**:
+
+```json
+{ "name": "6° A", "teacher_user_id": 2 }
+```
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "class": { "id": 5, "name": "6° A", "teacher_name": "Prof. Elena Ramírez" },
+  "message": "Class 6° A created."
+}
+```
+
+`422` — validation errors, or `{"status":"error","reason":"duplicate"}`
+for an existing name (case-insensitive, mirroring the student rule).
+Every committed create writes one `class_created` roster frame in the
+same transaction (see Realtime roster frames below) — the students
+desk's class select goes live the moment the class exists.
+
+---
+
 ## DELETE /api/v1/admin/cards/{id} — per-card unpair (TASK-027, admin-only)
 
 The GUI half of gap D1: the pairing desk's roster carries an **Unpair**
@@ -694,6 +726,26 @@ taps, admins see the whole school. The hello snapshot honors the same
 scope, and the EcoStation page consumes `recycling` frames live
 (`realtime:recycling` CustomEvents — ledger rows, impact metrics and the
 latest-capture panel update with no reload).
+
+**Realtime roster frames (TASK-029):** roster changes broadcast on a
+fourth channel, `roster` — admin connections only (the payloads mirror
+the admin REST endpoints' exposure; same wire discipline as pairing
+frames):
+
+```json
+{"type": "roster", "update": {"id": 3, "type": "student_created",
+ "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_enrolled": false},
+ "at": "2026-09-09 08:00:00"}}
+```
+
+Frame types: `student_created` (one row), `students_imported`
+(`payload.students[]` — one frame per import), `class_created`, and
+`reader_updated` (written by BOTH reader write endpoints — the settings
+PUT and the mode-only POST). Rows ride the same transaction as the
+change they describe; the admin hello carries the recent snapshot under
+`roster` so a freshly connected page reconciles. The students desk
+prepends live roster rows and adds class options; the readers desk and
+the admin dashboard's readers table repaint reader changes.
 
 Student self-service web desk (TASK-025): students log in (same login page;
 demo accounts printed by the seeder, e.g. `carlos@presence.test` /

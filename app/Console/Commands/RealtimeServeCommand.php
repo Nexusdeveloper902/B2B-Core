@@ -7,6 +7,7 @@ use App\Services\Realtime\Handshake;
 use App\Services\Realtime\RealtimeFeed;
 use App\Services\Realtime\RealtimePairing;
 use App\Services\Realtime\RealtimeRecycling;
+use App\Services\Realtime\RealtimeRoster;
 use App\Services\Realtime\RealtimeToken;
 use App\Services\Realtime\WsFrame;
 use Illuminate\Console\Command;
@@ -70,17 +71,23 @@ class RealtimeServeCommand extends Command
     /** TASK-025 item 6 — head id of the recycling channel. */
     private int $lastRecyclingId = 0;
 
+    /** TASK-029 — head id of the roster channel. */
+    private int $lastRosterId = 0;
+
     private RealtimeFeed $feed;
 
     private RealtimePairing $pairing;
 
     private RealtimeRecycling $recycling;
 
-    public function handle(RealtimeFeed $feed, RealtimePairing $pairing, RealtimeRecycling $recycling): int
+    private RealtimeRoster $roster;
+
+    public function handle(RealtimeFeed $feed, RealtimePairing $pairing, RealtimeRecycling $recycling, RealtimeRoster $roster): int
     {
         $this->feed = $feed;
         $this->pairing = $pairing;
         $this->recycling = $recycling;
+        $this->roster = $roster;
 
         $host = (string) ($this->option('host') ?: config('realtime.host'));
         $port = (int) ($this->option('port') ?: config('realtime.port'));
@@ -106,6 +113,8 @@ class RealtimeServeCommand extends Command
         // TASK-025 — and the recycling channel: hello carries the recent
         // snapshot, then only genuinely new updates broadcast.
         $this->lastRecyclingId = $recycling->latestUpdateId();
+        // TASK-029 — and the roster channel: same rule.
+        $this->lastRosterId = $roster->latestUpdateId();
 
         $this->info("realtime:serve listening on ws://{$host}:{$port} — poll {$pollMs} ms, history {$historyLimit}, head id {$this->lastEventId}.");
 
@@ -274,6 +283,11 @@ class RealtimeServeCommand extends Command
             // admins only (card UIDs cross this wire, same as the REST
             // status endpoint the payload mirrors).
             $hello['pairing'] = $this->pairing->payload();
+            // TASK-029 — the roster channel's recent snapshot too: a
+            // freshly connected admin page replays it through the same
+            // idempotent handlers live frames use, reconciling anything
+            // that changed between its SSR paint and this connect.
+            $hello['roster'] = $this->roster->recent(30);
         }
         $this->sendJson($socket, $hello);
     }
@@ -452,6 +466,31 @@ class RealtimeServeCommand extends Command
             ));
             foreach ($this->clients as $clientId => $client) {
                 if ($client['handshook']) {
+                    $this->write($clientId, $frame);
+                }
+            }
+        }
+
+        // TASK-029 — the roster channel: rows newer than the head, oldest
+        // first, to ADMIN connections only (roster management payloads
+        // mirror the admin REST endpoints' exposure — same wire discipline
+        // as pairing frames). Reads ONLY: the writers were the transactions.
+        try {
+            $rosterUpdates = $this->roster->updatesAfter($this->lastRosterId);
+        } catch (QueryException) {
+            DB::purge();
+
+            return;
+        }
+
+        foreach ($rosterUpdates as $update) {
+            $this->lastRosterId = $update['id'];
+            $frame = WsFrame::encode(json_encode(
+                ['type' => 'roster', 'update' => $update],
+                JSON_UNESCAPED_UNICODE,
+            ));
+            foreach ($this->clients as $clientId => $client) {
+                if ($client['handshook'] && $client['admin']) {
                     $this->write($clientId, $frame);
                 }
             }

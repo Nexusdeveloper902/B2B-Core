@@ -194,6 +194,18 @@
         } catch (e) { /* older browsers: SSR rows remain the truth */ }
     }
 
+    // TASK-029 — the roster channel's hook: student/class/reader changes
+    // leave as a `realtime:roster` CustomEvent carrying {id, type,
+    // payload, at}. Frames are admin-only on the wire (the server gates
+    // them like pairing frames); handlers are update-or-prepend so the
+    // hello snapshot can replay safely.
+    function dispatchRosterUpdate(update) {
+        if (!update) { return; }
+        try {
+            document.dispatchEvent(new CustomEvent('realtime:roster', { detail: update }));
+        } catch (e) { /* older browsers: SSR rows remain the truth */ }
+    }
+
     function mintToken() {
         return fetch('/realtime/token', {
             credentials: 'same-origin',
@@ -237,6 +249,12 @@
             if (data.type === 'hello') {
                 if (list) { renderHistory(data.events); }
                 refreshPairingState(data.pairing);
+                // TASK-029 — replay the roster snapshot through the same
+                // idempotent handlers live frames use (admins only receive
+                // it; reconcile the SSR-paint → connect gap).
+                if (data.roster && data.roster.forEach) {
+                    data.roster.forEach(dispatchRosterUpdate);
+                }
             } else if (data.type === 'tap' && data.event) {
                 if (list) { prependTap(data.event); }
                 refreshPageState(data.event);
@@ -244,6 +262,8 @@
                 refreshPairingState(data);
             } else if (data.type === 'recycling' && data.update) {
                 dispatchRecyclingUpdate(data.update);
+            } else if (data.type === 'roster' && data.update) {
+                dispatchRosterUpdate(data.update);
             }
         };
 

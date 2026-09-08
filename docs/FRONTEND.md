@@ -72,6 +72,48 @@ both, pinned by a regression test.
   all-time impact totals.
 - **Goal meters on locked reward cards**: real math (balance ÷ cost).
 
+## 3b. TASK-029 — the realtime passover + GUI completion
+
+The owner's verdict after living in the GUI: "everything that could
+change needs websockets, this needs to be realtime" — plus class
+creation and the grade-°-typing chore. Every page that renders mutable
+state now boots the realtime client and updates live:
+
+| Page | Live channel(s) | What moves without a reload |
+|---|---|---|
+| Admin dashboard | tap + recycling + roster | KPI strip (distinct-student Sets for attendance/PAE), recycling totals, readers table, live feed |
+| Teacher dashboard | tap | attendance rows, per-class summary chips, KPI strip (all scope-fenced server-side, as before) |
+| Students desk | roster (admin frames + hello replay) | created/imported students prepend idempotently; created classes join the select |
+| Readers desk | roster | label/mode repaint (never clobbers the input you're typing in) |
+| Pairing desk | pairing + tap | armed window, status, history, roster card cells (unchanged from TASK-020/023/027) |
+| EcoStation | recycling | ledger, metrics, latest capture (TASK-027, unchanged) |
+| Parent timeline | tap | the viewed student's events prepend; pills/search stay owners of visibility |
+| Student dashboard | recycling | balance (fixed latent bug: the listener read `frame.payload`; the server sends `frame.update.payload`) |
+| Student history | recycling | points ledger rows prepend with the true running balance; the lede balance follows |
+| Student leaderboard | recycling | board + podium re-sort (points DESC, student_id ASC — the server's rule), ranks renumber, my rank/balance follow |
+
+The roster channel (TASK-029) is a fourth WS channel: an append-only
+`roster_updates` table written inside the same transaction as the change
+it describes (`student_created`, `students_imported`, `class_created`,
+`reader_updated`), polled by `realtime:serve`, delivered to admin
+connections only (same exposure discipline as pairing frames), with the
+recent snapshot riding the admin hello (idempotent replay).
+
+GUI completion: grade is a SELECT (`0°`–`11°` — no more typing the
+degree sign), class creation lives in the students desk
+(`POST /api/v1/admin/classes`, optional homeroom teacher), the CSV
+import file input got the design-system surface, and the paginator now
+renders in Datum (a `pagination::tailwind` vendor override — the stock
+Tailwind pager markup never matched this CSS; students desk + history
+were unstyled). Scattered `style="text-align:right"` inline styles
+became one `.ta-right` rule.
+
+Honest limits (documented, not pretended): the leaderboard's
+class-standings panel stays a snapshot (frames carry student-level
+points, not class aggregates); the timeline's empty state doesn't grow
+a live table from zero (reload renders it); the student rewards
+catalog is static by nature.
+
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 
 Everything below was **omitted or replaced honestly** (no fake data, no

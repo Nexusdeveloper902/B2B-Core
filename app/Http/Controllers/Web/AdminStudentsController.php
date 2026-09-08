@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\User;
+use App\Services\Realtime\RealtimeToken;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
@@ -35,6 +38,16 @@ class AdminStudentsController extends Controller
             'classes' => $classes,
             'students' => $students,
             'search' => $search,
+            // TASK-029 — the class-create form's optional homeroom
+            // teacher select (staff only; admins may create classes
+            // before assigning anyone).
+            'teachers' => User::where('role', UserRole::Teacher->value)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            // TASK-029 — the desk is LIVE: roster frames prepend created
+            // students / add created classes the moment they commit.
+            'realtimeToken' => RealtimeToken::issue((int) auth()->id()),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 }

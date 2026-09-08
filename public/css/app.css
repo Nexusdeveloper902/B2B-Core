@@ -973,6 +973,42 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 
 .tool-form { display: flex; flex-wrap: wrap; gap: var(--sp-2xs); align-items: center; margin-bottom: var(--sp-sm); }
 .tool-form .bare-input { flex: 1 1 220px; }
+
+/* TASK-029 — the import desk's file input was the last bare form
+   control: same surface language as .bare-input (frame, radius, field
+   font), with a label-style selector button. */
+.file-row { display: flex; flex-wrap: wrap; gap: var(--sp-2xs); align-items: center; }
+.file-row input[type="file"] {
+    flex: 1 1 240px;
+    min-height: 38px;
+    padding: 7px var(--sp-sm);
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+    color: var(--text-muted);
+}
+.file-row input[type="file"]::file-selector-button {
+    margin-right: var(--sp-sm);
+    border: none;
+    background: var(--surface-container);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    cursor: pointer;
+    font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label);
+    letter-spacing: var(--ls-label-sm);
+    text-transform: uppercase;
+}
+.file-row input[type="file"]::file-selector-button:hover { background: var(--surface-container-high); }
+
+/* Shared right-alignment utility (replaces the scattered inline
+   style="text-align:right" on ledger cells — one rule, one truth). */
+.ta-right { text-align: right; }
+
+/* The teacher dashboard's searchbox owned its flex sizing inline; the
+   rule belongs to the filterbar pair it lives in. */
+.filterbar .searchbox { flex: 1 1 320px; }
 .mode-form { display: flex; gap: var(--sp-2xs); align-items: center; flex-wrap: wrap; }
 .mode-form .mode-select { flex: 1 1 130px; min-width: 0; }
 

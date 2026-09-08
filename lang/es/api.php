@@ -69,6 +69,10 @@ return [
     // TASK-027 (brecha E1) — ruta de imagen de captura
     'capture_image_missing' => 'No hay imagen almacenada para esta captura',
 
+    // TASK-029 — creación de clases (el escritorio de estudiantes)
+    'class_created' => 'Clase :name creada',
+    'class_duplicate' => 'Ya existe una clase llamada :name',
+
     // Genérico
     'forbidden_role' => 'No tienes permiso para realizar esta acción.',
     'not_found' => 'Recurso no encontrado',

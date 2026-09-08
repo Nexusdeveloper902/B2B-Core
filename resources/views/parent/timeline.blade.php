@@ -54,8 +54,9 @@
             </div>
         </div>
     </div>
-    {{-- Honest "live anchor": the only truth this static view can state is
-         when the record was rendered (WS frames are staff pages only). --}}
+    {{-- Honest "live anchor": TASK-029 makes this view live (tap frames
+         prepend events as they happen); the anchor keeps stating the SSR
+         render moment — the truth about what the server painted. --}}
     <div class="live-anchor">
         <span class="dot" aria-hidden="true"></span>
         <span class="live-anchor-label">
@@ -119,7 +120,8 @@
     </div>
 </div>
 
-<div class="stack" data-reveal>
+<div class="stack" data-reveal data-student-live="{{ $student->id }}"
+     data-event-labels='@json(collect(\App\Enums\EventType::cases())->mapWithKeys(fn ($t) => [$t->value => __('app.event_type_'.$t->value)])->all())'>
     <x-panel :label="__('app.event_type')" rule>
         @if(empty($timeline))
             <div class="empty">
@@ -136,7 +138,7 @@
                         <th scope="col">{{ __('app.tapped_at') }}</th>
                         <th scope="col">{{ __('app.reader_label') }}</th>
                         <th scope="col">{{ __('app.material') }}</th>
-                        <th scope="col" style="text-align:right;">{{ __('app.points') }}</th>
+                        <th scope="col" class="ta-right">{{ __('app.points') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -144,7 +146,7 @@
                         <tr data-category="{{ str_starts_with($event['type'], 'CLASS_') || $event['type'] === 'ENTRY' ? 'attendance' : (str_starts_with($event['type'], 'PAE_') ? 'pae' : (str_starts_with($event['type'], 'RECYCLING_') ? 'recycling' : 'other')) }}"
                             data-search="{{ mb_strtolower($event['type'] . ' ' . ($event['reader'] ?? '') . ' ' . ($event['material'] ?? '')) }}">
                             <td data-label="{{ __('app.event_type') }}">
-                                <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ $event['type'] }}</span>
+                                <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ __('app.event_type_'.$event['type']) }}</span>
                             </td>
                             <td class="num" data-label="{{ __('app.tapped_at') }}">
                                 {{ \Illuminate\Support\Carbon::parse($event['occurred_at'])->format('Y-m-d') }}
@@ -152,7 +154,7 @@
                             </td>
                             <td data-label="{{ __('app.reader_label') }}">{{ $event['reader'] ?? '—' }}</td>
                             <td data-label="{{ __('app.material') }}">{{ $event['material'] ?? '—' }}</td>
-                            <td class="num" data-label="{{ __('app.points') }}" style="text-align:right;">
+                            <td class="num ta-right" data-label="{{ __('app.points') }}">
                                 @if($event['points'] !== null && $event['points'] > 0)
                                     <span class="points-badge">+{{ $event['points'] }} PTS</span>
                                 @else
@@ -174,6 +176,16 @@
     </div>
 </div>
 
+{{-- TASK-029 — the timeline is LIVE: tap frames (already role-scoped on
+      the wire) prepend THIS student's events the moment they happen;
+      the filter pills and the search stay owners of visibility. --}}
+<div id="timeline-realtime" hidden data-realtime="{{ json_encode([
+    'token' => $realtimeToken,
+    'expires_at' => $realtimeTokenExpires,
+    'port' => (int) config('realtime.port'),
+    'max_rows' => (int) config('realtime.history_limit'),
+]) }}"></div>
+<script src="{{ asset('js/realtime.js') }}"></script>
 {{-- Client-side filtering + search over the REAL server-rendered rows
      (mockup micro-interaction; no new backend needed). --}}
 <script>
@@ -221,6 +233,76 @@
 
         var allPill = document.querySelector('[data-filter="all"]');
         if (allPill) { allPill.dataset.allLabel = allPill.textContent; }
+
+        // TASK-029 — live prepend: a tap frame naming THIS student adds
+        // its row to the ledger (built with the same DOM grammar the SSR
+        // rows use; textContent everywhere — a label can never inject
+        // markup). The pills and the search stay owners of visibility;
+        // the all-pill count follows the row list.
+        var liveStack = document.querySelector('.stack[data-student-live]');
+        if (liveStack) {
+            var liveStudentId = Number(liveStack.dataset.studentLive);
+            var eventLabels = {};
+            try { eventLabels = JSON.parse(liveStack.dataset.eventLabels || '{}'); } catch (err) { /* labels stay raw */ }
+
+            document.addEventListener('realtime:tap', function (e) {
+                var ev = e.detail || {};
+                if (Number(ev.student_id) !== liveStudentId) { return; }
+
+                var table = document.querySelector('[data-ledger]');
+                if (!table) { return; } // empty-state page: reload renders it
+
+                var type = String(ev.type || '');
+                var category = type.indexOf('CLASS_') === 0 || type === 'ENTRY' ? 'attendance'
+                    : (type.indexOf('PAE_') === 0 ? 'pae'
+                    : (type.indexOf('RECYCLING_') === 0 ? 'recycling' : 'other'));
+
+                if (table.tBodies[0].querySelector('tr[data-live-id="' + ev.id + '"]')) { return; } // idempotent
+
+                var tr = document.createElement('tr');
+                tr.setAttribute('data-category', category);
+                tr.setAttribute('data-live-id', String(ev.id));
+                tr.setAttribute('data-search', (type + ' ' + (ev.reader_label || '')).toLowerCase());
+                tr.className = 'js-row-flash';
+
+                var chipCell = document.createElement('td');
+                var chip = document.createElement('span');
+                chip.className = 'live-chip';
+                chip.setAttribute('data-event-type', type);
+                chip.textContent = eventLabels[type] || type;
+                chipCell.appendChild(chip);
+                tr.appendChild(chipCell);
+
+                var timeCell = document.createElement('td');
+                timeCell.className = 'num';
+                timeCell.textContent = (ev.date || '') + ' ';
+                var timeSpan = document.createElement('span');
+                timeSpan.className = 'muted';
+                timeSpan.textContent = ev.time || '';
+                timeCell.appendChild(timeSpan);
+                tr.appendChild(timeCell);
+
+                var readerCell = document.createElement('td');
+                readerCell.textContent = ev.reader_label || '—';
+                tr.appendChild(readerCell);
+
+                var materialCell = document.createElement('td');
+                materialCell.textContent = '—';
+                tr.appendChild(materialCell);
+
+                var pointsCell = document.createElement('td');
+                pointsCell.className = 'num ta-right';
+                var badge = document.createElement('span');
+                badge.className = 'points-badge is-none';
+                badge.textContent = '—';
+                pointsCell.appendChild(badge);
+                tr.appendChild(pointsCell);
+
+                table.tBodies[0].insertBefore(tr, table.tBodies[0].firstChild);
+                rows.push(tr);
+                apply();
+            });
+        }
     })();
 </script>
 @endsection

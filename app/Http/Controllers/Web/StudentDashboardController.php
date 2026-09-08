@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reward;
+use App\Services\Realtime\RealtimeToken;
 use App\Services\Recycling\LeaderboardService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -51,6 +52,10 @@ class StudentDashboardController extends Controller
                 ->latest('id')
                 ->paginate(25),
             'balance' => $student->pointBalance(),
+            // TASK-029 — the ledger is LIVE: points_awarded / reward_redeemed
+            // frames prepend rows (own student only; the wire is school-wide).
+            'realtimeToken' => RealtimeToken::issue((int) $request->user()->id),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 
@@ -99,6 +104,10 @@ class StudentDashboardController extends Controller
         return view('student.leaderboard', [
             'student' => $student,
             'balance' => $student->pointBalance(),
+            // TASK-029 — the board is LIVE: recycling frames re-sort the
+            // rows and renumber ranks (server-side standings math only).
+            'realtimeToken' => RealtimeToken::issue((int) $request->user()->id),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
             'board' => $board,
             'top3' => array_slice($board, 0, 3),
             'myRank' => $this->leaderboard->rankOf($student),

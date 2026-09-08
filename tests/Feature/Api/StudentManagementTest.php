@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\RosterUpdate;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
@@ -66,6 +67,14 @@ class StudentManagementTest extends TestCase
             'class_id' => $class->id,
             'pae_enrolled' => true,
         ]);
+
+        // TASK-029 — the roster channel frame rides the create
+        // transaction: the students desk goes live the moment it commits.
+        $frame = RosterUpdate::where('type', 'student_created')->latest('id')->first();
+        $this->assertNotNull($frame, 'no student_created roster frame was written');
+        $this->assertSame('Nueva Estudiante', $frame->payload['name']);
+        $this->assertSame($class->name, $frame->payload['class_name']);
+        $this->assertSame('5°', $frame->payload['grade']);
     }
 
     #[Test]
@@ -160,6 +169,14 @@ class StudentManagementTest extends TestCase
         $this->assertDatabaseHas('students', ['name' => 'Importada Dos', 'pae_enrolled' => false]);
         // "si" is a Spanish yes; the class name matched case-insensitively.
         $this->assertDatabaseHas('students', ['name' => 'Importada Tres', 'pae_enrolled' => true]);
+
+        // TASK-029 — ONE students_imported frame per import (not one per
+        // row): the desk prepends every row from the single payload.
+        $frame = RosterUpdate::where('type', 'students_imported')->latest('id')->first();
+        $this->assertNotNull($frame, 'no students_imported roster frame was written');
+        $this->assertCount(3, $frame->payload['students']);
+        $this->assertSame('Importada Uno', $frame->payload['students'][0]['name']);
+        $this->assertSame('5° B', $frame->payload['students'][0]['class_name']);
     }
 
     #[Test]

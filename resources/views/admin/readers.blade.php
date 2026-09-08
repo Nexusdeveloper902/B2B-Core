@@ -68,6 +68,16 @@
     </x-panel>
 </section>
 
+{{-- TASK-029 — the desk is LIVE: reader changes (from either surface —
+      this page or the admin dashboard's mode form) repaint the row the
+      moment they commit (roster frames, realtime.js). --}}
+<div id="readers-realtime" hidden data-realtime="{{ json_encode([
+    'token' => $realtimeToken,
+    'expires_at' => $realtimeTokenExpires,
+    'port' => (int) config('realtime.port'),
+    'max_rows' => (int) config('realtime.history_limit'),
+]) }}"></div>
+<script src="{{ asset('js/realtime.js') }}"></script>
 <script>
     (function () {
         var csrf = document.querySelector('meta[name="csrf-token"]').content;
@@ -84,6 +94,25 @@
         }
 
         var resultBox = document.getElementById('reader-result');
+
+        // TASK-029 — live reader rows: a reader_updated roster frame (or
+        // the hello snapshot replay) repaints the row — unless this admin
+        // is typing into that exact input (never clobber the user).
+        document.addEventListener('realtime:roster', function (e) {
+            var update = e.detail || {};
+            if (update.type !== 'reader_updated') { return; }
+            var r = update.payload || {};
+            if (r.id === undefined) { return; }
+            var label = document.getElementById('label-' + r.id);
+            if (label && document.activeElement !== label && r.label !== undefined) {
+                label.value = r.label;
+                label.dataset.original = r.label;
+            }
+            var mode = document.getElementById('mode-' + r.id);
+            if (mode && document.activeElement !== mode && r.active_event_type !== undefined) {
+                mode.value = r.active_event_type;
+            }
+        });
 
         // Save one reader (label + mode) via the settings endpoint.
         document.querySelectorAll('.reader-save').forEach(function (btn) {

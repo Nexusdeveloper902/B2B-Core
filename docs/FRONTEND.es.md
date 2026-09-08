@@ -77,6 +77,53 @@ sin JS) ahora enlaza ambos, fijado por un test de regresión.
 - **Medidores de progreso en recompensas bloqueadas**: matemática real
   (saldo ÷ costo).
 
+
+## 3b. TASK-029 — el pase de tiempo real + completación de GUI
+
+El veredicto del dueño tras vivir en la GUI: "todo lo que pueda cambiar
+necesita websockets, esto tiene que ser en tiempo real" — más la
+creación de clases y el fastidio de teclear el ° del grado. Cada página
+que muestra estado mutable ahora arranca el cliente de tiempo real y se
+actualiza en vivo:
+
+| Página | Canal(es) en vivo | Qué se mueve sin recargar |
+|---|---|---|
+| Panel admin | tap + reciclaje + roster | franja KPI (Sets de estudiantes distintos para asistencia/PAE), totales de reciclaje, tabla de lectores, feed en vivo |
+| Panel del profesor | tap | filas de asistencia, chips de resumen por clase, franja KPI (todo con alcance por rol en el servidor, como siempre) |
+| Escritorio de estudiantes | roster (marcos admin + replay del hello) | los estudiantes creados/importados se anteponen de forma idempotente; las clases creadas se unen al select |
+| Escritorio de lectores | roster | etiqueta/modo se repintan (nunca pisa el input que estás tecleando) |
+| Escritorio de emparejamiento | emparejamiento + tap | ventana armada, estado, historial, celdas de tarjeta del roster (sin cambios desde TASK-020/023/027) |
+| EcoStation | reciclaje | ledger, métricas, última captura (TASK-027, sin cambios) |
+| Timeline de padres | tap | los eventos del estudiante visto se anteponen; las pastillas/búsqueda siguen siendo dueñas de la visibilidad |
+| Panel del estudiante | reciclaje | saldo (bug latente corregido: el listener leía `frame.payload`; el servidor envía `frame.update.payload`) |
+| Historial del estudiante | reciclaje | las filas del ledger de puntos se anteponen con el saldo corriente real; el saldo del encabezado sigue |
+| Tablero del estudiante | reciclaje | tablero + podio se reordenan (puntos DESC, student_id ASC — la regla del servidor), los rangos se renumeran, mi rango/saldo siguen |
+
+El canal roster (TASK-029) es un cuarto canal WS: una tabla
+`roster_updates` de solo añadir, escrita dentro de la misma transacción
+del cambio que describe (`student_created`, `students_imported`,
+`class_created`, `reader_updated`), sondeada por `realtime:serve`,
+entregada solo a conexiones admin (la misma disciplina de exposición
+del canal de emparejamiento), con el snapshot reciente viajando en el
+hello del admin (replay idempotente).
+
+Completación de GUI: el grado es un SELECT (`0°`–`11°` — se acabó
+teclear el signo de grado), la creación de clases vive en el escritorio
+de estudiantes (`POST /api/v1/admin/classes`, profesor titular
+opcional), el input de archivo del importador CSV recibió la superficie
+del sistema de diseño, y el paginador ahora renderiza en Datum (una
+sobrescritura vendor de `pagination::tailwind` — el marcado Tailwind de
+fábrica nunca casó con este CSS; el escritorio de estudiantes y el
+historial quedaban sin estilo). Los estilos inline dispersos de
+`style="text-align:right"` se volvieron una sola regla `.ta-right`.
+
+Límites honestos (documentados, no fingidos): el panel de posiciones
+por clase del tablero sigue siendo un snapshot (los marcos llevan
+puntos por estudiante, no agregados por clase); el estado vacío del
+timeline no cultiva una tabla en vivo desde cero (una recarga lo
+renderiza); el catálogo de recompensas del estudiante es estático por
+naturaleza.
+
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 
 Todo lo de abajo fue **omitido o reemplazado con honestidad** (sin datos

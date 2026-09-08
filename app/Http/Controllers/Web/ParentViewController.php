@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\AttendanceService;
+use App\Services\Realtime\RealtimeToken;
 use App\Services\StudentScope;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -37,6 +38,11 @@ class ParentViewController extends Controller
             'timeline' => $timeline,
             'points' => $points,
             'paeEnrolled' => $student->pae_enrolled,
+            // TASK-029 — the timeline is LIVE: tap frames (already scoped
+            // per role on the wire) prepend this student's new events as
+            // they happen — the "live anchor" below becomes a real badge.
+            'realtimeToken' => RealtimeToken::issue((int) $request->user()->id),
+            'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
         ]);
     }
 }

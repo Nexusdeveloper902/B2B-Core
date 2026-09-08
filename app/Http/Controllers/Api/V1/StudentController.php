@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StudentStoreRequest;
+use App\Models\RosterUpdate;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Services\Realtime\RosterUpdateLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * TASK-027 — student management through the GUI: create students and
@@ -52,12 +55,29 @@ class StudentController extends Controller
             ], 422);
         }
 
-        $student = Student::create([
-            'name' => $validated['name'],
-            'grade' => $validated['grade'],
-            'class_id' => (int) $validated['class_id'],
-            'pae_enrolled' => (bool) ($validated['pae_enrolled'] ?? false),
-        ]);
+        $student = DB::transaction(function () use ($validated) {
+            $student = Student::create([
+                'name' => $validated['name'],
+                'grade' => $validated['grade'],
+                'class_id' => (int) $validated['class_id'],
+                'pae_enrolled' => (bool) ($validated['pae_enrolled'] ?? false),
+            ]);
+
+            // TASK-029 — the roster channel frame rides the same
+            // transaction: the students desk prepends the row the
+            // moment this commits (same transaction = committed-only
+            // broadcast, the recycling channel's rule).
+            RosterUpdateLog::record(RosterUpdate::TYPE_STUDENT_CREATED, [
+                'id' => $student->id,
+                'name' => $student->name,
+                'grade' => $student->grade,
+                'class_id' => $student->class_id,
+                'class_name' => $student->schoolClass?->name,
+                'pae_enrolled' => $student->pae_enrolled,
+            ]);
+
+            return $student;
+        });
 
         return response()->json([
             'status' => 'ok',
@@ -106,40 +126,64 @@ class StudentController extends Controller
                 $classesLower[mb_strtolower($name)] = $id;
             }
 
-            $created = 0;
-            $errors = [];
-            $dataRows = 0;
-            $rowNumber = 1; // header is row 1
-            $students = [];
+            // TASK-029 — the whole import (creates + the ONE roster
+            // frame describing them) runs inside a single transaction:
+            // committed-only broadcast, and a mid-import failure can
+            // never leave a half-applied roster.
+            [$created, $errors, $dataRows, $students] = DB::transaction(function () use ($handle, $columns, $classes, $classesLower) {
+                $created = 0;
+                $errors = [];
+                $dataRows = 0;
+                $rowNumber = 1; // header is row 1
+                $students = [];
 
-            while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
-                $rowNumber++;
+                while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
+                    $rowNumber++;
 
-                if (count($row) === 1 && trim((string) $row[0]) === '') {
-                    continue; // blank line — not a data row
+                    if (count($row) === 1 && trim((string) $row[0]) === '') {
+                        continue; // blank line — not a data row
+                    }
+
+                    $dataRows++;
+
+                    if ($dataRows > self::IMPORT_MAX_ROWS) {
+                        $errors[] = [
+                            'row' => $rowNumber,
+                            'message' => __('api.students_import_too_many_rows', ['max' => self::IMPORT_MAX_ROWS]),
+                        ];
+                        break;
+                    }
+
+                    $result = $this->importRow($row, $columns, $classes, $classesLower);
+
+                    if ($result['error'] !== null) {
+                        $errors[] = ['row' => $rowNumber, 'message' => $result['error']];
+
+                        continue;
+                    }
+
+                    $students[] = Student::create($result['attributes']);
+                    $created++;
                 }
 
-                $dataRows++;
-
-                if ($dataRows > self::IMPORT_MAX_ROWS) {
-                    $errors[] = [
-                        'row' => $rowNumber,
-                        'message' => __('api.students_import_too_many_rows', ['max' => self::IMPORT_MAX_ROWS]),
-                    ];
-                    break;
+                if ($students !== []) {
+                    // One frame per import: the desk prepends every row
+                    // from this single committed payload (idempotent —
+                    // a row that already renders is updated, not duplicated).
+                    RosterUpdateLog::record(RosterUpdate::TYPE_STUDENTS_IMPORTED, [
+                        'students' => array_map(fn (Student $s) => [
+                            'id' => $s->id,
+                            'name' => $s->name,
+                            'grade' => $s->grade,
+                            'class_id' => $s->class_id,
+                            'class_name' => $s->schoolClass?->name,
+                            'pae_enrolled' => $s->pae_enrolled,
+                        ], $students),
+                    ]);
                 }
 
-                $result = $this->importRow($row, $columns, $classes, $classesLower);
-
-                if ($result['error'] !== null) {
-                    $errors[] = ['row' => $rowNumber, 'message' => $result['error']];
-
-                    continue;
-                }
-
-                $students[] = Student::create($result['attributes']);
-                $created++;
-            }
+                return [$created, $errors, $dataRows, $students];
+            });
         } finally {
             @fclose($handle);
         }

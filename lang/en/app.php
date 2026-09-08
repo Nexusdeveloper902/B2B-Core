@@ -296,4 +296,16 @@ return [
     'open_session' => 'Still inside',
     'session_minutes' => ':n min in school',
     'no_sessions' => 'No entry/exit taps recorded yet for this student.',
+
+    // Class creation (TASK-029 — the students desk's missing first step)
+    'create_class' => 'Create class',
+    'class_name' => 'Class name',
+    'class_teacher_optional' => 'Homeroom teacher (optional)',
+    'class_teacher_none' => 'No teacher',
+
+    // Pagination (TASK-029 — the design-system pager view)
+    'pagination_nav' => 'Pagination',
+    'pagination_prev' => 'Previous page',
+    'pagination_next' => 'Next page',
+    'pagination_page' => 'Page :page',
 ];

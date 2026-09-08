@@ -341,6 +341,56 @@ class RealtimeServerTest extends TestCase
         fclose($sock);
     }
 
+    #[Test]
+    public function roster_updates_broadcast_to_admins_only_and_ride_the_hello(): void
+    {
+        // TASK-029 — rows in roster_updates written by ANOTHER process
+        // (the admin API transactions' job) broadcast as `roster` frames
+        // to ADMIN connections only, and the admin hello carries the
+        // channel's recent snapshot (teachers get neither).
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $adminId = $this->seedUser($db, 'admin');
+        $teacherId = $this->seedUser($db, 'teacher');
+        $seededId = $this->seedRosterUpdate($db, 'student_created', ['id' => 9, 'name' => 'Roster Live One', 'grade' => '2°', 'class_name' => '2° A', 'pae_enrolled' => false]);
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $adminToken = RealtimeToken::issue($adminId, time() + 120);
+        [$adminSock] = $this->upgrade($port, $adminToken);
+
+        $hello = $this->readMessage($adminSock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertSame('hello', $hello['type']);
+        $this->assertArrayHasKey('roster', $hello, 'the admin hello carries the roster channel snapshot');
+        $this->assertSame('student_created', $hello['roster'][0]['type']);
+        $this->assertSame('Roster Live One', $hello['roster'][0]['payload']['name']);
+
+        $teacherToken = RealtimeToken::issue($teacherId, time() + 120);
+        [$teacherSock] = $this->upgrade($port, $teacherToken);
+        $teacherHello = $this->readMessage($teacherSock);
+        $this->assertArrayNotHasKey('roster', $teacherHello, 'teachers never receive the roster channel (admin-only frames)');
+
+        // A committed roster update (the API transaction's write)
+        // broadcasts to admins only.
+        $newId = $this->seedRosterUpdate($db, 'class_created', ['id' => 4, 'name' => '7° B']);
+
+        $frame = $this->readMessage($adminSock);
+        $this->assertNotNull($frame, 'no roster frame arrived for the admin after a committed update');
+        $this->assertSame('roster', $frame['type']);
+        $this->assertSame($newId, $frame['update']['id']);
+        $this->assertSame('class_created', $frame['update']['type']);
+        $this->assertSame('7° B', $frame['update']['payload']['name']);
+
+        // The teacher connection gets NOTHING for the roster write (its
+        // socket stays silent — the next read times out empty).
+        $this->assertNull($this->readMessageIfAny($teacherSock, 0.2), 'a roster frame leaked to a teacher connection');
+
+        fclose($adminSock);
+        fclose($teacherSock);
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private function freshFileDatabase(): string
@@ -446,6 +496,20 @@ class RealtimeServerTest extends TestCase
         $now = now()->format('Y-m-d H:i:s');
 
         return (int) $conn->table('recycling_updates')->insertGetId([
+            'type' => $type,
+            'payload' => json_encode($payload),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    /** Insert one roster_updates row (an admin API transaction's write); returns the id. */
+    private function seedRosterUpdate(string $db, string $type, array $payload): int
+    {
+        $conn = DB::connection('realtime_file');
+        $now = now()->format('Y-m-d H:i:s');
+
+        return (int) $conn->table('roster_updates')->insertGetId([
             'type' => $type,
             'payload' => json_encode($payload),
             'created_at' => $now,

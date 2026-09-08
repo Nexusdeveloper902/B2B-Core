@@ -15,7 +15,7 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
 | `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
@@ -530,6 +530,39 @@ ilegible).
 
 ---
 
+## POST /api/v1/admin/classes — crear una clase (TASK-029, solo admin)
+
+El primer paso que faltaba en el flujo de roster: el SELECT de clases
+del escritorio `/admin/students` era de solo lectura antes — crear una
+clase exigía SQL escrito a mano. **Requiere rol admin.** La asignación
+de profesor es OPCIONAL (una clase puede existir antes de elegir a su
+profesor titular; solo usuarios con `role: teacher` pueden asignarse).
+
+**Petición**:
+
+```json
+{ "name": "6° A", "teacher_user_id": 2 }
+```
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "class": { "id": 5, "name": "6° A", "teacher_name": "Prof. Elena Ramírez" },
+  "message": "Clase 6° A creada."
+}
+```
+
+`422` — errores de validación, o `{"status":"error","reason":"duplicate"}`
+si el nombre ya existe (sin distinguir mayúsculas, igual que la regla de
+estudiantes). Cada creación confirmada escribe un marco `class_created`
+del canal roster en la misma transacción (ver Marcos en vivo del canal
+roster abajo) — el SELECT de clases del escritorio se actualiza en vivo
+en cuanto la clase existe.
+
+---
+
 ## DELETE /api/v1/admin/cards/{id} — desvincular una tarjeta (TASK-027, solo admin)
 
 La mitad GUI del vacío D1: el roster del escritorio de emparejamiento
@@ -723,3 +756,24 @@ seeder, p. ej. `carlos@presence.test` / `password`) y aterrizan en
 `/student`, `/student/history`, `/student/rewards` — alcance restringido
 del lado del servidor a sus propios datos únicamente.
 
+## Marcos en vivo del canal roster (TASK-029)
+
+Los cambios de roster se difunden en un cuarto canal, `roster` — solo
+conexiones admin (los payloads reflejan la exposición de los endpoints
+REST admin; la misma disciplina del canal de emparejamiento):
+
+```json
+{"type": "roster", "update": {"id": 3, "type": "student_created",
+ "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_enrolled": false},
+ "at": "2026-09-09 08:00:00"}}
+```
+
+Tipos de marco: `student_created` (una fila), `students_imported`
+(`payload.students[]` — un marco por importación), `class_created` y
+`reader_updated` (lo escriben AMBOS endpoints de escritura de lectores
+— el PUT de ajustes y el POST de solo modo). Las filas van en la misma
+transacción del cambio que describen; el hello del admin lleva el
+snapshot reciente bajo `roster` para que una página recién conectada se
+reconcilie. El escritorio de estudiantes antepone filas en vivo y añade
+opciones de clase; el escritorio de lectores y la tabla de lectores del
+panel admin repintan los cambios de lector.

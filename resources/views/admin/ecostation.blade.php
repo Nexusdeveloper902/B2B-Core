@@ -88,7 +88,7 @@
                     <th scope="col">{{ __('app.reader_label') }}</th>
                     <th scope="col">{{ __('app.material') }}</th>
                     <th scope="col">{{ __('app.ecostation_confidence') }}</th>
-                    <th scope="col" style="text-align:right;">{{ __('app.points') }}</th>
+                    <th scope="col" class="ta-right">{{ __('app.points') }}</th>
                 </tr>
                 </thead>
                 <tbody id="deposit-ledger-body">
@@ -101,7 +101,7 @@
                             <span class="live-chip" data-event-type="RECYCLING_DEPOSIT">{{ __('app.material_'.$deposit->material_class?->value) }}</span>
                         </td>
                         <td class="num mono" data-label="{{ __('app.ecostation_confidence') }}">{{ $deposit->confidence !== null ? round(100 * $deposit->confidence) . '%' : '—' }}</td>
-                        <td class="num" data-label="{{ __('app.points') }}" style="text-align:right;">
+                        <td class="num ta-right" data-label="{{ __('app.points') }}">
                             <span class="points-badge">+{{ $deposit->points_awarded }} PTS</span>
                         </td>
                     </tr>
@@ -235,7 +235,7 @@
                             esc(labels.material[payload.material_class] || payload.material_class || '—') + '</span></td>' +
                         '<td class="num mono">' + (payload.confidence != null
                             ? Math.round(100 * payload.confidence) + '%' : '—') + '</td>' +
-                        '<td class="num" style="text-align:right;"><span class="points-badge" id="points-' +
+                        '<td class="num ta-right"><span class="points-badge" id="points-' +
                             esc(String(payload.event_id)) + '">+… PTS</span></td>';
                     body.insertBefore(tr, body.firstChild);
                     while (body.children.length > 15) { body.removeChild(body.lastChild); }
