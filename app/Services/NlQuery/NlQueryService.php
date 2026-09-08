@@ -3,6 +3,7 @@
 namespace App\Services\NlQuery;
 
 use App\Services\NlQuery\Exceptions\NlQueryException;
+use App\Services\StudentScope;
 
 /**
  * NL-query orchestration (Phase E).
@@ -19,6 +20,10 @@ use App\Services\NlQuery\Exceptions\NlQueryException;
  * contract api-docs.deepseek.com/guides/tool_calls prescribes.
  *
  * Max 3 tool rounds so a confused model cannot loop forever.
+ *
+ * TASK-027 — the caller's StudentScope (admin = school-wide, teacher =
+ * own classes) rides along into every function execution, so answers
+ * can never leave the caller's data wall.
  */
 class NlQueryService
 {
@@ -28,7 +33,14 @@ class NlQueryService
         .'class attendance, the PAE school feeding program, and recycling points. '
         .'When a question needs data, call one of the provided functions; the backend '
         .'executes the real query and returns the numbers — never invent numbers. '
-        .'After receiving function results, answer concisely in the language of the question.';
+        .'The caller is either an admin with school-wide access or a teacher whose '
+        .'answers are automatically scoped to the classes they teach — functions '
+        .'already apply that scope, so answer within it without apologizing for it. '
+        .'After receiving function results, answer in the language of the question. '
+        .'Be concise: at most three short sentences or a compact bullet list — no '
+        .'preamble, no filler, no restating the question. Use light Markdown only: '
+        .'**bold** for key numbers, "- " bullets for short lists, `backticks` for '
+        .'identifiers; never headings and never tables.';
 
     public function __construct(
         private readonly DeepSeekClient $client,
@@ -46,7 +58,7 @@ class NlQueryService
      * @throws NlQueryException when no LLM credential is configured (the
      *                          controller maps this to a structured 503)
      */
-    public function ask(string $question): array
+    public function ask(string $question, ?StudentScope $scope = null): array
     {
         if (! $this->client->isConfigured()) {
             // Credential-dependent blocker (protocol Phase E / ADR-005).
@@ -89,8 +101,9 @@ class NlQueryService
             foreach ($result['tool_calls'] as $call) {
                 $functionsCalled[] = ['name' => $call['name'], 'args' => $call['arguments']];
 
-                // Execute locally — the single source of numbers is the backend.
-                $functionResult = $this->registry->execute($call['name'], $call['arguments']);
+                // Execute locally — the single source of numbers is the
+                // backend, already fenced by the caller's data wall.
+                $functionResult = $this->registry->execute($call['name'], $call['arguments'], $scope);
 
                 $messages[] = [
                     'role' => 'tool',

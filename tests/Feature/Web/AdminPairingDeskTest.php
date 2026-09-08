@@ -114,6 +114,51 @@ class AdminPairingDeskTest extends TestCase
     }
 
     #[Test]
+    public function each_paired_card_carries_its_own_unpair_button(): void
+    {
+        // TASK-027 — gap D1's GUI half: the roster's card cell is no longer
+        // a read-only code dump; every credential is a chip with a
+        // server-backed Unpair action, and the desk script drives
+        // DELETE /api/v1/admin/cards/{card}.
+        $uid = $this->cardUidFor('Maria González');
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing');
+
+        $response->assertOk()
+            ->assertSee('data-card-chip', false)
+            ->assertSee('class="btn btn-quiet btn-small unpair-btn"', false)
+            ->assertSee('data-unpair=', false)
+            ->assertSee('data-uid="'.$uid.'"', false)
+            ->assertSeeText('Unpair')
+            // the destructive endpoint + confirm copy the script uses
+            ->assertSee("'/api/v1/admin/cards/' + btn.dataset.unpair", false)
+            ->assertSee('var UNPAIRED_TEXT = "Card unpaired', false);
+
+        // The confirm dialog warns that the tap history is deleted.
+        $this->assertStringContainsString('tap history is deleted', $response->getContent());
+    }
+
+    #[Test]
+    public function the_unpair_button_copy_is_fully_translated_into_spanish(): void
+    {
+        $teacher = User::where('email', 'teacher@presence.test')->firstOrFail();
+
+        $this->actingAs($teacher)->get('/locale/es');
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing');
+
+        $response->assertOk()
+            ->assertSeeText('Desvincular')
+            ->assertSee('var UNPAIRED_TEXT = "Tarjeta desvinculada', false);
+
+        // The Spanish confirm template substitutes the same placeholders.
+        $this->assertStringContainsString(':UID:', $response->getContent());
+        $this->assertStringContainsString(':NAME:', $response->getContent());
+
+        $this->actingAs($teacher)->get('/locale/en');
+    }
+
+    #[Test]
     public function a_rejected_tap_is_server_rendered_on_the_armed_window(): void
     {
         // TASK-014 — F5 mid-window keeps the operator informed: the armed

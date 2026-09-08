@@ -34,13 +34,24 @@ class TeacherDashboardController extends Controller
 
         $cutoff = (string) config('presence.late_cutoff');
 
+        // TASK-027 — the SSR live feed honors the teacher data wall: rows
+        // are scoped to the classes this teacher teaches (the WS server
+        // applies the same scope per connection). Admins keep the
+        // school-wide plane.
+        $feedClassIds = $user->isTeacher()
+            ? $user->classes()->pluck('classes.id')->values()->all()
+            : null;
+
         return view('teacher.dashboard', [
             'classes' => $classes,
             'attendanceByClass' => $attendanceByClass,
             'cutoff' => $cutoff,
-            'recentEvents' => $this->realtimeFeed->recent((int) config('realtime.history_limit')),
+            'recentEvents' => $this->realtimeFeed->recent((int) config('realtime.history_limit'), $feedClassIds),
             'realtimeToken' => RealtimeToken::issue((int) $user->id),
             'realtimeTokenExpires' => RealtimeToken::freshExpiry(),
+            // TASK-027 — the teacher's own NL query desk renders only when
+            // the LLM credential exists (same honesty rule as the admin box).
+            'nlQueryConfigured' => ! empty(config('recycling.nl_query.api_key')),
         ]);
     }
 }

@@ -46,6 +46,28 @@ return [
     'nlq_rate_limited' => 'The language model quota is exhausted, please retry later.',
     'nlq_unavailable' => 'The language model service is unavailable, please retry later.',
 
+    // TASK-027 — PAE enrollment gate (feeding-program readers reject
+    // non-enrolled students; message is device-facing, Accept-Language).
+    'pae_not_enrolled' => ':student is not enrolled in the PAE feeding program',
+    'pae_unknown_student' => 'this student',
+
+    // TASK-027 — student management (create + CSV import)
+    'student_duplicate' => 'A student named :name already exists in :class',
+    'student_created' => 'Student :name created',
+    'students_import_unreadable' => 'The uploaded file could not be read as CSV',
+    'students_import_bad_header' => 'Missing required CSV columns (name, grade, class) in the header row',
+    'students_import_no_rows' => 'The CSV contains no data rows',
+    'students_import_too_many_rows' => 'The CSV exceeds the maximum of :max rows',
+    'students_import_row_incomplete' => 'Row is missing a name or grade',
+    'students_import_unknown_class' => 'Class :class does not exist',
+    'students_import_summary' => ':created student(s) created, :failed row(s) failed',
+
+    // TASK-027 — per-card unpair
+    'card_unpaired' => 'Card unpaired from :student — the credential is fresh again',
+
+    // TASK-027 (gap E1) — capture image route
+    'capture_image_missing' => 'No stored image for this capture',
+
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',
     'not_found' => 'Resource not found',

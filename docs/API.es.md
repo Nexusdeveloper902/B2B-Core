@@ -15,7 +15,8 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Roles admin/teacher aplicados por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
+| `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
 `Accept-Language: es` para español (p. ej. `{"message": "Tarjeta no reconocida"}`);
@@ -91,6 +92,25 @@ otorgan puntos en el momento del tap.**
 `404 Not Found` — tarjeta desconocida (`Tarjeta no reconocida`) o no activa
 (`La tarjeta no está activa`).
 
+`422 Unprocessable Entity` — **compuerta de inscripción PAE** (TASK-027):
+una tarjeta válida y activa cuyo estudiante **no está inscrito en el PAE**
+tocó un lector en modo `PAE_BREAKFAST`/`PAE_LUNCH`. El consumo NO se
+registra (mantiene honesto a `paeCount()`: la asistencia de comidas solo
+proviene de toques de estudiantes inscritos) y el intento queda escrito en
+`storage/logs/laravel.log` como pista de auditoría del programa:
+
+```json
+{"status":"error","reason":"student_not_pae","event_type":"PAE_BREAKFAST","message":"Ana no está inscrita en el programa de alimentación"}
+```
+
+**Pares entrada/salida (TASK-027):** un lector en modo `ENTRY` registra
+cada toque como evento `ENTRY` — y el mismo lector en modo `EXIT` registra
+`EXIT`. Varias filas por estudiante y día son el punto (cada entrada queda
+registrada); `AttendanceService::studentSessions()` las empareja al vuelo
+para derivar el tiempo en la escuela (una entrada sin salida cuenta como
+sesión abierta). Sin cambio de esquema: ambos valores cabalgan la misma
+columna `events.type`.
+
 ---
 
 ## POST /api/v1/admin/readers/{id}/mode — reetiquetar lector (Fase B)
@@ -106,7 +126,7 @@ se acepta `PUT`.
 ```
 
 Valores válidos: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
-`RECYCLING_DEPOSIT`, `ENTRY` (cualquier otro → 422).
+`RECYCLING_DEPOSIT`, `ENTRY`, `EXIT` (cualquier otro → 422).
 
 **Respuesta `200`**:
 
@@ -116,6 +136,10 @@ Valores válidos: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
   "reader": { "id": 1, "label": "Demo Reader — Classroom/PAE", "type": "classroom", "active_event_type": "PAE_LUNCH" }
 }
 ```
+
+¿También renombrar el lector? Usa el endpoint combinado de ajustes de
+abajo (`PUT /api/v1/admin/readers/{id}`) — una sola petición actualiza el
+nombre Y el modo activo.
 
 ---
 
@@ -340,19 +364,37 @@ toques en el endpoint de tap.
 
 ---
 
-## POST /api/v1/nl-query — consulta en lenguaje natural (Fase E, solo admin)
+## POST /api/v1/nl-query — consulta en lenguaje natural (Fase E, admin + docente)
 
 **Petición**: `{"question": "¿Cuántos niños llegaron tarde esta semana?"}`
+
+**Roles (TASK-027):** admin (toda la escuela) Y docente. Las preguntas de
+un docente quedan cercadas **en el servidor** a las clases que dicta —
+cada ejecución de función aplica el `StudentScope` del autor; una clase o
+estudiante fuera del muro responde con un error explícito de alcance,
+nunca con datos. Los estudiantes siguen en 403.
 
 Flujo: la pregunta + un conjunto fijo de esquemas de funciones va al modelo
 de DeepSeek (por defecto `deepseek-v4-flash`) → el modelo
 **selecciona una función** → el backend ejecuta la
 **consulta Eloquent real** → el resultado vuelve al modelo → el modelo redacta
-la respuesta final. El LLM nunca calcula ni fabrica cifras.
+la respuesta final. El LLM nunca calcula ni fabrica cifras. Las respuestas
+son **concisas por contrato** (máximo tres frases cortas o una lista
+compacta) y usan **Markdown ligero** (`**negrita**`, viñetas `- `,
+`` `comillas inversas` ``) — los paneles lo renderizan vía
+`public/js/markdown.js` (escape primero, nunca HTML crudo).
 
 Funciones disponibles: `get_attendance_count(date, class_id?)`,
-`get_pae_count(meal, date)`, `get_recycling_totals(date_from, date_to)`,
-`get_student_timeline(student_id)`.
+`get_pae_count(meal, date, class_id?)`,
+`get_recycling_totals(date_from, date_to)` (toda la escuela por diseño —
+tablero público de competencia, spec §22),
+`get_student_timeline(student_id)`, más la **mitad analítica
+(TASK-027)**: `get_absence_count(date, class_id?)`,
+`get_absent_students(date, class_id?)`, `get_late_count(date,
+class_id?)`, `get_attendance_trend(days)`,
+`get_repeatedly_absent_students(days, min_absences, class_id?)`,
+`get_student_time_in_school(student_id, days)` y
+`find_student(name)` (resuelve un nombre parcial a un `student_id`).
 
 **Respuestas**
 
@@ -390,6 +432,147 @@ DeepSeek):
 Ejecuta `./run llm-check` en la máquina que hace las llamadas — realiza una
 petición directa en vivo con la misma clave + modelo e imprime el veredicto
 exacto de DeepSeek con orientación bilingüe.
+
+---
+
+## PUT /api/v1/admin/readers/{id} — ajustes del lector: nombre + modo (TASK-027, solo admin)
+
+El endpoint que respalda el escritorio de gestión `/admin/readers` (la
+página perdida en el rediseño del frontend, ahora restaurada): renombrar
+un lector Y cambiar su modo activo en UNA petición. **Requiere rol admin**
+(teacher → 403, invitado → 401). El endpoint de solo-modo de arriba queda
+intacto — su contrato está fijado por pruebas.
+
+**Petición**:
+
+```json
+{ "label": "Aula 12 — Entrada", "active_event_type": "ENTRY" }
+```
+
+`label`: obligatorio, 3–255 caracteres. `active_event_type`: obligatorio,
+mismos valores válidos que el endpoint de modo.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "ENTRY" }
+}
+```
+
+`422` — errores de validación (nombre corto, modo desconocido).
+
+---
+
+## POST /api/v1/admin/students — crear un estudiante (TASK-027, solo admin)
+
+El fin de los INSERT escritos a mano: el escritorio `/admin/students`
+crea estudiantes por este endpoint. **Requiere rol admin.** La CUENTA de
+estudiante 1:1 NO se crea aquí — las cuentas son un paso separado y
+deliberado (el patrón del seeder), no un efecto silencioso de la
+inscripción.
+
+**Petición**:
+
+```json
+{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_enrolled": true }
+```
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true },
+  "message": "Estudiante Nueva Estudiante creado."
+}
+```
+
+`422` — errores de validación, o `{"status":"error","reason":"duplicate"}`
+para el mismo nombre en la misma clase (un duplicado nunca es un salto
+silencioso).
+
+---
+
+## POST /api/v1/admin/students/import — importación masiva de roster CSV (TASK-027, solo admin)
+
+**Requiere rol admin.** Petición multipart: `file` (CSV, máx 2 MB, hasta
+500 filas). Fila de encabezado OBLIGATORIA — columnas sin distinción de
+mayúsculas, orden libre, columnas extra ignoradas:
+
+```csv
+name,grade,class,pae_enrolled
+María Pérez,5°,5° B,yes
+```
+
+`class` se resuelve por NOMBRE de clase (el flujo humano); `pae_enrolled`
+acepta `yes`/`no`/`true`/`false`/`1`/`0`/`si`/`sí`. Las fallas por fila se
+reportan por fila (número de fila + mensaje bilingüe) — una fila mala
+nunca bloquea a las buenas; los duplicados son errores de fila.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "created": 2,
+  "failed": 0,
+  "errors": [],
+  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B" }],
+  "message": "Importación terminada: 2 creados, 0 fallidos."
+}
+```
+
+`status` es `ok` (todas las filas), `partial` (algunas sí, algunas no) o
+`error` + 422 (nada creado — encabezado malo, sin filas de datos, archivo
+ilegible).
+
+---
+
+## DELETE /api/v1/admin/cards/{id} — desvincular una tarjeta (TASK-027, solo admin)
+
+La mitad GUI del vacío D1: el roster del escritorio de emparejamiento
+lleva un botón **Desvincular** por credencial; este endpoint lo respalda.
+**Requiere rol admin.** Las semánticas reflejan el comando masivo
+`cards:unpair` (ADR-023) con granularidad de una sola tarjeta — «fresca»
+significa que la fila no existe, así que desvincular BORRA la fila de la
+tarjeta (nunca pone `student_id` en null — una fila nuleada seguiría
+bloqueando el re-emparejamiento). Los eventos de tap se eliminan en
+cascada con la tarjeta; las filas de historial `pending_pairings` sobreviven
+con su vínculo limpiado (pista de auditoría). Una transacción, resultado
+determinista.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "unpaired": { "credential_uid": "M9TN530AIT7N", "student_name": "Maria González", "events_deleted": 3, "history_links_cleared": 1 },
+  "message": "Tarjeta desvinculada de Maria González — la credencial vuelve a estar fresca"
+}
+```
+
+Tras una desvinculación exitosa la MISMA credencial puede volver a
+emparejarse de inmediato (el bucle de banco: emparejar → desvincular →
+re-emparejar).
+
+---
+
+## GET /api/v1/admin/captures/{deposit}/image — transmitir una captura almacenada (TASK-027, vacío E1, solo admin)
+
+Las imágenes de captura viven en el disco **privado** `local`
+(`storage/app/private`) como artefactos de auditoría y pueden contener
+estudiantes — nunca van a un disco público. Esta ruta con autenticación
+de admin es la única puerta autorizada (la página EcoStation la solicita
+mismo-origen con la cookie de sesión; una petición de docente/estudiante
+recibe 403 en el muro de roles antes de leer un solo byte del archivo).
+
+**Respuesta `200`** — los bytes de la imagen (transmitida, inline,
+`Cache-Control: private, max-age=60`).
+
+`404` — el depósito no tiene imagen almacenada, o el archivo falta en
+disco.
 
 ---
 
@@ -524,6 +707,15 @@ Tipos de marco: `capture_created`, `validation_started`, `validated`,
 escriben dentro de la MISMA transacción de BD que el cambio de estado que
 describen, así un marco solo refleja estado confirmado. El marco hello
 lleva la instantánea reciente bajo `recycling`.
+
+**Alcance por conexión (TASK-027):** el canal de toques ahora está cercado
+por conexión, resuelto una sola vez en el handshake (fail closed): los
+docentes solo ven toques de estudiantes de SUS clases, las cuentas de
+estudiante solo ven SUS propios toques, los admins ven toda la escuela. El
+marco hello respeta el mismo alcance, y la página EcoStation consume los
+marcos `recycling` en vivo (CustomEvents `realtime:recycling` — filas del
+libro, métricas de impacto y el panel de última captura se actualizan sin
+recargar).
 
 Escritorio web de autoservicio del estudiante (TASK-025): los estudiantes
 inician sesión (misma página de login; cuentas demo impresas por el

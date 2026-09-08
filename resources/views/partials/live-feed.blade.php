@@ -42,6 +42,11 @@
                 'state_offline' => __('app.live_state_offline'),
                 'rel_now' => __('app.live_rel_now'),
                 'rel_min' => __('app.live_rel_min'),
+                // TASK-027 — i18n: live-arriving chips render the localized
+                // label (SSR rows use the same keys below).
+                'event_types' => collect(\App\Enums\EventType::cases())
+                    ->mapWithKeys(fn ($type) => [$type->value => __('app.event_type_'.$type->value)])
+                    ->all(),
             ],
         ]) }}">
         @forelse($recentEvents as $event)
@@ -53,7 +58,7 @@
                     <span class="live-context">{{ $event['class_name'] ?? '—' }} · {{ $event['reader_label'] ?? '—' }}</span>
                 </span>
                 <span class="live-side">
-                    <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ $event['type'] }}</span>
+                    <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ __('app.event_type_'.$event['type']) }}</span>
                     <span class="live-time">{{ $event['time'] }}</span>
                 </span>
             </li>

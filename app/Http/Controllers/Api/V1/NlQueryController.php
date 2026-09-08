@@ -6,13 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\NlQueryRequest;
 use App\Services\NlQuery\Exceptions\NlQueryException;
 use App\Services\NlQuery\NlQueryService;
+use App\Services\StudentScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Phase E — natural-language query interface (admin-only).
+ * Phase E — natural-language query interface.
  *
  * POST /api/v1/nl-query  { "question": "..." }
+ *
+ * TASK-027 — admin AND teacher. A teacher's questions are fenced by
+ * their StudentScope (own classes) at every function execution — the
+ * data wall is server-side, never prompt-side. Students stay 403.
  *
  * DeepSeek (deepseek-v4-flash) tool-calling. The LLM only selects
  * functions and phrases answers; all numbers come from real backend
@@ -28,8 +33,10 @@ class NlQueryController extends Controller
 
     public function store(NlQueryRequest $request): JsonResponse
     {
+        $scope = StudentScope::forUser($request->user());
+
         try {
-            $result = $this->nlQuery->ask((string) $request->validated('question'));
+            $result = $this->nlQuery->ask((string) $request->validated('question'), $scope);
         } catch (NlQueryException $e) {
             return $this->blockedResponse($e);
         }

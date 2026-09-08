@@ -73,7 +73,7 @@
                 @forelse($readers as $reader)
                     <tr>
                         <td data-label="{{ __('app.reader') }}">{{ $reader->label }}</td>
-                        <td data-label="{{ __('app.reader_type') }}"><code>{{ $reader->type->value }}</code></td>
+                        <td data-label="{{ __('app.reader_type') }}"><code>{{ __('app.reader_type_'.$reader->type->value) }}</code></td>
                         <td data-label="{{ __('app.active_mode') }}">
                             <form class="mode-form tool-form" data-reader="{{ $reader->id }}">
                                 <select name="active_event_type" class="mode-select bare-select"
@@ -81,7 +81,7 @@
                                     @foreach(\App\Enums\EventType::cases() as $eventType)
                                         <option value="{{ $eventType->value }}"
                                                 @selected($reader->active_event_type === $eventType->value)>
-                                            {{ $eventType->value }}
+                                            {{ __('app.event_type_'.$eventType->value) }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -156,6 +156,7 @@
 </section>
 
 <script src="{{ asset('js/realtime.js') }}"></script>
+<script src="{{ asset('js/markdown.js') }}"></script>
 <script>
     (function () {
         var csrf = document.querySelector('meta[name="csrf-token"]').content;
@@ -184,10 +185,19 @@
             });
         }
 
+        // TASK-027 — NL answers render light Markdown. The answer is
+        // model-generated text and NEVER trusted HTML: markdown.js
+        // escapes everything first and only then emits its own tiny
+        // elements (no links, no images, no raw HTML). Our own error
+        // strings stay plain text.
         function show(el, text, ok) {
             el.classList.remove('hidden');
-            el.textContent = text;
             el.className = 'nl-answer ' + (ok ? 'answer-ok' : 'answer-error');
+            if (ok && window.renderMarkdown) {
+                el.innerHTML = window.renderMarkdown(text);
+            } else {
+                el.textContent = text;
+            }
         }
 
         // Reader mode change (calls the Phase B mode endpoint).
@@ -210,7 +220,8 @@
             });
         });
 
-        // NL query box (Phase E).
+        // NL query box (Phase E). TASK-027 — the pending state says what
+        // is happening; the answer renders Markdown.
         var nlForm = document.getElementById('nl-query-form');
         nlForm.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -221,7 +232,7 @@
             busy(btn, true);
             box.classList.remove('hidden');
             box.className = 'nl-answer';
-            box.textContent = '…';
+            box.textContent = '{{ __('app.nl_query_processing') }}';
             postJson('/api/v1/nl-query', {question: question}).then(function (r) {
                 busy(btn, false);
                 show(box, r.data.answer || r.data.message || '{{ __('app.error_generic') }}', r.ok);

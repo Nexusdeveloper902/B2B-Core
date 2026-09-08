@@ -117,6 +117,14 @@ class ClassificationService
                     'confidence' => (float) $result['confidence'],
                     'is_bottle' => (bool) ($result['is_bottle'] ?? false),
                     'is_recyclable' => (bool) ($result['is_recyclable'] ?? false),
+                    // TASK-027 — EcoStation live rows + the latest-capture
+                    // panel render straight from this frame; the reader
+                    // label and student name ride it so the live row is
+                    // as complete as the SSR one (no invented cells).
+                    'student_name' => $student->name,
+                    'reader_label' => $event->reader?->label,
+                    'occurred_at' => $event->occurred_at->format('Y-m-d H:i'),
+                    'image_path_present' => $deposit->image_path !== null,
                 ]);
 
                 RecyclingUpdateLog::record(RecyclingUpdate::TYPE_POINTS_AWARDED, [

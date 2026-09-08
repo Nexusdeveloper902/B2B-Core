@@ -72,7 +72,11 @@ class FullJourneyTest extends TestCase
         $newStudent = Student::create([
             'name' => 'Estudiante Nueva',
             'grade' => '5°',
-            'pae_enrolled' => false,
+            // TASK-027 — the reader is already in PAE_BREAKFAST mode at
+            // this point of the journey, and the PAE enrollment gate now
+            // rejects non-enrolled students at feeding-program readers:
+            // this student is enrolled, so the freshly paired card works.
+            'pae_enrolled' => true,
         ]);
 
         $this->actingAs($admin)

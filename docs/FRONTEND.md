@@ -47,10 +47,13 @@ drain bar, login auth card, demo chips, empty states.
 | EcoStation & Recycling Hub | `/admin/ecostation` **(new)** | `admin/ecostation` |
 | Rewards & Perks Store | `/student/rewards` | `student/rewards` |
 | Leaderboard & Class Standings | `/student/leaderboard` **(new)** | `student/leaderboard` |
+| Students — enrollment desk | `/admin/students` **(new, TASK-027)** | `admin/students` |
+| Readers — management desk | `/admin/readers` **(new, TASK-027)** | `admin/readers` |
 
-The two **new** pages are read-only views over data that already existed
-(see §4). Nav stays role-scoped exactly as before — students see the
-student hub (now 4 items), staff see staff pages.
+The two TASK-026 pages and the two TASK-027 desks are views over data
+that already existed plus new admin write endpoints (see §4). Nav stays
+role-scoped exactly as before — students see the student hub, staff see
+staff pages.
 
 ## 3. What was deliberately added (real data, no new backend behavior)
 
@@ -123,21 +126,22 @@ backend surface required before the mockup element can ship truthfully.
 
 ### Pairing desk
 
-| # | Mockup element | Why it's not there | Needs |
-|---|---|---|---|
-| D1 | Per-row "reassignment / replace card" actions | Unpair is a server-side CLI (`./run unpair`) by design — the card link is an admin decision | An unpair web endpoint (currently one honest click: arm) |
+| # | Mockup element | Status |
+|---|---|---|
+| D1 | Per-row "reassignment / replace card" actions | **CLOSED (TASK-027)** — every paired credential in the roster is a chip with its own **Unpair** button, backed by `DELETE /api/v1/admin/cards/{card}` (semantics mirror the bulk `cards:unpair` command; confirm dialog says the tap history is deleted) |
 | D2 | Status-state reference matrix | The real states already render live in the panel | — |
 | D3 | Reader terminal telemetry + firmware status | No firmware reporting (B2B-Firmware has no status channel) | A device-status endpoint + WS frame |
 | D4 | Crypto ledger footer | See G6 | — |
 
 ### EcoStation
 
-| # | Mockup element | Why it's not there | Needs |
-|---|---|---|---|
-| E1 | Capture image display ("sensor audit spotlight") | Images persist on the **private** disk as audit artifacts (spec §14) — serving them requires an authorized image route (images may contain students) | An admin-authed streaming route for `recycling-captures/*`; the card shows the REAL capture metadata (material, confidence, boundary booleans) with an honest "kept in private audit storage" note |
+| # | Mockup element | Status |
+|---|---|---|
+| E1 | Capture image display ("sensor audit spotlight") | **CLOSED (TASK-027)** — the REAL image streams through the admin-authed `GET /api/v1/admin/captures/{deposit}/image` (private disk stays private); a deposit without a stored image keeps the honest private-storage note |
 | E2 | Terminal telemetry / firmware snippet / compliance box | No hardware reporting | See D3 |
 | E3 | Interactive terminal simulation modal | A mockup demo tool, not a feature | — |
 | E4 | Per-reader material "directives" | Rates are global config today (rendered truthfully) | Per-reader rate overrides (would need a schema change) |
+| E5 | Live updates (no reload) | **CLOSED (TASK-027)** — the hub boots `[data-realtime]` (live badge + `realtime:recycling` CustomEvents): ledger rows prepend, impact metrics bump, the latest-capture panel refreshes |
 
 ### Login
 

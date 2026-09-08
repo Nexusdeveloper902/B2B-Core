@@ -45,8 +45,23 @@ class FunctionRegistryTest extends TestCase
     {
         $names = array_column($this->registry->declarations(), 'name');
 
+        // TASK-027 — the analytical half joins the fixed set: absences,
+        // repeat absentees, trends, late counts, name lookup, and
+        // time-in-school (all scope-aware for the teacher interface).
         $this->assertSame(
-            ['get_attendance_count', 'get_pae_count', 'get_recycling_totals', 'get_student_timeline'],
+            [
+                'get_attendance_count',
+                'get_pae_count',
+                'get_recycling_totals',
+                'get_student_timeline',
+                'get_absence_count',
+                'get_absent_students',
+                'get_late_count',
+                'get_attendance_trend',
+                'get_repeatedly_absent_students',
+                'get_student_time_in_school',
+                'find_student',
+            ],
             $names
         );
     }

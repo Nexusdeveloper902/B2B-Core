@@ -15,7 +15,8 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `POST /api/v1/students/{id}/redeem`, `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. Admin/teacher roles enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
 `Accept-Language: es` for Spanish (e.g. `{"message": "Tarjeta no reconocida"}`);
@@ -89,6 +90,24 @@ awarded at tap time.**
 `404 Not Found` — unknown card (`Card not recognized`) or non-active card
 (`Card is not active`).
 
+`422 Unprocessable Entity` — **PAE enrollment gate** (TASK-027): a valid,
+active card whose student is **not enrolled in PAE** tapped a reader in
+`PAE_BREAKFAST`/`PAE_LUNCH` mode. The meal is NOT recorded (keeps
+`paeCount()` honest: attendance comes only from enrolled students' taps)
+and the attempt is written to `storage/logs/laravel.log` for the
+feeding-program audit trail:
+
+```json
+{"status":"error","reason":"student_not_pae","event_type":"PAE_BREAKFAST","message":"Ana is not enrolled in the feeding program"}
+```
+
+**Entry/exit pairs (TASK-027):** a reader in `ENTRY` mode logs every tap
+as an `ENTRY` event — and the same reader in `EXIT` mode logs `EXIT`.
+Multiple rows per student per day are the point (every entry is
+registered); `AttendanceService::studentSessions()` pairs them on the
+fly to derive time-in-school (an unmatched entry counts as an open
+session). No schema change: both values ride the same `events.type` spine.
+
 ---
 
 ## POST /api/v1/admin/readers/{id}/mode — reader relabeling (Phase B)
@@ -104,7 +123,7 @@ accepted.
 ```
 
 Valid values: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
-`RECYCLING_DEPOSIT`, `ENTRY` (anything else → 422).
+`RECYCLING_DEPOSIT`, `ENTRY`, `EXIT` (anything else → 422).
 
 **Response `200`**:
 
@@ -114,6 +133,10 @@ Valid values: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
   "reader": { "id": 1, "label": "Demo Reader — Classroom/PAE", "type": "classroom", "active_event_type": "PAE_LUNCH" }
 }
 ```
+
+Renaming the reader too? Use the combined settings endpoint below
+(`PUT /api/v1/admin/readers/{id}`) — one request updates the label AND
+the active mode.
 
 ---
 
@@ -329,19 +352,37 @@ immediately for taps on the tap endpoint.
 
 ---
 
-## POST /api/v1/nl-query — natural-language query (Phase E, admin-only)
+## POST /api/v1/nl-query — natural-language query (Phase E, admin + teacher)
 
 **Request**: `{"question": "How many kids were late this week?"}`
+
+**Roles (TASK-027):** admin (school-wide) AND teacher. A teacher's
+questions are fenced **server-side** to the classes they teach — every
+function execution applies the caller's `StudentScope`; a class or
+student outside the wall answers with an explicit scope error, never
+with data. Students stay 403.
 
 Flow: the question + a fixed set of function schemas goes to the DeepSeek
 model (default `deepseek-v4-flash`) → the model **selects a
 function** → the backend executes the **real
 Eloquent query** → the result returns to the model → the model phrases the
-final answer. The LLM never computes or fabricates numbers.
+final answer. The LLM never computes or fabricates numbers. Answers are
+**concise by contract** (at most three short sentences or a compact
+bullet list) and use **light Markdown** (`**bold**`, `- ` bullets,
+`` `backticks` ``) — the dashboards render it via `public/js/markdown.js`
+(escaped-first, never raw HTML).
 
 Callable functions: `get_attendance_count(date, class_id?)`,
-`get_pae_count(meal, date)`, `get_recycling_totals(date_from, date_to)`,
-`get_student_timeline(student_id)`.
+`get_pae_count(meal, date, class_id?)`,
+`get_recycling_totals(date_from, date_to)` (school-wide by design —
+public competition board, spec §22),
+`get_student_timeline(student_id)`, plus the **analytical half
+(TASK-027)**: `get_absence_count(date, class_id?)`,
+`get_absent_students(date, class_id?)`, `get_late_count(date,
+class_id?)`, `get_attendance_trend(days)`,
+`get_repeatedly_absent_students(days, min_absences, class_id?)`,
+`get_student_time_in_school(student_id, days)`, and
+`find_student(name)` (resolves a partial name to a `student_id` first).
 
 **Responses**
 
@@ -378,6 +419,141 @@ Callable functions: `get_attendance_count(date, class_id?)`,
 Run `./run llm-check` on the machine making the calls — it performs one
 bare live request with the same key + model and prints DeepSeek's exact
 verdict with bilingual fix guidance.
+
+---
+
+## PUT /api/v1/admin/readers/{id} — reader settings: name + mode (TASK-027, admin-only)
+
+The backing endpoint of the `/admin/readers` management desk (the page
+lost in the frontend redesign, now restored): rename a reader AND switch
+its active mode in ONE request. **Admin role required** (teacher → 403,
+guest → 401). The mode-only endpoint above stays untouched — its contract
+is pinned by tests.
+
+**Request**:
+
+```json
+{ "label": "Aula 12 — Entrada", "active_event_type": "ENTRY" }
+```
+
+`label`: required, 3–255 chars. `active_event_type`: required, same
+valid values as the mode endpoint.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "ENTRY" }
+}
+```
+
+`422` — validation errors (short label, unknown mode).
+
+---
+
+## POST /api/v1/admin/students — create one student (TASK-027, admin-only)
+
+The end of hand-written SQL INSERTs: the `/admin/students` desk creates
+students through this endpoint. **Admin role required.** The 1:1 student
+ACCOUNT is not created here — accounts are a separate, deliberate step
+(the seeder's pattern), not a silent side effect of enrollment.
+
+**Request**:
+
+```json
+{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_enrolled": true }
+```
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true },
+  "message": "Student Nueva Estudiante created."
+}
+```
+
+`422` — validation errors, or `{"status":"error","reason":"duplicate"}`
+for the same name in the same class (a duplicate is never a silent skip).
+
+---
+
+## POST /api/v1/admin/students/import — CSV roster bulk import (TASK-027, admin-only)
+
+**Admin role required.** Multipart request: `file` (CSV, max 2 MB, up to
+500 rows). Header row REQUIRED — columns are case-insensitive, order
+free, extra columns ignored:
+
+```csv
+name,grade,class,pae_enrolled
+María Pérez,5°,5° B,yes
+```
+
+`class` resolves by class NAME (the human workflow); `pae_enrolled`
+accepts `yes`/`no`/`true`/`false`/`1`/`0`/`si`/`sí`. Row-level failures
+are reported per row (row number + bilingual message) — a bad row never
+blocks the good ones; duplicates are row errors.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "created": 2,
+  "failed": 0,
+  "errors": [],
+  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B" }],
+  "message": "Import finished: 2 created, 0 failed."
+}
+```
+
+`status` is `ok` (all rows in), `partial` (some in, some failed), or
+`error` + 422 (nothing created — bad header, no data rows, unreadable
+file).
+
+---
+
+## DELETE /api/v1/admin/cards/{id} — per-card unpair (TASK-027, admin-only)
+
+The GUI half of gap D1: the pairing desk's roster carries an **Unpair**
+button per credential; this endpoint backs it. **Admin role required.**
+Semantics mirror the bulk `cards:unpair` command (ADR-023) at single-card
+granularity — "fresh" means the row does not exist, so unpairing DELETES
+the cards row (never nulls `student_id` — a nulled row would still block
+re-pairing). Tap events cascade with the card; `pending_pairings`
+history rows survive with their card link cleared (audit trail). One
+transaction, so the outcome is deterministic.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "unpaired": { "credential_uid": "M9TN530AIT7N", "student_name": "Maria González", "events_deleted": 3, "history_links_cleared": 1 },
+  "message": "Card unpaired from Maria González — the credential is fresh again"
+}
+```
+
+After a successful unpair the SAME credential can be paired again
+immediately (the bench loop: pair → unpair → re-pair).
+
+---
+
+## GET /api/v1/admin/captures/{deposit}/image — stream a stored capture (TASK-027, gap E1, admin-only)
+
+Capture images live on the **private** `local` disk
+(`storage/app/private`) as audit artifacts and may contain students —
+they are never put on a public disk. This admin-authed route is the
+single authorized door (the EcoStation page fetches it same-origin with
+the session cookie; a teacher/student request 403s at the role wall
+before any byte of the file is read).
+
+**Response `200`** — the image bytes (streamed, inline,
+`Cache-Control: private, max-age=60`).
+
+`404` — the deposit has no stored image, or the file is missing on disk.
 
 ---
 
@@ -510,6 +686,14 @@ Frame types: `capture_created`, `validation_started`, `validated`,
 written inside the same DB transaction as the state change they describe,
 so a frame only ever reflects committed state. The hello frame carries the
 recent snapshot under `recycling`.
+
+**Per-connection scope (TASK-027):** the tap channel is now fenced per
+connection, resolved once at handshake (fail closed): teachers see only
+taps of students in THEIR classes, student accounts see only their OWN
+taps, admins see the whole school. The hello snapshot honors the same
+scope, and the EcoStation page consumes `recycling` frames live
+(`realtime:recycling` CustomEvents — ledger rows, impact metrics and the
+latest-capture panel update with no reload).
 
 Student self-service web desk (TASK-025): students log in (same login page;
 demo accounts printed by the seeder, e.g. `carlos@presence.test` /
