@@ -76,11 +76,17 @@ eval "$("$PHP_BIN" -r '
 $pdo = new PDO("sqlite:database/e2e.sqlite");
 $classroom = $pdo->query("SELECT api_key, id FROM readers WHERE type = \"classroom\"")->fetch(PDO::FETCH_ASSOC);
 $recycling = $pdo->query("SELECT api_key FROM readers WHERE type = \"recycling\"")->fetch(PDO::FETCH_ASSOC);
-$card = $pdo->query("SELECT credential_uid FROM cards LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-$student = $pdo->query("SELECT student_id FROM cards LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+// Deterministic + PAE-valid card pick. LIMIT 1 without ORDER BY is
+// planner-dependent (SQLite may serve it from the credential_uid
+// unique-index scan, and the seeded UIDs are RANDOM — the owner then
+// varies per run; CI run 34285994702 drew the one non-PAE student and
+// the relabel-phase tap correctly hit the TASK-027 PAE gate). One
+// ordered, PAE-filtered query also keeps CARD_UID and STUDENT_ID
+// coherent for the redemption phase.
+$card = $pdo->query("SELECT c.credential_uid, c.student_id FROM cards c JOIN students s ON s.id = c.student_id WHERE s.pae_enrolled = 1 ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDENT_ID=%s\n",
     escapeshellarg($classroom["api_key"]), $classroom["id"], $recycling["api_key"],
-    $card["credential_uid"], $student["student_id"]);
+    $card["credential_uid"], $card["student_id"]);
 ')"
 
 # A test image (valid PNG) — created project-relative so BOTH Linux curl and
