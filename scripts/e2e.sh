@@ -239,9 +239,6 @@ fi
 kill "$WS_PID" 2>/dev/null || true
 wait "$WS_PID" 2>/dev/null || true
 WS_PID=""
-kill "$WS_PID" 2>/dev/null || true
-wait "$WS_PID" 2>/dev/null || true
-WS_PID=""
 
 # ---------------------------------------------------------------------------
 say "== Fase H - botella-primero + tablero + cuenta estudiante / bottle-first + leaderboard + student account (TASK-025) =="

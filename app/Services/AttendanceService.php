@@ -48,20 +48,30 @@ class AttendanceService
             ->orderBy('name')
             ->get();
 
+        // One grouped query for the whole class: each student's FIRST
+        // CLASS_ATTENDANCE tap of today, across all their cards. The
+        // per-student loop this replaces issued one events query per
+        // student, per class, on every teacher-dashboard render.
+        $firstTaps = PresenceEvent::query()
+            ->where('type', 'CLASS_ATTENDANCE')
+            ->whereDate('occurred_at', $today)
+            ->whereIn('card_id', $students->flatMap->cards->pluck('id'))
+            ->join('cards', 'cards.id', '=', 'events.card_id')
+            ->selectRaw('cards.student_id, min(events.occurred_at) as first_tap')
+            ->groupBy('cards.student_id')
+            ->pluck('first_tap', 'cards.student_id');
+
         $rows = [];
         foreach ($students as $student) {
-            $event = PresenceEvent::whereIn('card_id', $student->cards->pluck('id'))
-                ->where('type', 'CLASS_ATTENDANCE')
-                ->whereDate('occurred_at', $today)
-                ->orderBy('occurred_at')
-                ->first();
+            $firstTap = $firstTaps[$student->id] ?? null;
 
             $status = 'absent';
             $tappedAt = null;
 
-            if ($event !== null) {
-                $tappedAt = $event->occurred_at->format('H:i');
-                $status = $event->occurred_at->format('H:i') > $cutoff ? 'late' : 'present';
+            if ($firstTap !== null) {
+                $occurredAt = Carbon::parse($firstTap);
+                $tappedAt = $occurredAt->format('H:i');
+                $status = $tappedAt > $cutoff ? 'late' : 'present';
             }
 
             $rows[] = compact('student', 'status', 'tappedAt');

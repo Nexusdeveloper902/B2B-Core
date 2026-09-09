@@ -40,7 +40,17 @@ class StudentScope
         }
 
         if ($user->isStudent()) {
-            return new self(null, $user->student_id !== null ? (int) $user->student_id : null);
+            // FAIL CLOSED: users.student_id is nullable by design (deleting
+            // a student leaves the account row, nullOnDelete), so an
+            // orphaned student account is possible. A null here must never
+            // degrade to the admin shape (null classIds = unrestricted —
+            // that construction would hand the whole school to an account
+            // with no identity); an empty allowlist serves nothing instead.
+            if ($user->student_id === null) {
+                return new self(collect(), null);
+            }
+
+            return new self(null, (int) $user->student_id);
         }
 
         return new self($user->classes()->pluck('classes.id'));

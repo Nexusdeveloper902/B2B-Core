@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Enums\ReaderType;
 use App\Http\Controllers\Controller;
+use App\Models\PointsLedger;
 use App\Models\Reader;
 use App\Models\RecyclingDeposit;
 use App\Models\Reward;
@@ -68,7 +69,11 @@ class AdminDashboardController extends Controller
 
         return view('admin.ecostation', [
             'totalItems' => (int) RecyclingDeposit::query()->count(),
-            'totalPoints' => (int) RecyclingDeposit::query()->sum('points_awarded'),
+            // The ledger is the source of truth for balances (PointsService:
+            // "balances are always SUM(delta)") — summing deposits here used
+            // to contradict the students' own balances and the standings
+            // page whenever a redemption or pre-deposit history row existed.
+            'totalPoints' => (int) PointsLedger::query()->sum('delta'),
             'byMaterial' => $byMaterial,
             'rates' => (array) config('recycling.points'),
             'readers' => Reader::query()

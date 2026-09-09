@@ -117,15 +117,20 @@ Documentación completa de endpoints: [docs/API.es.md](docs/API.es.md) ·
 
 Cambio de idioma: `EN·ES` en la barra de navegación (por sesión).
 
-### Sistema de diseño — "The Event Ledger"
+### Sistema de diseño — "Datum"
 
-Los paneles comparten una sola identidad visual con la tienda del marketplace:
-fondo porcelana, reglas finas, datos tabulares en monoespaciada, acentos
-verde pino, radios de 2px en controles, fuentes autohospedadas Space Grotesk /
-IBM Plex. Los tokens viven en `public/css/tokens.css` (fuente de verdad) y se
-replican por valor desde el repositorio del marketplace — ver
-`.agent/DECISIONS/ADR-013-design-tokens-value-matched.md` y
-`.agent/DECISIONS/ADR-014-shared-layout-components.md`.
+Los paneles renderizan la identidad de las maquetas entregadas (TASK-026,
+ADR-036): paleta tonal Material-3 clara sobre fondo salvia, primario casi
+negro con acentos dorados, esquinas "arquitectónicas" de 2px, secciones
+editoriales con reglas (énfasis de 2px + divisores de 1px), datos tabulares
+en IBM Plex Mono, tipografía display Epilogue sobre cuerpo Manrope, fuentes
+autohospedadas y revelados de scroll con anime.js respetando
+`prefers-reduced-motion`. Los tokens viven en `public/css/tokens.css`
+(fuente de verdad). "Datum" sustituye el contrato de valor compartido
+"Signal" (ADR-013/ADR-028) solo para Core: el marketplace y Core ya no
+comparten valores literales de tokens — comparten una familia de
+componentes (el "Datum" v3 del marketplace está documentado en su propio
+`docs/FRONTEND.md`).
 
 ## Pruebas
 

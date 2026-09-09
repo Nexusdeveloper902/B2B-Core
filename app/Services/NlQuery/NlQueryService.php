@@ -73,7 +73,11 @@ class NlQueryService
 
         $functionsCalled = [];
 
-        for ($round = 0; $round <= self::MAX_TOOL_ROUNDS; $round++) {
+        // "< MAX_TOOL_ROUNDS" + a final answer round = at most 3 tool
+        // executions, exactly the docblock contract (the old "<=" let a
+        // 4th round execute real queries whose results were then thrown
+        // away by maxRoundsExceeded).
+        for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
             $result = $this->client->generate($messages, $declarations);
 
             // Final answer?

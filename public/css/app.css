@@ -697,6 +697,10 @@ img { max-width: 100%; }
     margin-bottom: var(--sp-md);
     align-items: start;
 }
+/* 1fr = minmax(auto, 1fr): without min-width:0 a panel's intrinsic
+   min-content (e.g. the CSV file input) widens the track past the
+   viewport and the whole page scrolls sideways on phones. */
+.grid-2 > * { min-width: 0; }
 .grid-2-wide-left { grid-template-columns: 7fr 5fr; }
 .grid-2-wide-right { grid-template-columns: 5fr 7fr; }
 .stack { display: flex; flex-direction: column; gap: var(--sp-md); }
@@ -980,6 +984,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .file-row { display: flex; flex-wrap: wrap; gap: var(--sp-2xs); align-items: center; }
 .file-row input[type="file"] {
     flex: 1 1 240px;
+    /* File inputs carry a large intrinsic min-width ("No file chosen…");
+       clamp it so the panel can shrink inside a 1fr grid track. */
+    min-width: 0;
+    max-width: 100%;
     min-height: 38px;
     padding: 7px var(--sp-sm);
     background: var(--surface-container-lowest);
@@ -1040,6 +1048,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     border: 1px solid var(--border);
     background: var(--surface-container-lowest);
     color: var(--text-body);
+    white-space: pre-line; /* multi-line content: CSV import row errors */
 }
 .answer-ok {
     background: color-mix(in srgb, var(--tertiary-fixed) 32%, var(--surface));
@@ -1610,7 +1619,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 
 @media (max-width: 620px) {
     .topbar-user { display: none; }
-    .topbar-tools .inline-form { display: none; }
+    /* Direct child only: the hamburger menu (inside .topbar-tools) owns
+       the logout form on mobile — hiding every .inline-form here used to
+       make logout unreachable on phones. */
+    .topbar-tools > .inline-form { display: none; }
     .bento { grid-template-columns: 1fr; }
     .metric, .metric-hero { grid-column: span 1; }
     .stat-strip, .stat-strip-2 { grid-template-columns: 1fr; }
@@ -1626,6 +1638,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 
     /* data tables become labeled cards */
     .ledger-table[data-stack] thead { display: none; }
+    /* The HTML hidden attribute is a UA-origin rule and loses to the
+       display:block below — without this, JS row filters (teacher
+       search, parent timeline pills) are dead on mobile. */
+    .ledger-table[data-stack] tbody tr[hidden] { display: none; }
     .ledger-table[data-stack] tbody tr {
         display: block;
         border: 1px solid var(--border);
@@ -1663,6 +1679,29 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     .page-head h1, .lede h1 { font-size: var(--fs-headline-md); }
     .profile-name { font-size: var(--fs-headline-md); }
     .metric-hero .metric-value { font-size: 44px; }
+}
+
+/* ---------- Error pages (UI polish pass: 403/404/500 in the app shell) ---------- */
+.error-page { max-width: 560px; margin: var(--sp-3xl) auto var(--sp-4xl); text-align: left; }
+.error-code {
+    font: 600 var(--fs-headline-md)/var(--lh-headline-md) var(--font-mono);
+    letter-spacing: var(--ls-headline-md);
+    color: var(--text-meta);
+    margin: 0 0 var(--sp-2xs);
+}
+.error-page h1 {
+    font-size: var(--fs-headline-lg);
+    line-height: var(--lh-headline-lg);
+    letter-spacing: var(--ls-headline-lg);
+    font-weight: var(--fw-headline-lg);
+    color: var(--primary);
+    margin: 0 0 var(--sp-xs);
+}
+.error-page .lede-sub { margin: 0 0 var(--sp-lg); }
+.error-actions { display: flex; gap: var(--sp-sm); flex-wrap: wrap; }
+@media (max-width: 620px) {
+    .error-page { margin-top: var(--sp-xl); text-align: center; }
+    .error-actions .btn { width: 100%; }
 }
 
 /* ---------- TASK-025 keepers (student desk, affordability) ---------- */

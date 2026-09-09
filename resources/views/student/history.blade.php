@@ -22,9 +22,17 @@
     @php
         // Chronological pass computes the running balance; the
         // display order stays newest-first (page renders top-down).
+        //
+        // The accumulator is seeded with the balance CARRIED INTO this
+        // page (all deltas older than the page's oldest row) — starting
+        // at 0 would show page-local sums on every page after the first,
+        // contradicting the true balance in the header. Empty pages skip
+        // the query entirely (min() of nothing is null).
         $chronological = $ledger->getCollection()->sortBy('id')->values();
         $running = [];
-        $acc = 0;
+        $acc = $chronological->isEmpty()
+            ? 0
+            : (int) $student->pointsLedger()->where('id', '<', $chronological->min('id'))->sum('delta');
         foreach ($chronological as $row) {
             $acc += $row->delta;
             $running[$row->id] = $acc;
@@ -94,15 +102,22 @@
                 return;
             }
 
+            // Mobile stacked tables label each cell via data-label
+            // (CSS attr()); reuse the SSR headers so live rows match.
+            var headers = body.closest('table').querySelectorAll('thead th');
+            function label(i) { return headers[i] ? headers[i].textContent : ''; }
+
             var tr = document.createElement('tr');
             tr.className = 'js-row-flash';
 
             var when = document.createElement('td');
             when.className = 'num mono';
+            when.setAttribute('data-label', label(0));
             when.textContent = String(update.at || '').replace('T', ' ').slice(0, 16);
             tr.appendChild(when);
 
             var change = document.createElement('td');
+            change.setAttribute('data-label', label(1));
             var text = document.createElement('span');
             text.textContent = reason || '';
             change.appendChild(text);
@@ -115,6 +130,7 @@
 
             var balance = document.createElement('td');
             balance.className = 'num';
+            balance.setAttribute('data-label', label(2));
             if (typeof p.new_balance === 'number') {
                 balance.textContent = p.new_balance;
                 var lede = document.querySelector('[data-balance]');

@@ -86,6 +86,21 @@ class MockupPagesTest extends TestCase
             ->assertSee('+10 PTS')  // the rate table's config truth
             ->assertSee(__('app.ecostation_ledger_note'));
 
+        // UI pass 2026-09-09 — "Total awarded to students" is a LEDGER sum
+        // (the same source as balances and the standings board), not a
+        // deposits sum: a ledger row without a deposit twin (a redemption
+        // offset, or history from before the deposits table) used to make
+        // this hero contradict the students' own numbers.
+        PointsLedger::create([
+            'student_id' => $this->cardOf('Maria González')->student_id,
+            'delta' => 5,
+            'reason' => 'recycling_deposit',
+        ]);
+        $this->actingAs($this->user('admin'))->get('/admin/ecostation')
+            // the hero element itself: ledger sum 15, not the deposits' 10
+            // (the +15 METAL rate row must not satisfy this)
+            ->assertSee('id="metric-points">15<', false);
+
         // Teachers keep the dashboards; the hub is an admin surface.
         $this->actingAs($this->user('teacher'))->get('/admin/ecostation')->assertForbidden();
 

@@ -83,7 +83,7 @@
                     <div class="meter on-light">
                         <div class="meter-row">
                             <span>{{ __('app.goal_progress') }}</span>
-                            <span><strong>{{ $balance }}</strong> / {{ $reward->point_cost }} PTS</span>
+                            <span><strong>{{ $balance }}</strong> / {{ $reward->point_cost }} {{ __('app.points_unit') }}</span>
                         </div>
                         <div class="meter-track">
                             <div class="meter-fill" style="width: {{ min(100, (int) round($balance * 100 / max(1, $reward->point_cost))) }}%;"></div>
@@ -107,7 +107,7 @@
             <thead>
             <tr>
                 <th scope="col">{{ __('app.student_ledger_when') }}</th>
-                <th scope="col">{{ __('app.students') }}</th>
+                <th scope="col">{{ __('app.reward') }}</th>
                 <th scope="col">{{ __('app.student_reward_cost') }}</th>
             </tr>
             </thead>
@@ -115,7 +115,7 @@
             @forelse($redemptions as $redemption)
                 <tr>
                     <td class="num mono" data-label="{{ __('app.student_ledger_when') }}">{{ $redemption->created_at?->format('Y-m-d H:i') }}</td>
-                    <td data-label="{{ __('app.students') }}">{{ $redemption->reward->name }}</td>
+                    <td data-label="{{ __('app.reward') }}">{{ $redemption->reward->name }}</td>
                     <td class="num" data-label="{{ __('app.student_reward_cost') }}">
                         <span class="points-badge is-negative">-{{ $redemption->points_spent }}</span>
                     </td>

@@ -76,9 +76,9 @@ for cmd in "${COMMANDS[@]}"; do
     if grep -qE "^## \`${cmd}\`" "$DOC_EN" && grep -qE "^## \`${cmd}\`" "$DOC_ES"; then
         ok "documented (EN+ES): ${cmd}"
     else
-        fail_msg="command '${cmd}' is missing a '### \`${cmd}\`' section in"
+        fail_msg="command '${cmd}' is missing a '## \`${cmd}\`' section in"
         err "${fail_msg} docs/SCRIPTS.md or docs/SCRIPTS.es.md"
-        err "el comando '${cmd}' no tiene su sección '### \`${cmd}\`' en docs/SCRIPTS.md o docs/SCRIPTS.es.md"
+        err "el comando '${cmd}' no tiene su sección '## \`${cmd}\`' en docs/SCRIPTS.md o docs/SCRIPTS.es.md"
         exit 1
     fi
 done

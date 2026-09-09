@@ -126,7 +126,7 @@
                                     <x-stamp :status="$row['status']">{{ __('app.'.$row['status']) }}</x-stamp>
                                 </td>
                                 <td class="num js-tap-time" data-label="{{ __('app.tapped_at') }}">{{ $row['tappedAt'] ?? '—' }}</td>
-                                <td class="num" data-label="{{ __('app.pae_enrolled') }}">{{ $row['student']->pae_enrolled ? '✓' : '—' }}</td>
+                                <td class="num" data-label="{{ __('app.pae_enrolled') }}">{{ $row['student']->pae_enrolled ? __('app.pae_enrolled_yes') : __('app.pae_enrolled_no') }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="4" class="muted">{{ __('app.no_students') }}</td></tr>
@@ -196,6 +196,11 @@
                 }).catch(function () {
                     btn.disabled = false;
                     btn.classList.remove('is-loading');
+                    // A network failure must still close the aria-live
+                    // region — leaving "Thinking..." would freeze the box.
+                    box.classList.remove('hidden');
+                    box.className = 'nl-answer answer-error';
+                    box.textContent = '{{ __('app.error_generic') }}';
                 });
             });
         }

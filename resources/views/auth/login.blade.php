@@ -34,9 +34,9 @@
                 <x-field :label="__('app.email')" for="email">
                     <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
                            autocomplete="email" placeholder="admin@presence.test"
-                           @error('email') aria-invalid="true" @enderror>
+                           @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
                     @error('email')
-                        <p class="field-error">{{ $message }}</p>
+                        <p class="field-error" id="email-error">{{ $message }}</p>
                     @enderror
                 </x-field>
 
@@ -44,12 +44,12 @@
                     <div class="pw-wrap">
                         <input id="password" type="password" name="password" required autocomplete="current-password"
                                placeholder="••••••••"
-                               @error('password') aria-invalid="true" @enderror>
+                               @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
                         <button type="button" class="pw-toggle" id="pw-toggle" data-show="{{ __('app.show') }}"
                                 data-hide="{{ __('app.hide') }}" aria-pressed="false">{{ __('app.show') }}</button>
                     </div>
                     @error('password')
-                        <p class="field-error">{{ $message }}</p>
+                        <p class="field-error" id="password-error">{{ $message }}</p>
                     @enderror
                 </x-field>
 

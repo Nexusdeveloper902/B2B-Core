@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Reward;
+use App\Models\Student;
 use App\Services\Realtime\RealtimeToken;
 use App\Services\Recycling\LeaderboardService;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class StudentDashboardController extends Controller
 
     public function dashboard(Request $request): View
     {
-        $student = $request->user()->student;
+        $student = $this->studentFor($request);
 
         $standing = $this->leaderboard->rankOf($student);
         $recent = $student->pointsLedger()
@@ -44,7 +45,7 @@ class StudentDashboardController extends Controller
 
     public function history(Request $request): View
     {
-        $student = $request->user()->student;
+        $student = $this->studentFor($request);
 
         return view('student.history', [
             'student' => $student,
@@ -61,7 +62,7 @@ class StudentDashboardController extends Controller
 
     public function rewards(Request $request): View
     {
-        $student = $request->user()->student;
+        $student = $this->studentFor($request);
 
         return view('student.rewards', [
             'student' => $student,
@@ -84,7 +85,7 @@ class StudentDashboardController extends Controller
      */
     public function leaderboard(Request $request): View
     {
-        $student = $request->user()->student;
+        $student = $this->studentFor($request);
 
         $board = $this->leaderboard->top(50);
 
@@ -113,5 +114,20 @@ class StudentDashboardController extends Controller
             'myRank' => $this->leaderboard->rankOf($student),
             'classStandings' => $classStandings,
         ]);
+    }
+
+    /**
+     * The student row behind the authenticated account. users.student_id
+     * is nullable by design (deleting a student keeps the account row),
+     * so an orphaned account is possible — answer it with a clean 404
+     * instead of a fatal error on the first property access.
+     */
+    private function studentFor(Request $request): Student
+    {
+        $student = $request->user()->student;
+
+        abort_unless($student !== null, 404, __('app.error_generic'));
+
+        return $student;
     }
 }

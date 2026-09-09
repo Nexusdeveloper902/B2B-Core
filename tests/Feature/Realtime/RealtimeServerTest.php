@@ -579,7 +579,7 @@ class RealtimeServerTest extends TestCase
 
             $pipes = [];
             $proc = proc_open(
-                [PHP_BINARY, 'artisan', 'realtime:serve', '--host=127.0.0.1', "--port={$port}"],
+                [PHP_BINARY, 'artisan', 'realtime:serve', '--host=127.0.0.1', '--port='.(int) $port],
                 [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
                 $pipes,
                 base_path(),

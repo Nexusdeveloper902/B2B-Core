@@ -53,6 +53,7 @@ return [
     'class_summary' => 'Resumen de la clase',
     'pae_enrolled' => 'PAE',
     'points' => 'Puntos',
+    'points_unit' => 'PTS',
 
     // Panel del administrador
     'school_today' => 'Hoy en la escuela',
@@ -307,4 +308,18 @@ return [
     'pagination_prev' => 'Página anterior',
     'pagination_next' => 'Página siguiente',
     'pagination_page' => 'Página :page',
+
+    // Páginas de error (pasada de pulido UI — 403/404/500 se renderizan
+    // dentro del shell de la app con una salida, en lugar de la página
+    // en crudo de Laravel)
+    'error_403_title' => 'Sin permiso',
+    'error_403_text' => 'Tu cuenta no tiene acceso a esta página.',
+    'error_404_title' => 'Página no encontrada',
+    'error_404_text' => 'La página que pediste no existe o fue movida.',
+    'error_500_title' => 'Algo salió mal',
+    'error_500_text' => 'Ocurrió un error inesperado. Quedó registrado — inténtalo de nuevo en un momento.',
+    'error_503_title' => 'En mantenimiento',
+    'error_503_text' => 'La plataforma no está disponible brevemente por mantenimiento.',
+    'error_back' => 'Volver a tu panel',
+    'error_home' => 'Ir a iniciar sesión',
 ];

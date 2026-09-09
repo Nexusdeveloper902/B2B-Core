@@ -33,8 +33,6 @@ return [
         'other' => 0,
     ],
 
-    'materials' => ['plastic', 'paper', 'metal', 'glass', 'other'],
-
     /*
      | TASK-025 item 2 — the bottle-first capture window (spec §5/§32):
      | how long an image captured WITHOUT a card stays resolvable before

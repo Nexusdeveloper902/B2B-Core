@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
@@ -88,13 +89,16 @@ class ScriptSuiteTest extends TestCase
         foreach ($targets as $target) {
             $path = base_path($target);
             // Forward slashes survive Symfony Process + cmd.exe quoting on
-            // Windows; backslashes inside double quotes do not.
+            // Windows; backslashes inside double quotes do not. Array argv —
+            // no shell string assembly (audit 2026-09-09).
             $pathArg = str_replace('\\', '/', $path);
-            exec(sprintf('bash -n %s 2>&1', escapeshellarg($pathArg)), $output, $code);
+            $proc = new Process(['bash', '-n', $pathArg]);
+            $proc->run();
+            $output = $proc->getOutput().$proc->getErrorOutput();
             $this->assertSame(
                 0,
-                $code,
-                "bash -n failed for [{$target}]: ".implode(PHP_EOL, $output)
+                $proc->getExitCode(),
+                "bash -n failed for [{$target}]: {$output}"
             );
         }
     }
@@ -260,12 +264,16 @@ class ScriptSuiteTest extends TestCase
             $this->markTestSkipped('No hermetic .tools/php present to prove the exclusion.');
         }
 
-        $command = 'B2B_OS=windows B2B_PHP= bash -c '
-            .escapeshellarg('source scripts/_lib/common.sh; php_candidates');
-        exec($command.' 2>&1', $output, $code);
-        $candidates = implode(PHP_EOL, $output);
+        // Array argv + explicit env: no shell string assembly (audit 2026-09-09).
+        $proc = new Process(
+            ['bash', '-c', 'source scripts/_lib/common.sh; php_candidates 2>&1'],
+            null,
+            ['B2B_OS' => 'windows', 'B2B_PHP' => ''],
+        );
+        $proc->run();
+        $candidates = $proc->getOutput().$proc->getErrorOutput();
 
-        $this->assertSame(0, $code, "windows-simulated php_candidates failed: {$candidates}");
+        $this->assertSame(0, $proc->getExitCode(), "windows-simulated php_candidates failed: {$candidates}");
         $this->assertStringNotContainsString(
             '.tools/php',
             $candidates,
@@ -284,12 +292,16 @@ class ScriptSuiteTest extends TestCase
             $this->markTestSkipped('No hermetic .tools/php present.');
         }
 
-        $command = 'B2B_OS=linux B2B_PHP= bash -c '
-            .escapeshellarg('source scripts/_lib/common.sh; php_candidates');
-        exec($command.' 2>&1', $output, $code);
-        $candidates = implode(PHP_EOL, $output);
+        // Array argv + explicit env: no shell string assembly (audit 2026-09-09).
+        $proc = new Process(
+            ['bash', '-c', 'source scripts/_lib/common.sh; php_candidates 2>&1'],
+            null,
+            ['B2B_OS' => 'linux', 'B2B_PHP' => ''],
+        );
+        $proc->run();
+        $candidates = $proc->getOutput().$proc->getErrorOutput();
 
-        $this->assertSame(0, $code, "php_candidates failed: {$candidates}");
+        $this->assertSame(0, $proc->getExitCode(), "php_candidates failed: {$candidates}");
         $this->assertStringContainsString('.tools/php', $candidates, 'Linux mode must keep probing .tools/php');
     }
 
@@ -318,12 +330,16 @@ class ScriptSuiteTest extends TestCase
             $this->markTestSkipped('Simulated-windows guidance is proven on Linux runners.');
         }
 
-        $command = 'B2B_OS=windows bash -c '
-            .escapeshellarg('source scripts/_lib/common.sh; php_candidates() { return 0; }; resolve_php 2>&1');
-        exec($command.' 2>&1', $output, $code);
-        $out = implode(PHP_EOL, $output);
+        // Array argv + explicit env: no shell string assembly (audit 2026-09-09).
+        $proc = new Process(
+            ['bash', '-c', 'source scripts/_lib/common.sh; php_candidates() { return 0; }; resolve_php 2>&1'],
+            null,
+            ['B2B_OS' => 'windows'],
+        );
+        $proc->run();
+        $out = $proc->getOutput().$proc->getErrorOutput();
 
-        $this->assertSame(1, $code, 'resolve_php must die (exit 1) when no candidate is valid');
+        $this->assertSame(1, $proc->getExitCode(), 'resolve_php must die (exit 1) when no candidate is valid');
         $this->assertStringContainsString('winget install PHP.PHP', $out, 'windows guidance must name the winget install');
         $this->assertStringContainsString('windows.php.net', $out, 'windows guidance must point at the manual zip download');
     }

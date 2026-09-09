@@ -6,9 +6,11 @@ use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
+use App\Models\RecyclingDeposit;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Testing\File;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Test;
@@ -70,6 +72,43 @@ class UnpairCardsCommandTest extends TestCase
         $this->assertSame($studentsBefore, Student::count(), 'students untouched');
         $this->assertSame($readersBefore, Reader::count(), 'readers untouched');
         $this->assertSame($usersBefore, User::count(), 'users untouched');
+    }
+
+    #[Test]
+    public function recycling_deposits_cascade_away_with_the_events(): void
+    {
+        // DOCUMENTED SEMANTICS (audit fix): the old docblock claimed
+        // "recycling untouched" while the schema (deposits.event_id is a
+        // unique cascadeOnDelete FK to events) destroys every deposit row
+        // with the events. This test pins the REAL contract: deposits die,
+        // point balances (the ledger) survive.
+        $this->seedDemo();
+
+        $student = Student::create(['name' => 'Depositante', 'grade' => '6°', 'pae_enrolled' => false]);
+        $this->actingAs(User::where('email', 'admin@presence.test')->firstOrFail())
+            ->postJson("/api/v1/admin/students/{$student->id}/arm-pairing");
+        $this->postJson('/api/v1/admin/cards/pair', [
+            'credential_uid' => 'DEPOSIT01',
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])->assertOk();
+
+        // A recycling tap + classify = an event with a deposit row. The
+        // tap response carries the event_id directly (device contract).
+        $eventId = (int) $this->postJson('/api/v1/events/tap', [
+            'credential_uid' => 'DEPOSIT01',
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])->assertOk()->json('event_id');
+
+        $this->postJson('/api/v1/recycling/classify', [
+            'event_id' => $eventId,
+            'image' => File::fake()->image('deposit.jpg'),
+        ], ['Authorization' => 'Bearer '.$this->readerToken('recycling')])->assertOk();
+
+        $this->assertGreaterThan(0, RecyclingDeposit::count(), 'fixture produced a deposit');
+        $balanceBefore = $student->pointBalance();
+
+        Artisan::call('cards:unpair', ['--force' => true]);
+
+        $this->assertSame(0, RecyclingDeposit::count(), 'deposit rows cascade with the events (documented reality)');
+        $this->assertSame($balanceBefore, $student->pointBalance(), 'point balances survive the unpair');
     }
 
     #[Test]

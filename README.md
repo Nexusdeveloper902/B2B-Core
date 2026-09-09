@@ -109,17 +109,19 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 
 Language switch: `EN·ES` in the navbar (session-based).
 
-### Design system — "Signal"
+### Design system — "Datum"
 
-The dashboards share one visual identity with the marketplace storefront:
-shadow-grey 950 ground, scarlet primary, muted-teal data, tiger-orange
-sparing accents, ruled editorial sections (2px emphasis rules + 1px
-dividers), tabular data set in IBM Plex Mono, Space Grotesk display type,
-self-hosted fonts, and anime.js scroll reveals gated behind
-`prefers-reduced-motion`. Tokens live in `public/css/tokens.css` (source of
-truth) and are value-matched 1:1 with the marketplace repo — see
-`.agent/DECISIONS/ADR-028-signal-redesign.md` (ADR-013's value-match
-contract, restored).
+The dashboards render the owner-supplied mockup identity (TASK-026,
+ADR-036): a light sage-ground Material-3 tonal palette with a near-black
+primary and gold tertiary accents, sharp 2px-radius "architectural"
+corners, ruled editorial sections (2px emphasis rules + 1px dividers),
+tabular data set in IBM Plex Mono, Epilogue display type over Manrope
+body text, self-hosted fonts, and anime.js scroll reveals gated behind
+`prefers-reduced-motion`. Tokens live in `public/css/tokens.css` (source
+of truth). "Datum" supersedes the old "Signal" value-match contract
+(ADR-013/ADR-028) for Core: the marketplace and Core no longer share
+literal token values — they share a family of components instead (the
+marketplace's own "Datum" v3 is documented in its `docs/FRONTEND.md`).
 
 ## Testing
 

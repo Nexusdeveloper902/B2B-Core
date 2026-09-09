@@ -15,6 +15,7 @@
     even with the realtime server down.
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.students_page'))
 
@@ -145,8 +146,10 @@
 <script>
     (function () {
         var csrf = document.querySelector('meta[name="csrf-token"]').content;
-        var NO_CARD = {!! json_encode(__('app.no_card')) !!};
-        var VIEW_PARENT = {!! json_encode(__('app.view_parent')) !!};
+        var NO_CARD = {!! Js::from(__('app.no_card')) !!};
+        var VIEW_PARENT = {!! Js::from(__('app.view_parent')) !!};
+        var PAE_YES = {!! Js::from(__('app.pae_enrolled_yes')) !!};
+        var PAE_NO = {!! Js::from(__('app.pae_enrolled_no')) !!};
 
         function busy(btn, on) {
             btn.disabled = on;
@@ -187,7 +190,7 @@
             var name = td(s.name);
             var klass = td(s.class_name || '—');
             var grade = td(s.grade || '—');
-            var pae = td(s.pae_enrolled ? '✓' : '—');
+            var pae = td(s.pae_enrolled ? PAE_YES : PAE_NO);
             var card = document.createElement('td');
             var noCard = document.createElement('span');
             noCard.className = 'muted';
@@ -218,10 +221,15 @@
         function updateStudentRow(row, s) {
             var cells = row.querySelectorAll('td');
             if (cells.length >= 5) {
-                if (s.name !== undefined) { cells[0].textContent = s.name; }
+                if (s.name !== undefined) {
+                    cells[0].textContent = s.name;
+                    // The client-side search reads data-search — a renamed
+                    // student would otherwise be findable only by the old name.
+                    row.dataset.search = String(s.name || '').toLowerCase();
+                }
                 if (s.class_name !== undefined) { cells[1].textContent = s.class_name || '—'; }
                 if (s.grade !== undefined) { cells[2].textContent = s.grade || '—'; }
-                if (s.pae_enrolled !== undefined) { cells[3].textContent = s.pae_enrolled ? '✓' : '—'; }
+                if (s.pae_enrolled !== undefined) { cells[3].textContent = s.pae_enrolled ? PAE_YES : PAE_NO; }
             }
             return row;
         }

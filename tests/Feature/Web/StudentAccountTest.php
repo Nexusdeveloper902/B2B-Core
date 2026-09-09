@@ -121,6 +121,45 @@ class StudentAccountTest extends TestCase
         $this->get('/student')->assertRedirect(route('login'));
     }
 
+    #[Test]
+    public function a_logged_in_student_opening_a_guest_page_lands_on_their_own_dashboard(): void
+    {
+        // UI pass 2026-09-09 — the framework default sent every authenticated
+        // user who opened /login to the staff /dashboard, so students hit a
+        // bare 403 dead end. The redirect is now role-aware.
+        $maria = $this->studentUser('maria');
+
+        $this->actingAs($maria)->get('/login')->assertRedirect(route('student.dashboard'));
+        $this->actingAs($this->adminUser())->get('/login')->assertRedirect(route('dashboard'));
+    }
+
+    #[Test]
+    public function access_denied_renders_inside_the_app_shell_with_a_way_out(): void
+    {
+        // UI pass 2026-09-09 — 403 used to render Laravel's bare abort page:
+        // no topbar, no logout, no escape hatch.
+        $maria = $this->studentUser('maria');
+
+        $this->actingAs($maria)->get('/admin')
+            ->assertForbidden()
+            ->assertSee(__('app.error_403_title'))
+            ->assertSee(__('app.error_back'))
+            ->assertSee(route('student.dashboard'), false);
+    }
+
+    #[Test]
+    public function the_mobile_menu_keeps_the_logout_form_reachable(): void
+    {
+        // UI pass 2026-09-09 — the ≤620px rule that hides the topbar logout
+        // button must target ONLY the topbar's direct form; a descendant
+        // selector also hid the hamburger menu's logout form, leaving
+        // phones with no way to sign out.
+        $css = file_get_contents(public_path('css/app.css'));
+
+        $this->assertStringContainsString('.topbar-tools > .inline-form { display: none; }', $css);
+        $this->assertStringNotContainsString('.topbar-tools .inline-form { display: none; }', $css);
+    }
+
     // ------------------------------------------------------------- helpers
 
     private function studentUser(string $slug)

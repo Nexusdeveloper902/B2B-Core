@@ -29,8 +29,8 @@
             <span class="scope-tag">{{ __('app.scope_tag') }}</span>
             <span class="scope-tag mono">{{ __('app.student_record') }} #{{ $student->id }}</span>
         </div>
-        <p><span class="lang-key">{{ __('app.scope_lang_en') }}</span>{{ __('app.scope_note_en') }}</p>
-        <p><span class="lang-key">{{ __('app.scope_lang_es') }}</span>{{ __('app.scope_note_es') }}</p>
+        <p lang="en"><span class="lang-key">{{ __('app.scope_lang_en') }}</span>{{ __('app.scope_note_en') }}</p>
+        <p lang="es"><span class="lang-key">{{ __('app.scope_lang_es') }}</span>{{ __('app.scope_note_es') }}</p>
     </div>
 </section>
 
@@ -46,7 +46,7 @@
                 <span class="sep">·</span>
                 {{ __('app.student_id') }} #{{ $student->id }}
             </div>
-            <h1 class="profile-name" style="margin:0;">{{ $student->name }}</h1>
+            <h2 class="profile-name" style="margin:0;">{{ $student->name }}</h2>
             <div class="profile-meta">
                 <span>{{ __('app.class') }}: <strong>{{ $student->schoolClass?->name ?? '—' }}</strong></span>
                 <span class="sep">/</span>
@@ -100,7 +100,7 @@
             {{ __('app.student_points_balance') }}
             <span class="material-symbols-outlined is-20" aria-hidden="true">eco</span>
         </div>
-        <div class="metric-value">{{ $points }}<span class="unit">PTS</span></div>
+        <div class="metric-value">{{ $points }}<span class="unit">{{ __('app.points_unit') }}</span></div>
         <p class="metric-sub">{{ __('app.parent_points_sub') }}</p>
     </div>
 </section>
@@ -108,10 +108,11 @@
 {{-- 04 + 05 // Interactive filters, search, and the read-only ledger --}}
 <div class="filterbar">
     <div class="pills" role="group" aria-label="{{ __('app.filter_events') }}" data-filter-pills>
-        <button type="button" class="pill is-active" data-filter="all">{{ __('app.filter_all', ['n' => count($timeline)]) }}</button>
-        <button type="button" class="pill" data-filter="attendance">{{ __('app.filter_attendance') }}</button>
-        <button type="button" class="pill" data-filter="pae">{{ __('app.filter_pae') }}</button>
-        <button type="button" class="pill" data-filter="recycling">{{ __('app.filter_recycling') }}</button>
+        <button type="button" class="pill is-active" data-filter="all" aria-pressed="true"
+                data-all-template="{{ __('app.filter_all', ['n' => ':n']) }}">{{ __('app.filter_all', ['n' => count($timeline)]) }}</button>
+        <button type="button" class="pill" data-filter="attendance" aria-pressed="false">{{ __('app.filter_attendance') }}</button>
+        <button type="button" class="pill" data-filter="pae" aria-pressed="false">{{ __('app.filter_pae') }}</button>
+        <button type="button" class="pill" data-filter="recycling" aria-pressed="false">{{ __('app.filter_recycling') }}</button>
     </div>
     <div class="searchbox">
         <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
@@ -121,15 +122,20 @@
 </div>
 
 <div class="stack" data-reveal data-student-live="{{ $student->id }}"
-     data-event-labels='@json(collect(\App\Enums\EventType::cases())->mapWithKeys(fn ($t) => [$t->value => __('app.event_type_'.$t->value)])->all())'>
+     data-event-labels="{{ json_encode(collect(\App\Enums\EventType::cases())->mapWithKeys(fn ($t) => [$t->value => __('app.event_type_'.$t->value)])->all()) }}">
     <x-panel :label="__('app.event_type')" rule>
         @if(empty($timeline))
             <div class="empty">
                 <span class="empty-icon"><span class="material-symbols-outlined is-24" aria-hidden="true">event_busy</span></span>
                 <p>{{ __('app.no_events') }}</p>
-                <p class="muted small">{{ __('app.no_events_filter') }}</p>
+                {{-- The "no match for the filters" line belongs to the
+                     filtered variant only (rendered below when rows exist
+                     but pills/search hide them all). --}}
             </div>
         @else
+            <div class="empty" data-filter-empty hidden>
+                <p>{{ __('app.no_events_filter') }}</p>
+            </div>
             <div class="ledger-wrap">
                 <table class="ledger-table" data-stack data-ledger>
                     <thead>
@@ -156,7 +162,7 @@
                             <td data-label="{{ __('app.material') }}">{{ $event['material'] ?? '—' }}</td>
                             <td class="num ta-right" data-label="{{ __('app.points') }}">
                                 @if($event['points'] !== null && $event['points'] > 0)
-                                    <span class="points-badge">+{{ $event['points'] }} PTS</span>
+                                    <span class="points-badge">+{{ $event['points'] }} {{ __('app.points_unit') }}</span>
                                 @else
                                     <span class="points-badge is-none">—</span>
                                 @endif
@@ -210,15 +216,23 @@
                 emptyNote.hidden = visible !== 0 || rows.length !== 0;
             }
             var counter = document.querySelector('[data-filter="all"]');
-            if (counter) {
-                counter.textContent = counter.dataset.allLabel.replace(':n', String(rows.length));
+            if (counter && counter.dataset.allTemplate) {
+                counter.textContent = counter.dataset.allTemplate.replace(':n', String(rows.length));
+            }
+            var emptyFiltered = document.querySelector('[data-filter-empty]');
+            if (emptyFiltered) {
+                emptyFiltered.hidden = !(rows.length > 0 && visible === 0);
             }
         }
 
         pills.forEach(function (pill) {
             pill.addEventListener('click', function () {
-                pills.forEach(function (p) { p.classList.remove('is-active'); });
+                pills.forEach(function (p) {
+                    p.classList.remove('is-active');
+                    p.setAttribute('aria-pressed', 'false');
+                });
                 pill.classList.add('is-active');
+                pill.setAttribute('aria-pressed', 'true');
                 filter = pill.dataset.filter;
                 apply();
             });
@@ -231,8 +245,7 @@
             });
         }
 
-        var allPill = document.querySelector('[data-filter="all"]');
-        if (allPill) { allPill.dataset.allLabel = allPill.textContent; }
+        // The template lives in data-all-template (SSR); nothing to capture here.
 
         // TASK-029 — live prepend: a tap frame naming THIS student adds
         // its row to the ledger (built with the same DOM grammar the SSR
@@ -244,6 +257,11 @@
             var liveStudentId = Number(liveStack.dataset.studentLive);
             var eventLabels = {};
             try { eventLabels = JSON.parse(liveStack.dataset.eventLabels || '{}'); } catch (err) { /* labels stay raw */ }
+
+            // Mobile stacked tables label cells via data-label (CSS attr());
+            // live rows reuse the SSR headers so the labels never drift.
+            var headers = liveStack.querySelectorAll('[data-ledger] thead th');
+            function label(i) { return headers[i] ? headers[i].textContent : ''; }
 
             document.addEventListener('realtime:tap', function (e) {
                 var ev = e.detail || {};
@@ -266,6 +284,7 @@
                 tr.className = 'js-row-flash';
 
                 var chipCell = document.createElement('td');
+                chipCell.setAttribute('data-label', label(0));
                 var chip = document.createElement('span');
                 chip.className = 'live-chip';
                 chip.setAttribute('data-event-type', type);
@@ -275,6 +294,7 @@
 
                 var timeCell = document.createElement('td');
                 timeCell.className = 'num';
+                timeCell.setAttribute('data-label', label(1));
                 timeCell.textContent = (ev.date || '') + ' ';
                 var timeSpan = document.createElement('span');
                 timeSpan.className = 'muted';
@@ -283,15 +303,18 @@
                 tr.appendChild(timeCell);
 
                 var readerCell = document.createElement('td');
+                readerCell.setAttribute('data-label', label(2));
                 readerCell.textContent = ev.reader_label || '—';
                 tr.appendChild(readerCell);
 
                 var materialCell = document.createElement('td');
+                materialCell.setAttribute('data-label', label(3));
                 materialCell.textContent = '—';
                 tr.appendChild(materialCell);
 
                 var pointsCell = document.createElement('td');
                 pointsCell.className = 'num ta-right';
+                pointsCell.setAttribute('data-label', label(4));
                 var badge = document.createElement('span');
                 badge.className = 'points-badge is-none';
                 badge.textContent = '—';

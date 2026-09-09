@@ -9,7 +9,10 @@ use App\Http\Controllers\Web\ParentViewController;
 use App\Http\Controllers\Web\RealtimeTokenController;
 use App\Http\Controllers\Web\StudentDashboardController;
 use App\Http\Controllers\Web\TeacherDashboardController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 // Landing -> login (or the role-appropriate dashboard when authenticated).
 Route::get('/', function () {
@@ -32,10 +35,11 @@ Route::get('/locale/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('locale.switch');
 
-// Guest-only.
+// Guest-only. Login is throttled (AppServiceProvider 'login' limiter) —
+// brute-force guard, no UX change for a human typing credentials.
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])
@@ -114,4 +118,44 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/realtime/token', [RealtimeTokenController::class, 'issue'])
         ->middleware('role:admin,teacher,student')
         ->name('realtime.token');
+});
+
+// UI pass 2026-09-09 — unknown web paths render the in-shell 404. As a
+// MATCHED route this still runs the web middleware (session, locale,
+// auth), so the page is localized and shows the user's own way out; a
+// bare abort(404) renders before group middleware and always comes out
+// guest-mode English. A fallback also intercepts requests the router
+// would have answered with 405, so the verb verdict is rebuilt here:
+// a known path probed with the wrong method keeps its 405 (with Allow),
+// and API/JSON misses re-throw NotFound so their response shape is
+// byte-identical to before.
+Route::fallback(function (Request $request) {
+    $allowed = [];
+    $path = $request->path();
+    foreach (Route::getRoutes()->getRoutes() as $route) {
+        if ($route->isFallback) {
+            continue;
+        }
+        $pattern = '#^'.preg_replace(
+            ['#/\{[^}]+\?\}#', '#\{[^}]+\}#'],
+            ['(?:/[^/]+)?', '[^/]+'],
+            $route->uri(),
+        ).'$#';
+
+        if (preg_match($pattern, $path) === 1) {
+            $allowed = array_merge($allowed, $route->methods());
+        }
+    }
+    $allowed = array_values(array_unique(array_diff($allowed, ['HEAD'])));
+
+    if ($allowed !== []) {
+        throw new MethodNotAllowedHttpException($allowed);
+    }
+
+    if ($request->is('api/*') || $request->expectsJson()) {
+        // Same wording the router itself throws (visible under APP_DEBUG).
+        throw new NotFoundHttpException("The route {$path} could not be found.");
+    }
+
+    return response()->view('errors.404', ['code' => 404], 404);
 });

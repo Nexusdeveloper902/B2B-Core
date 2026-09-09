@@ -38,6 +38,7 @@ comando siempre se te imprime — y normalmente es `./run doctor`.
 | `./run reset` | `migrate:fresh --seed` | BD nueva + datos demo (pregunta primero) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Servidor del modelo local: start/stop/status/run |
 | `./run llm-check` | leer un «no disponible» genérico | Una llamada en vivo a DeepSeek — veredicto exacto para ESTA máquina |
+| `./run unpair` | `php artisan cards:unpair` | Reset de pruebas: borra todas las tarjetas (+ sus eventos) para que las credenciales vuelvan a estar frescas |
 | `./run toolchain` | instalar PHP a mano | PHP+Composer herméticos estáticos en `.tools/` |
 | `./run ci` | leer ci.yml | Todo lo que corre CI, localmente y en orden |
 
@@ -116,7 +117,7 @@ pruebas con LLM real siguen siendo opcionales (`RUN_LIVE_LLM_TESTS=1` +
 
 Arranca `php artisan serve` contra `database/e2e.sqlite` (tu base de datos de
 desarrollo **nunca se toca**) y luego ejercita toda la historia de la plataforma
-por HTTP plano con 22 verificaciones bilingües: tap → clasificar → otorgo
+por HTTP plano con 30 verificaciones bilingües: tap → clasificar → otorgo
 idempotente → reetiquetar lector → canje → estado bloqueado honesto de NL-query
 → enrutado de paneles. Sale con código distinto de cero si algo falla.
 
@@ -190,7 +191,9 @@ Qué borra / qué conserva (reflejando el contrato de FKs del esquema):
 | `cards` | **todas las filas borradas** — cada credencial vuelve a ser fresca |
 | `events` (toques) | borrados (todos pertenecen a tarjetas) |
 | `pending_pairings.card_id` | limpiado — las **filas** de historial sobreviven (auditoría) |
-| estudiantes, lectores, usuarios, puntos, reciclaje | intactos |
+| estudiantes, lectores, usuarios, filas de historial | intactos |
+| points_ledger (saldos) | sobrevive (`event_id` pasa a nulo — los saldos conservan su valor) |
+| recycling_deposits | **borrados** — cascan con los eventos (FK única); las imágenes de captura también se eliminan |
 
 Imprime conteos honestos bilingües antes y después; pide confirmación salvo
 `--force` (tanto el wrapper `./run` como el comando artisan mismo tienen
@@ -286,7 +289,8 @@ envoltorios los ejecuta **directamente** (ellos mismos envuelven a PHP).
 | `B2B_BASH` | — | solo `run.cmd`: forzar el Git Bash al que delegar |
 | `B2B_PHP` | — | forzar un binario de PHP |
 | `B2B_COMPOSER` | — | forzar un phar/binario de Composer |
-| `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run toolchain` |
+| `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run unpair` | `php artisan cards:unpair` | Reset de pruebas: borra todas las tarjetas (+ sus eventos) para que las credenciales vuelvan a estar frescas |
+| `./run toolchain` |
 | `B2B_SERVE_PORT` / `B2B_SERVE_HOST` | `8000` / `127.0.0.1` | `./run serve` |
 | `B2B_MODEL_PORT` | `8501` | `./run model` |
 | `NO_COLOR` | — | desactivar los colores |
@@ -369,6 +373,7 @@ fuerza uno con `B2B_BASH=C:\ruta\a\bash.exe`) y reenvía cada argumento al
 |---|---|---|
 | Candidatos de PHP | `B2B_PHP` → PATH → `.tools/php` (ELF estático) | `B2B_PHP` → PATH (`php.exe`); el ELF de Linux `.tools/php` **jamás se sondea** |
 | Composer | phar ejecutado vía el PHP resuelto | + sondeos de `composer.bat` / `composer.cmd` / `composer.phar` en PATH; los envoltorios corren **directos** (ellos envuelven a PHP) |
+| `./run unpair` | `php artisan cards:unpair` | Reset de pruebas: borra todas las tarjetas (+ sus eventos) para que las credenciales vuelvan a estar frescas |
 | `./run toolchain` | PHP estático + composer.phar en `.tools/` | **solo composer.phar** — el PHP estático es binario de Linux; instala PHP vía winget/choco/php.net |
 | Venv del modelo | `.venv/bin/` | `.venv/Scripts/`; python se resuelve `python3` → `python` → lanzador `py` |
 | Respaldo de model stop | `pkill -f 'uvicorn server:app'` | `taskkill /F /T /PID <winpid>` (vía `/proc/<pid>/winpid` de Git Bash) |
@@ -411,6 +416,7 @@ scripts/
 ├── _lib/common.sh               # librería: cadena de resolución, logging, detección de distro
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh
 ├── doctor.sh · status.sh · reset.sh
+├── unpair.sh                   # testing reset (cards:unpair)
 ├── model-server.sh              # ciclo de vida del clasificador local
 ├── provision-toolchain.sh       # provisionador hermético de PHP+Composer
 ├── ci.sh                        # espejo local de CI

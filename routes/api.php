@@ -139,8 +139,9 @@ Route::prefix('v1')->group(function () {
 
     // Phase E — natural-language query. TASK-027 — admin AND teacher
     // (the teacher's questions are server-side scoped to their classes;
-    // see NlQueryController + StudentScope).
+    // see NlQueryController + StudentScope). Throttled per user — every
+    // forwarded question is a paid LLM call (see 'nl-query' limiter).
     Route::post('/nl-query', [NlQueryController::class, 'store'])
-        ->middleware(['auth:sanctum', 'role:admin,teacher'])
+        ->middleware(['auth:sanctum', 'role:admin,teacher', 'throttle:nl-query'])
         ->name('api.v1.nl-query');
 });

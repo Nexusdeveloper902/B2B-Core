@@ -430,10 +430,15 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString("classList.add('js-motion')", $html);
         $this->assertStringContainsString('js/motion.js', $html);
         $this->assertFileExists(public_path('js/vendor/anime.esm.min.js'));
+        // UI pass 2026-09-09 — reveals now hand off via IntersectionObserver
+        // (the old anime onScroll "85% center" trigger left tall panels
+        // invisible on phones); the vendored anime module still drives the
+        // stagger animation.
         $this->assertStringContainsString(
-            "import { animate, stagger, onScroll } from './vendor/anime.esm.min.js';",
+            "import { animate, stagger } from './vendor/anime.esm.min.js';",
             file_get_contents(public_path('js/motion.js')),
         );
+        $this->assertStringContainsString('IntersectionObserver', file_get_contents(public_path('js/motion.js')));
         // reveals are progressive enhancement only
         $this->assertStringContainsString('data-reveal', $html);
     }

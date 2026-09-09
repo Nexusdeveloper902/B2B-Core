@@ -132,7 +132,7 @@ class AdminPairingDeskTest extends TestCase
             ->assertSeeText('Unpair')
             // the destructive endpoint + confirm copy the script uses
             ->assertSee("'/api/v1/admin/cards/' + btn.dataset.unpair", false)
-            ->assertSee('var UNPAIRED_TEXT = "Card unpaired', false);
+            ->assertSee("var UNPAIRED_TEXT = 'Card unpaired", false);
 
         // The confirm dialog warns that the tap history is deleted.
         $this->assertStringContainsString('tap history is deleted', $response->getContent());
@@ -149,7 +149,7 @@ class AdminPairingDeskTest extends TestCase
 
         $response->assertOk()
             ->assertSeeText('Desvincular')
-            ->assertSee('var UNPAIRED_TEXT = "Tarjeta desvinculada', false);
+            ->assertSee("var UNPAIRED_TEXT = 'Tarjeta desvinculada", false);
 
         // The Spanish confirm template substitutes the same placeholders.
         $this->assertStringContainsString(':UID:', $response->getContent());
@@ -233,12 +233,12 @@ class AdminPairingDeskTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/admin/pairing');
 
         $response->assertOk()
-            ->assertSee('var lastSeenUid = "DESKSCRIPT1";', false)
+            ->assertSee("var lastSeenUid = 'DESKSCRIPT1';", false)
             ->assertDontSee('&quot;');
 
         // The script must also carry the TASK-014 templates as valid literals.
-        $this->assertStringContainsString('var REJECTED_TPL = "Card ', $response->getContent());
-        $this->assertStringContainsString('var ARMED_TPL = "Armed for ', $response->getContent());
+        $this->assertStringContainsString("var REJECTED_TPL = 'Card ", $response->getContent());
+        $this->assertStringContainsString("var ARMED_TPL = 'Armed for ", $response->getContent());
     }
 
     #[Test]

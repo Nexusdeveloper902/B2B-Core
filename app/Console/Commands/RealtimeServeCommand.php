@@ -58,6 +58,9 @@ class RealtimeServeCommand extends Command
 
     private const SELECT_TIMEOUT_MICRO = 250000; // 250 ms — caps event latency even when idle
 
+    /** Pre-handshake bytes a client may buffer before the drop (an HTTP head is never this big). */
+    private const MAX_HANDSHAKE_BUFFER = 32768;
+
     /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null}> keyed by (int) socket */
     private array $clients = [];
 
@@ -186,6 +189,14 @@ class RealtimeServeCommand extends Command
         $this->clients[$clientId]['buf'] .= $data;
 
         if (! $this->clients[$clientId]['handshook']) {
+            // Post-handshake frames are capped by WsFrame::MAX_INBOUND;
+            // this guard closes the one unbounded surface left: a client
+            // that dribbles handshake bytes forever.
+            if (\strlen($this->clients[$clientId]['buf']) > self::MAX_HANDSHAKE_BUFFER) {
+                $this->drop($clientId);
+
+                return;
+            }
             $this->handshake($clientId, $socket);
 
             return;
@@ -292,16 +303,6 @@ class RealtimeServeCommand extends Command
         $this->sendJson($socket, $hello);
     }
 
-    /** One role/scope lookup per connection; fail closed on any doubt. */
-    private function isAdmin(int $userId): bool
-    {
-        try {
-            return DB::table('users')->where('id', $userId)->value('role') === UserRole::Admin->value;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
     /**
      * TASK-027 — resolve the tap-channel scope for one connection.
      *
@@ -330,7 +331,16 @@ class RealtimeServeCommand extends Command
         }
 
         if ($user->role === UserRole::Student->value) {
+            // FAIL CLOSED (mirrors StudentScope::forUser): users.student_id
+            // is nullable by design, and a student connection with no linked
+            // row must see NOTHING — null class_ids + null student_id is the
+            // ADMIN shape here, and handing the whole school's taps to an
+            // account with no identity is exactly the fail-open it must not be.
             $scope['student_id'] = $user->student_id !== null ? (int) $user->student_id : null;
+
+            if ($scope['student_id'] === null) {
+                $scope['class_ids'] = [];  // empty allowlist — clientSeesRow serves nothing
+            }
 
             return $scope;
         }

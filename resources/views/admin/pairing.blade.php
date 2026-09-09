@@ -11,6 +11,7 @@
     (gaps #D2-D4).
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.pairing_desk'))
 
@@ -189,7 +190,7 @@
         // completed pairing (dead buttons on every reload until the
         // history was empty again). json_encode escapes slashes, so the
         // output cannot break out of the script tag.
-        var lastSeenUid = {!! json_encode($lastCardUid) !!};
+        var lastSeenUid = {!! Js::from($lastCardUid) !!};
         var armed = stateBox.dataset.initiallyArmed === '1';
         var secondsLeft = parseInt(stateBox.dataset.secondsLeft || '0', 10);
         var armBtns = Array.prototype.slice.call(document.querySelectorAll('.arm-btn'));
@@ -199,8 +200,8 @@
         // /api/v1/admin/cards/{card}. The confirm copy and the empty-cell
         // text come from the same lang files the server renders with.
         var unpairBtns = Array.prototype.slice.call(document.querySelectorAll('.unpair-btn'));
-        var UNPAIRED_TEXT = {!! json_encode(__('app.unpaired')) !!};
-        var NO_CARD_TEXT = {!! json_encode(__('app.no_card')) !!};
+        var UNPAIRED_TEXT = {!! Js::from(__('app.unpaired')) !!};
+        var NO_CARD_TEXT = {!! Js::from(__('app.no_card')) !!};
 
         // TASK-017 — the armed window as a draining progress bar.
         var countdown = document.getElementById('pairing-countdown');
@@ -223,15 +224,15 @@
 
         // TASK-014 — localized templates for the rejection note (session
         // locale, same convention as every other desk string).
-        var REJECTED_TPL = {!! json_encode(__('app.pairing_rejected', ['uid' => ':UID:', 'reason' => ':REASON:'])) !!};
+        var REJECTED_TPL = {!! Js::from(__('app.pairing_rejected', ['uid' => ':UID:', 'reason' => ':REASON:'])) !!};
         var REASON_TEXT = {
-            'already_paired': {!! json_encode(__('app.pairing_reason_already_paired')) !!}
+            'already_paired': {!! Js::from(__('app.pairing_reason_already_paired')) !!}
         };
         var rejectionNote = stateBox.dataset.rejectionNote || null;
 
-        var ARMED_TPL = {!! json_encode(__('app.pairing_armed_for', ['name' => ':NAME:']) . ' — ' . __('app.pairing_seconds_left', ['s' => ':S:']) . ' ' . __('app.pairing_go_tap')) !!};
-        var EXPIRED_TEXT = {!! json_encode(__('app.pairing_expired')) !!};
-        var SUCCESS_TPL = {!! json_encode(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!};
+        var ARMED_TPL = {!! Js::from(__('app.pairing_armed_for', ['name' => ':NAME:']) . ' — ' . __('app.pairing_seconds_left', ['s' => ':S:']) . ' ' . __('app.pairing_go_tap')) !!};
+        var EXPIRED_TEXT = {!! Js::from(__('app.pairing_expired')) !!};
+        var SUCCESS_TPL = {!! Js::from(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!};
 
         var ACTIVE_MS = 2000;   // armed window: live countdown
         var IDLE_MS = 15000;    // idle: quiet watch (cross-tab arm / success)
@@ -455,12 +456,12 @@
                             setPollInterval(ACTIVE_MS);
                             poll();
                         } else {
-                            setState((r.data && r.data.message) || {!! json_encode(__('app.error_generic')) !!}, false);
+                            setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
                         }
                     })
                     .catch(function () {
                         armBtns.forEach(function (b) { b.disabled = false; b.classList.remove('is-loading'); });
-                        setState({!! json_encode(__('app.error_generic')) !!}, false);
+                        setState({!! Js::from(__('app.error_generic')) !!}, false);
                     });
             });
         });
@@ -483,7 +484,7 @@
         // (textContent everywhere — a UID can never inject markup).
         unpairBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var confirmTpl = {!! json_encode(__('app.unpair_confirm', ['uid' => ':UID:', 'student' => ':NAME:'])) !!};
+                var confirmTpl = {!! Js::from(__('app.unpair_confirm', ['uid' => ':UID:', 'student' => ':NAME:'])) !!};
                 var really = window.confirm(
                     confirmTpl.replace(':UID:', btn.dataset.uid || '').replace(':NAME:', btn.dataset.name || '')
                 );
@@ -503,12 +504,12 @@
                             }
                             setState(UNPAIRED_TEXT, true);
                         } else {
-                            setState((r.data && r.data.message) || {!! json_encode(__('app.error_generic')) !!}, false);
+                            setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
                         }
                     })
                     .catch(function () {
                         btn.disabled = false;
-                        setState({!! json_encode(__('app.error_generic')) !!}, false);
+                        setState({!! Js::from(__('app.error_generic')) !!}, false);
                     });
             });
         });

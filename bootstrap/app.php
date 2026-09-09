@@ -22,6 +22,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // stateless (reader Bearer tokens).
         $middleware->statefulApi();
 
+        // Authenticated users who open a guest-only page (a bookmarked
+        // /login, most commonly) go to their OWN dashboard. The framework
+        // default sends everyone to /dashboard — staff-only, so students
+        // used to land on a bare 403 with no way out.
+        $middleware->redirectUsersTo(function (Request $request) {
+            $user = $request->user();
+
+            return $user && $user->isStudent()
+                ? route('student.dashboard')
+                : route('dashboard');
+        });
+
         // Dashboard UI locale: session-based (EN / ES language switcher).
         // Appended so it runs AFTER StartSession.
         $middleware->web(append: [

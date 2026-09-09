@@ -38,6 +38,7 @@ command to run is always printed for you — and it's usually `./run doctor`.
 | `./run reset` | `migrate:fresh --seed` | Fresh DB + demo data (asks first) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Local model server: start/stop/status/run |
 | `./run llm-check` | reading a generic "unavailable" | One live DeepSeek call — exact verdict for THIS machine |
+| `./run unpair` | `php artisan cards:unpair` | Testing reset: deletes every card (+ its events) so credentials are fresh again |
 | `./run toolchain` | manual PHP installation | Hermetic static PHP+Composer into `.tools/` |
 | `./run ci` | reading ci.yml | Everything CI runs, locally, in order |
 
@@ -114,7 +115,7 @@ tests remain opt-in (`RUN_LIVE_LLM_TESTS=1` + `DEEPSEEK_API_KEY`).
 
 Boots `php artisan serve` against `database/e2e.sqlite` (your dev database is
 **never touched**), then exercises the whole platform story over plain HTTP
-with 22 bilingual checks: tap → classify → idempotent earn → reader relabel →
+with 30 bilingual checks: tap → classify → idempotent earn → reader relabel →
 redeem → honest NL-query blocked state → dashboard routing. Exits non-zero if
 any check fails.
 
@@ -186,7 +187,9 @@ What it deletes / keeps (mirroring the schema's FK contract):
 | `cards` | **all rows deleted** — every credential becomes fresh |
 | `events` (taps) | deleted (they all belong to cards) |
 | `pending_pairings.card_id` | cleared — history **rows** survive (audit trail) |
-| students, readers, users, points, recycling | untouched |
+| students, readers, users, pairing-history rows | untouched |
+| points_ledger (balances) | survives (`event_id` is nulled — balances keep their value) |
+| recycling_deposits | **deleted** — they cascade with the events (unique event FK); stored capture images are removed too |
 
 Prints honest bilingual counts before and after; asks for confirmation unless
 `--force` (both the `./run` wrapper and the artisan command itself guard).
@@ -279,7 +282,8 @@ the wrappers **directly** (they wrap PHP themselves).
 | `B2B_BASH` | — | `run.cmd` only: force the Git Bash to delegate to |
 | `B2B_PHP` | — | force a PHP binary |
 | `B2B_COMPOSER` | — | force a Composer phar/binary |
-| `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run toolchain` |
+| `B2B_STATIC_PHP_VERSION` | `8.4.23` | `./run unpair` | `php artisan cards:unpair` | Testing reset: deletes every card (+ its events) so credentials are fresh again |
+| `./run toolchain` |
 | `B2B_SERVE_PORT` / `B2B_SERVE_HOST` | `8000` / `127.0.0.1` | `./run serve` |
 | `B2B_MODEL_PORT` | `8501` | `./run model` |
 | `NO_COLOR` | — | disable colored output |
@@ -359,6 +363,7 @@ dispatch, ADR-009).
 |---|---|---|
 | PHP candidates | `B2B_PHP` → PATH → `.tools/php` (static ELF) | `B2B_PHP` → PATH (`php.exe`); the Linux ELF `.tools/php` is **never probed** |
 | Composer | phar executed via the resolved PHP | + `composer.bat` / `composer.cmd` / `composer.phar` PATH probes; wrappers run **directly** (they wrap PHP themselves) |
+| `./run unpair` | `php artisan cards:unpair` | Testing reset: deletes every card (+ its events) so credentials are fresh again |
 | `./run toolchain` | static PHP + composer.phar into `.tools/` | **composer.phar only** — the static PHP is a Linux binary; install PHP via winget/choco/php.net |
 | Model-server venv | `.venv/bin/` | `.venv/Scripts/`; python resolved `python3` → `python` → `py` launcher |
 | Model stop fallback | `pkill -f 'uvicorn server:app'` | `taskkill /F /T /PID <winpid>` (via Git Bash's `/proc/<pid>/winpid`) |
@@ -401,8 +406,10 @@ scripts/
 ├── _lib/common.sh               # shared lib: resolution chain, OS detect, logging
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh
 ├── doctor.sh · status.sh · reset.sh
+├── unpair.sh                   # testing reset (cards:unpair)
 ├── model-server.sh              # local classifier lifecycle
 ├── provision-toolchain.sh       # hermetic PHP+Composer provisioner
+├── llm-check.sh                 # one live DeepSeek call, exact verdict
 ├── ci.sh                        # local CI mirror
 └── local-model-server/          # FastAPI reference server (unchanged)
 ```

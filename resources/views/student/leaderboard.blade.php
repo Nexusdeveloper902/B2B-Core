@@ -44,7 +44,7 @@
             <div class="podium-card {{ $i === 0 ? 'is-first' : '' }}" data-podium-student="{{ $entry['student_id'] }}">
                 <span class="podium-rank">#{{ $entry['rank'] }}</span>
                 <span class="podium-name">{{ $entry['student_name'] }}</span>
-                <span class="podium-points"><span class="podium-pts-value">{{ $entry['points'] }}</span> PTS · {{ $entry['class_name'] ?? '—' }}</span>
+                <span class="podium-points"><span class="podium-pts-value">{{ $entry['points'] }}</span> {{ __('app.points_unit') }} · {{ $entry['class_name'] ?? '—' }}</span>
             </div>
         @endforeach
     </section>
@@ -54,7 +54,9 @@
     <x-panel :label="__('app.leaderboard_board')" rule>
         <ol class="board-list">
             @forelse($board as $entry)
-                <li class="board-row {{ $entry['student_id'] === $student->id ? 'is-me' : '' }}" data-board-student="{{ $entry['student_id'] }}">
+                <li class="board-row {{ $entry['student_id'] === $student->id ? 'is-me' : '' }}"
+                    data-board-student="{{ $entry['student_id'] }}"
+                    @if($entry['student_id'] === $student->id) aria-current="true" @endif>
                     <span class="board-rank">{{ $entry['rank'] }}</span>
                     <span class="board-name">{{ $entry['student_name'] }}<span class="muted"> · {{ $entry['class_name'] ?? '—' }}</span></span>
                     <span class="board-points">{{ $entry['points'] }}</span>
@@ -70,7 +72,7 @@
             @forelse($classStandings as $standing)
                 <li>
                     <span class="rate-name"><span class="dot" aria-hidden="true"></span>{{ $standing['class_name'] }}</span>
-                    <span class="rate-value">{{ $standing['points'] }} PTS · {{ $standing['students'] }} {{ __('app.leaderboard_students') }}</span>
+                    <span class="rate-value">{{ $standing['points'] }} {{ __('app.points_unit') }} · {{ $standing['students'] }} {{ __('app.leaderboard_students') }}</span>
                 </li>
             @empty
                 <li class="muted">{{ __('app.leaderboard_no_classes') }}</li>
@@ -114,6 +116,9 @@
                 list.appendChild(row);
                 var rank = row.querySelector(rankSelector);
                 if (rank) { rank.textContent = (useHash ? '#' : '') + (i + 1); }
+                // The podium's hero styling must follow the re-sorted
+                // leader, not stay stuck on the original #1 card.
+                row.classList.toggle('is-first', i === 0);
             });
         }
 

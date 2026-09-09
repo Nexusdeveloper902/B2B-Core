@@ -38,8 +38,13 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
+            // The realtime server polls these tables every ~300 ms while
+            // HTTP writes (tap/classify/redeem) award points. WAL lets the
+            // poller's shared reads coexist with a writer, and a 5 s busy
+            // timeout turns a rare lock collision into a wait instead of an
+            // immediate "database is locked" 500.
+            'busy_timeout' => 5000,
+            'journal_mode' => 'WAL',
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
         ],

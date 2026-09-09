@@ -23,7 +23,7 @@ SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SOURCE_DIR}/_lib/common.sh"
 
-if [ "${1:-}" = "--help" ]; then
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     help_header "$0"
     exit 0
 fi

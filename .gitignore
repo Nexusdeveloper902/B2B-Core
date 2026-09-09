@@ -30,3 +30,7 @@ Thumbs.db
 /.tools
 /.model-server.pid
 /scripts/local-model-server/.venv
+
+# Mimosa security-scan tool state (2026-09-09 audits)
+/.mimosa/
+**/.mimosa/

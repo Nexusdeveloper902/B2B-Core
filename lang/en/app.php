@@ -53,6 +53,7 @@ return [
     'class_summary' => 'Class summary',
     'pae_enrolled' => 'PAE',
     'points' => 'Points',
+    'points_unit' => 'PTS',
 
     // Admin dashboard
     'school_today' => 'School today',
@@ -73,7 +74,6 @@ return [
     'ask' => 'Ask',
     'nl_query_not_configured' => 'NL query is not configured (no DEEPSEEK_API_KEY) — endpoint reports this as blocked.',
     'redemption' => 'Redeem reward',
-    'student' => 'Student',
     'reward' => 'Reward',
     'redeem' => 'Redeem',
     'balance' => 'Balance',
@@ -308,4 +308,17 @@ return [
     'pagination_prev' => 'Previous page',
     'pagination_next' => 'Next page',
     'pagination_page' => 'Page :page',
+
+    // Error pages (UI polish pass — 403/404/500 render in the app shell
+    // with a way out instead of Laravel's bare abort page)
+    'error_403_title' => 'No permission',
+    'error_403_text' => 'Your account doesn\'t have access to this page.',
+    'error_404_title' => 'Page not found',
+    'error_404_text' => 'The page you asked for doesn\'t exist or was moved.',
+    'error_500_title' => 'Something went wrong',
+    'error_500_text' => 'An unexpected error occurred. It has been logged — try again in a moment.',
+    'error_503_title' => 'Under maintenance',
+    'error_503_text' => 'The platform is briefly unavailable for maintenance.',
+    'error_back' => 'Back to your dashboard',
+    'error_home' => 'Go to sign in',
 ];

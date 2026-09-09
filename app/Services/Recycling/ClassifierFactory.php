@@ -6,7 +6,6 @@ use App\Contracts\MaterialClassifier;
 use App\Services\Recycling\Drivers\DeepSeekClassifier;
 use App\Services\Recycling\Drivers\LocalModelClassifier;
 use App\Services\Recycling\Drivers\StubClassifier;
-use InvalidArgumentException;
 
 /**
  * Resolves the configured MaterialClassifier driver from config/recycling.php.
@@ -29,7 +28,13 @@ class ClassifierFactory
                 (string) config('recycling.classifier.deepseek.model'),
                 (float) config('recycling.classifier.deepseek.timeout'),
             ),
-            default => throw new InvalidArgumentException("Unknown classifier driver [{$driver}]"),
+            // A typo'd RECYCLING_CLASSIFIER_DRIVER must surface as the
+            // codebase's standard classifier failure (HTTP 503 with a
+            // device-displayable message), not an unhandled 500.
+            default => throw ClassificationException::driverUnavailable(
+                'factory',
+                "unknown classifier driver [{$driver}] (expected stub | local | deepseek)",
+            ),
         };
     }
 }

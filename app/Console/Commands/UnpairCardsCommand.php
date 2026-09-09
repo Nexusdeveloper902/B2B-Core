@@ -5,9 +5,11 @@ namespace App\Console\Commands;
 use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\PresenceEvent;
+use App\Models\RecyclingDeposit;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * TASK-013 — unpair every card (dev/testing utility, ADR-023).
@@ -26,7 +28,14 @@ use Illuminate\Support\Facades\DB;
  *   cascadeOnDelete);
  * - pending_pairings.card_id links are cleared, history rows survive
  *   (nullOnDelete audit trail — TASK-011);
- * - students, readers, users, points and recycling data are untouched.
+ * - students, readers, users and pairing history are untouched;
+ * - points LEDGER rows survive (points_ledger.event_id is nullOnDelete),
+ *   so balances keep their value;
+ * - recycling DEPOSITS DO NOT survive: recycling_deposits.event_id is a
+ *   unique cascadeOnDelete FK to events, so every deposit row (and its
+ *   stored capture image file) is destroyed with the events. This was
+ *   previously mis-documented as "recycling untouched" — the audit fixed
+ *   the copy, not the semantics (the schema contract is the intent).
  * Deletes run explicitly inside ONE transaction so the outcome is
  * deterministic even where the sqlite foreign_key pragma is off.
  */
@@ -48,6 +57,7 @@ class UnpairCardsCommand extends Command
             $cardCount = Card::count();
             $eventCount = PresenceEvent::count(); // every event belongs to a card (FK), so all of them go
             $linkCount = PendingPairing::whereNotNull('card_id')->count();
+            $depositCount = RecyclingDeposit::count(); // deposits cascade with events (unique event FK)
         } catch (QueryException) {
             $this->error('Database not ready (cards table unreachable) — run: ./run setup or ./run reset');
             $this->error('Base de datos no lista (tabla cards inaccesible) — ejecuta: ./run setup o ./run reset');
@@ -61,9 +71,9 @@ class UnpairCardsCommand extends Command
             return self::SUCCESS;
         }
 
-        $summary = "{$cardCount} card(s) / tarjeta(s), {$eventCount} event(s) / evento(s), {$linkCount} history link(s) / enlace(s) de historial";
-        $this->warn("Unpairing EVERY card — will delete: {$summary}. Students, readers and pairing history rows survive.");
-        $this->warn("Desvinculando TODAS las tarjetas — se borrará: {$summary}. Estudiantes, lectores e historial de emparejamiento sobreviven.");
+        $summary = "{$cardCount} card(s) / tarjeta(s), {$eventCount} event(s) / evento(s), {$depositCount} recycling deposit(s) / recarga(s) de reciclaje, {$linkCount} history link(s) / enlace(s) de historial";
+        $this->warn("Unpairing EVERY card — will delete: {$summary}. Point balances survive; deposit images do not.");
+        $this->warn("Desvinculando TODAS las tarjetas — se borrará: {$summary}. Los saldos de puntos sobreviven; las imágenes de depósitos no.");
 
         if (! $this->option('force') && ! $this->confirm('Proceed? / ¿Continuar?')) {
             $this->info('Aborted — nothing changed. / Cancelado — no cambió nada.');
@@ -71,18 +81,34 @@ class UnpairCardsCommand extends Command
             return self::SUCCESS;
         }
 
-        [$cardsDeleted, $eventsDeleted, $linksCleared] = DB::transaction(function (): array {
+        [$cardsDeleted, $eventsDeleted, $depositsDeleted, $linksCleared, $imagePaths] = DB::transaction(function (): array {
             // Same order a DB-level cascade would apply, but explicit and
-            // counted: children first, then the cards themselves.
+            // counted: children first, then the cards themselves. Deposit
+            // image paths are collected BEFORE the cascade deletes the
+            // rows — the files must not orphan on disk.
+            $imagePaths = RecyclingDeposit::query()
+                ->whereNotNull('image_path')
+                ->pluck('image_path')
+                ->all();
+            $depositsDeleted = RecyclingDeposit::query()->delete();
             $eventsDeleted = PresenceEvent::query()->delete();
             $linksCleared = PendingPairing::whereNotNull('card_id')->update(['card_id' => null]);
             $cardsDeleted = Card::query()->delete();
 
-            return [$cardsDeleted, $eventsDeleted, $linksCleared];
+            return [$cardsDeleted, $eventsDeleted, $depositsDeleted, $linksCleared, $imagePaths];
         });
 
-        $this->info("[OK] {$cardsDeleted} card(s) unpaired, {$eventsDeleted} event(s) deleted, {$linksCleared} history link(s) cleared — every credential is fresh again: arm a pairing and tap any card.");
-        $this->info("[OK] {$cardsDeleted} tarjeta(s) desvinculada(s), {$eventsDeleted} evento(s) borrado(s), {$linksCleared} enlace(s) de historial limpiado(s) — cada credencial está fresca otra vez: arma un emparejamiento y toca cualquier tarjeta.");
+        // The deposit rows are gone; their stored capture images follow
+        // (the private audit trail dies with the deposits it belongs to).
+        $imagesDeleted = 0;
+        foreach ($imagePaths as $path) {
+            if (Storage::disk('local')->delete($path)) {
+                $imagesDeleted++;
+            }
+        }
+
+        $this->info("[OK] {$cardsDeleted} card(s) unpaired, {$eventsDeleted} event(s) deleted, {$depositsDeleted} deposit(s) deleted, {$imagesDeleted} image(s) removed, {$linksCleared} history link(s) cleared — every credential is fresh again: arm a pairing and tap any card.");
+        $this->info("[OK] {$cardsDeleted} tarjeta(s) desvinculada(s), {$eventsDeleted} evento(s) borrado(s), {$depositsDeleted} depósito(s) borrado(s), {$imagesDeleted} imagen(es) eliminada(s), {$linksCleared} enlace(s) de historial limpiado(s) — cada credencial está fresca otra vez: arma un emparejamiento y toca cualquier tarjeta.");
         $this->line('Tip / Consejo: ./run reset restores the seeded demo cards. / ./run reset restaura las tarjetas demo.');
 
         return self::SUCCESS;

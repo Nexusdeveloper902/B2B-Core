@@ -7,7 +7,7 @@
     Same variable contract as the framework view ($paginator/$elements).
 --}}
 @if ($paginator->hasPages())
-    <nav role="navigation" aria-label="{{ __('app.pagination_nav') }}">
+    <nav aria-label="{{ __('app.pagination_nav') }}">
         <ul class="pagination">
             @if ($paginator->onFirstPage())
                 <li class="disabled" aria-disabled="true"><span>&lsaquo;</span></li>

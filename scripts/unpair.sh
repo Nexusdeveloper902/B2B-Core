@@ -9,9 +9,12 @@
 # Deletes every cards row (+ its tap events; pairing-history card links
 # are cleared, history rows survive) so every credential_uid is FRESH
 # again and can be re-paired through the normal arm-then-pair flow
-# (ADR-020/023). Students, readers, users, points and recycling data are
-# untouched. ./run reset restores the seeded demo cards if you want them
-# back. The e2e throwaway DB is never affected.
+# (ADR-020/023). Students, readers, users and pairing history survive;
+# point balances survive (the ledger outlives the events). Recycling
+# DEPOSITS do not: they reference events with a cascade FK, so deposit
+# rows and their stored capture images are deleted too. ./run reset
+# restores the seeded demo cards if you want them back. The e2e
+# throwaway DB is never affected.
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

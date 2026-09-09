@@ -93,11 +93,13 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="muted">—</td></tr>
+                    <tr><td colspan="3" class="muted">{{ __('app.no_readers') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
         </div>
+
+        <p class="nl-answer hidden" id="reader-mode-result" role="status" aria-live="polite"></p>
     </x-panel>
 
     {{-- NL query box --}}
@@ -129,7 +131,7 @@
 
             <select id="redeem-reward" class="bare-select" required aria-label="{{ __('app.reward') }}">
                 @foreach($rewards as $reward)
-                    <option value="{{ $reward->id }}">{{ $reward->name }} ({{ $reward->point_cost }} pts)</option>
+                    <option value="{{ $reward->id }}">{{ $reward->name }} ({{ $reward->point_cost }} {{ __('app.points_unit') }})</option>
                 @endforeach
             </select>
 
@@ -147,7 +149,7 @@
                 @foreach($students as $student)
                     <li>
                         <a href="{{ route('parent.timeline', $student) }}">{{ $student->name }}</a>
-                        <span class="meta">{{ $student->schoolClass?->name }} · {{ $student->pae_enrolled ? 'PAE ✓' : '—' }}</span>
+                        <span class="meta">{{ $student->schoolClass?->name }} · {{ $student->pae_enrolled ? __('app.pae_enrolled_yes') : __('app.pae_enrolled_no') }}</span>
                     </li>
                 @endforeach
             </ul>
@@ -209,14 +211,20 @@
                 busy(btn, true);
                 postJson(btn.dataset.endpoint, {active_event_type: select.value}).then(function (r) {
                     busy(btn, false);
+                    // Reader feedback announces in the READERS panel's own
+                    // live region — the NL-query answer box is a different
+                    // panel with different semantics.
+                    var result = document.getElementById('reader-mode-result');
                     if (r.ok) {
-                        show(document.getElementById('nl-answer'),
-                            '{{ __('app.mode_updated') }}', true);
+                        show(result, '{{ __('app.mode_updated') }}', true);
                     } else {
-                        show(document.getElementById('nl-answer'),
-                            (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
+                        show(result, (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
                     }
-                }).catch(function () { busy(btn, false); });
+                }).catch(function () {
+                busy(btn, false);
+                // Close the aria-live region on network failure too.
+                show(box, '{{ __('app.error_generic') }}', false);
+            });
             });
         });
 
@@ -236,7 +244,11 @@
             postJson('/api/v1/nl-query', {question: question}).then(function (r) {
                 busy(btn, false);
                 show(box, r.data.answer || r.data.message || '{{ __('app.error_generic') }}', r.ok);
-            }).catch(function () { busy(btn, false); });
+            }).catch(function () {
+                busy(btn, false);
+                // Close the aria-live region on network failure too.
+                show(box, '{{ __('app.error_generic') }}', false);
+            });
         });
 
         // Redemption desk (Phase D).
@@ -258,7 +270,11 @@
                         show(box,
                             (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
                     }
-                }).catch(function () { busy(btn, false); });
+                }).catch(function () {
+                busy(btn, false);
+                // Close the aria-live region on network failure too.
+                show(box, '{{ __('app.error_generic') }}', false);
+            });
         });
 
         // ---- TASK-029 — the KPI strip is LIVE. Attendance and the PAE
