@@ -28,8 +28,8 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     exit 0
 fi
 
-DEFAULT_MODEL="deepseek-v4-flash"
-DEFAULT_VISION_MODEL="deepseek-v4-flash-vision-exp"
+DEFAULT_MODEL="deepseek-flash"
+DEFAULT_VISION_MODEL="deepseek-flash"
 ENDPOINT="https://api.deepseek.com/chat/completions"
 ERRORS_DOC="https://api-docs.deepseek.com/quick_start/error_codes"
 PLATFORM_URL="https://platform.deepseek.com"
@@ -68,15 +68,23 @@ printf '  %-16s %b\n' "nlq model:" "${MODEL}"
 printf '  %-16s %b\n' "vision model:" "${VISION_MODEL}"
 printf '  %-16s %b\n' "classifier:" "${DRIVER:-stub} ${C_DIM}(stub | local | deepseek)${C_RESET}"
 
-# Stale-model hint (the legacy names were discontinued on 2026-07-24 and
-# now point nowhere — see api-docs.deepseek.com/updates).
+# Model-name hints (ADR-046 — api-docs.deepseek.com, Models & Pricing:
+# the model is deepseek-flash; deepseek-chat/deepseek-reasoner are dead
+# since 2026-07-24, deepseek-v4-flash/deepseek-v4-flash-vision-exp are
+# retired but still served).
 if [ "$MODEL" = "deepseek-chat" ] || [ "$MODEL" = "deepseek-reasoner" ]; then
     warn "DEEPSEEK_MODEL=${MODEL} is a legacy name discontinued on 2026-07-24; current default is ${DEFAULT_MODEL}"
     warn "DEEPSEEK_MODEL=${MODEL} es un nombre antiguo discontinuado el 2026-07-24; el valor actual es ${DEFAULT_MODEL}"
+elif [ "$MODEL" = "deepseek-v4-flash" ]; then
+    warn "DEEPSEEK_MODEL=${MODEL} is retired (still served); canonical name is ${DEFAULT_MODEL}"
+    warn "DEEPSEEK_MODEL=${MODEL} está retirado (aún servido); el nombre canónico es ${DEFAULT_MODEL}"
 fi
-if [ "$VISION_MODEL" != "deepseek-v4-flash-vision-exp" ]; then
-    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} — only deepseek-v4-flash-vision-exp accepts images (others 400)"
-    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} — solo deepseek-v4-flash-vision-exp acepta imágenes (las demás dan 400)"
+if [ "$VISION_MODEL" = "deepseek-v4-flash-vision-exp" ]; then
+    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} is retired (still served); canonical vision model is ${DEFAULT_VISION_MODEL}"
+    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} está retirado (aún servido); el modelo de visión canónico es ${DEFAULT_VISION_MODEL}"
+elif [ "$VISION_MODEL" != "deepseek-flash" ]; then
+    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} — only ${DEFAULT_VISION_MODEL} accepts images (others 400)"
+    warn "DEEPSEEK_VISION_MODEL=${VISION_MODEL} — solo ${DEFAULT_VISION_MODEL} acepta imágenes (las demás dan 400)"
 fi
 
 # --- 2. one bare live call ---------------------------------------------------

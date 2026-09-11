@@ -375,7 +375,7 @@ estudiante fuera del muro responde con un error explícito de alcance,
 nunca con datos. Los estudiantes siguen en 403.
 
 Flujo: la pregunta + un conjunto fijo de esquemas de funciones va al modelo
-de DeepSeek (por defecto `deepseek-v4-flash`) → el modelo
+de DeepSeek (por defecto `deepseek-flash` — DeepSeek-V4.1-Flash; ADR-046) → el modelo
 **selecciona una función** → el backend ejecuta la
 **consulta Eloquent real** → el resultado vuelve al modelo → el modelo redacta
 la respuesta final. El LLM nunca calcula ni fabrica cifras. Las respuestas
@@ -417,7 +417,7 @@ DeepSeek):
 | `missing_llm_credential` | No hay `DEEPSEEK_API_KEY` en `.env` | Añade la clave y ejecuta `./run llm-check` |
 | `llm_invalid_key` | DeepSeek rechazó la clave (401 Authentication Fails) | Crea una clave nueva en platform.deepseek.com y actualiza `.env` |
 | `llm_insufficient_balance` | 402 — la clave SÍ es válida pero el saldo de la cuenta está vacío (pago por uso) | Recarga el saldo en platform.deepseek.com |
-| `llm_model_not_found` | `DEEPSEEK_MODEL` desconocido para esta cuenta/API (404 Model Not Exist) | Usa el valor por defecto `deepseek-v4-flash` |
+| `llm_model_not_found` | `DEEPSEEK_MODEL` desconocido para esta cuenta/API (404 Model Not Exist) | Usa el valor por defecto `deepseek-flash` |
 | `llm_rate_limited` | Límite de peticiones alcanzado (429) | Reintenta más tarde |
 | `llm_unavailable` | Error de transporte/servidor | Reintenta; el detalle está en `storage/logs/laravel.log` |
 

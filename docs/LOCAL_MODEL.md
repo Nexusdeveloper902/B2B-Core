@@ -10,8 +10,8 @@ implementation is chosen by **one .env variable**:
 ```dotenv
 # stub   → deterministic pseudo-classifier (default; for dev/CI/demos)
 # local  → YOUR local model-inference service   ← intended production driver
-# deepseek → optional cloud fallback (deepseek-v4-flash-vision-exp — the only
-#          image-capable DeepSeek model; needs DEEPSEEK_API_KEY)
+# deepseek → optional cloud fallback (deepseek-flash — DeepSeek-V4.1-Flash,
+#          the vision-capable Flash model; needs DEEPSEEK_API_KEY; ADR-046)
 RECYCLING_CLASSIFIER_DRIVER=local
 
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
@@ -63,6 +63,26 @@ uvicorn server:app --port 8501
 When a real model (e.g. a MobileNet fine-tuned on material photos) is trained
 and exported, deploy it behind the same URL and the whole earn loop keeps
 working untouched.
+
+## The `deepseek` cloud fallback (ADR-046)
+
+`RECYCLING_CLASSIFIER_DRIVER=deepseek` (+ `DEEPSEEK_API_KEY`) sends the
+capture to `deepseek-flash` (DeepSeek-V4.1-Flash) via OpenAI-compatible
+Chat Completions — re-verified against api-docs.deepseek.com 2026-09-11:
+
+- image as a base64 data URL in an `image_url` part of a **user**
+  message (system/assistant images 400), `detail: high` pinned
+  (accuracy-first for the verification gap), `thinking.disabled` +
+  temperature 0 (thinking is on by default and ignores temperature).
+- `response_format: json_object` with the word "json" + a format
+  example in the prompt; the model returns `{material_class,
+  confidence, is_bottle, is_recyclable}` — the backend still owns the
+  points rules (config table only).
+- local pre-flight: JPEG/PNG/GIF/WebP detected from file **content**,
+  32 MiB single-image ceiling — violations answer
+  driver-unavailable (503, retryable), never cryptic 400s.
+- `DEEPSEEK_VISION_MODEL` overrides the model ID (the retired
+  `deepseek-v4-flash-vision-exp` still serves if pinned).
 
 ## Why the stub exists
 

@@ -363,7 +363,7 @@ student outside the wall answers with an explicit scope error, never
 with data. Students stay 403.
 
 Flow: the question + a fixed set of function schemas goes to the DeepSeek
-model (default `deepseek-v4-flash`) → the model **selects a
+model (default `deepseek-flash` — DeepSeek-V4.1-Flash; ADR-046) → the model **selects a
 function** → the backend executes the **real
 Eloquent query** → the result returns to the model → the model phrases the
 final answer. The LLM never computes or fabricates numbers. Answers are
@@ -404,7 +404,7 @@ class_id?)`, `get_attendance_trend(days)`,
 | `missing_llm_credential` | No `DEEPSEEK_API_KEY` in `.env` | Add the key, then `./run llm-check` |
 | `llm_invalid_key` | DeepSeek rejected the key (401 Authentication Fails) | Create a fresh key at platform.deepseek.com, update `.env` |
 | `llm_insufficient_balance` | 402 — the key is valid but the account balance is empty (pay-as-you-go) | Top up at platform.deepseek.com |
-| `llm_model_not_found` | `DEEPSEEK_MODEL` unknown for this account/API (404 Model Not Exist) | Use the default `deepseek-v4-flash` |
+| `llm_model_not_found` | `DEEPSEEK_MODEL` unknown for this account/API (404 Model Not Exist) | Use the default `deepseek-flash` |
 | `llm_rate_limited` | Rate limit reached (429) | Retry later |
 | `llm_unavailable` | Transport/server error | Retry; see `storage/logs/laravel.log` for the raw cause |
 

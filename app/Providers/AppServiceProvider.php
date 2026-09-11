@@ -25,14 +25,14 @@ class AppServiceProvider extends ServiceProvider
         // change (ADR-003/ADR-007). Tests swap this binding with a fake.
         $this->app->bind(MaterialClassifier::class, fn () => ClassifierFactory::make());
 
-        // NL-query wiring (Phase E). DeepSeek deepseek-v4-flash per
-        // ADR-030 (OpenAI-compatible Chat Completions + tool calls);
+        // NL-query wiring (Phase E). DeepSeek deepseek-flash per
+        // ADR-046 (OpenAI-compatible Chat Completions + tool calls);
         // the live call is entirely skipped when no API key is
         // configured (ADR-005).
         $this->app->singleton(DeepSeekClient::class, function () {
             return new DeepSeekClient(
                 config('recycling.nl_query.api_key'),
-                (string) config('recycling.nl_query.model', 'deepseek-v4-flash'),
+                (string) config('recycling.nl_query.model', 'deepseek-flash'),
                 (float) config('recycling.nl_query.timeout', 20),
             );
         });

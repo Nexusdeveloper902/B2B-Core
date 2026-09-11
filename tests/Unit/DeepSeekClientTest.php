@@ -28,7 +28,7 @@ class DeepSeekClientTest extends TestCase
 {
     private function client(): DeepSeekClient
     {
-        return new DeepSeekClient('test-key', 'deepseek-v4-flash', 5.0);
+        return new DeepSeekClient('test-key', 'deepseek-flash', 5.0);
     }
 
     private function ask(): array
@@ -255,7 +255,7 @@ class DeepSeekClientTest extends TestCase
     {
         Http::fake();
 
-        $client = new DeepSeekClient(null, 'deepseek-v4-flash');
+        $client = new DeepSeekClient(null, 'deepseek-flash');
 
         $this->expectException(NlQueryException::class);
         $this->expectExceptionMessage('nl_query.not_configured');
@@ -263,5 +263,27 @@ class DeepSeekClientTest extends TestCase
         $client->generate([['role' => 'user', 'content' => 'hi']]);
 
         Http::assertNothingSent();
+    }
+
+    #[Test]
+    public function the_default_model_is_the_canonical_flash_id(): void
+    {
+        // ADR-046 — api-docs.deepseek.com (Models & Pricing): the model
+        // is deepseek-flash; legacy deepseek-v4-flash still serves.
+        Http::fake(['*' => Http::response([
+            'choices' => [['message' => ['content' => 'ok'], 'finish_reason' => 'stop']],
+        ], 200)]);
+
+        $result = (new DeepSeekClient('test-key'))->generate([['role' => 'user', 'content' => 'hi']]);
+
+        $this->assertSame('ok', $result['text']);
+
+        Http::assertSent(function ($request): bool {
+            $payload = $request->data();
+
+            return ($payload['model'] ?? null) === 'deepseek-flash'
+                && ($payload['thinking'] ?? []) === ['type' => 'disabled']
+                && ($payload['temperature'] ?? null) === 0;
+        });
     }
 }

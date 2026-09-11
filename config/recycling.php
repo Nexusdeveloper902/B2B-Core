@@ -18,7 +18,9 @@ return [
     |              driver once the platform runs fully on local hardware; see
     |              docs/LOCAL_MODEL.md for the JSON contract)
     |   deepseek — optional cloud fallback using the DeepSeek vision model
-    |              (deepseek-v4-flash-vision-exp — image-capable; ADR-030)
+    |              (deepseek-flash — DeepSeek-V4.1-Flash, vision-capable;
+    |              ADR-046; the legacy deepseek-v4-flash-vision-exp name is
+    |              still accepted but retired)
     |
     | Swapping drivers is a .env change only — no controller or route edits.
     | See ADR-003 and ADR-007 in .agent/DECISIONS/.
@@ -72,7 +74,7 @@ return [
 
         'deepseek' => [
             'api_key' => env('DEEPSEEK_API_KEY'),
-            'model' => env('DEEPSEEK_VISION_MODEL', 'deepseek-v4-flash-vision-exp'),
+            'model' => env('DEEPSEEK_VISION_MODEL', 'deepseek-flash'),
             'timeout' => (float) env('DEEPSEEK_TIMEOUT', 15),
         ],
     ],
@@ -80,14 +82,14 @@ return [
     /*
      | Natural-language query interface (Phase E).
      | Uses the DeepSeek API (OpenAI-compatible Chat Completions) with
-     | tool-calling. Default model deepseek-v4-flash (the legacy
-     | deepseek-chat name was discontinued 2026-07-24); the live call is
-     | skipped entirely when no API key is configured (endpoint then
-     | reports the blocker).
+     | tool-calling. Default model deepseek-flash (DeepSeek-V4.1-Flash;
+     | ADR-046 — the legacy deepseek-v4-flash name is still accepted but
+     | retired); the live call is skipped entirely when no API key is
+     | configured (endpoint then reports the blocker).
      */
     'nl_query' => [
         'api_key' => env('DEEPSEEK_API_KEY'),
-        'model' => env('DEEPSEEK_MODEL', 'deepseek-v4-flash'),
+        'model' => env('DEEPSEEK_MODEL', 'deepseek-flash'),
         'timeout' => (float) env('DEEPSEEK_TIMEOUT', 20),
     ],
 ];

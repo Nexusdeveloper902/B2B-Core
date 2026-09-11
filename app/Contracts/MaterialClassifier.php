@@ -15,7 +15,7 @@ use App\Services\Recycling\ClassificationException;
  *                          production driver when the platform runs fully
  *                          on local hardware — see docs/LOCAL_MODEL.md)
  *   - DeepSeekClassifier    (optional cloud fallback — vision model
- *                          deepseek-v4-flash-vision-exp; ADR-030)
+ *                          deepseek-flash; ADR-046)
  *
  * Swapping implementations is a .env config change
  * (RECYCLING_CLASSIFIER_DRIVER), not a code change. See ADR-003/ADR-007.

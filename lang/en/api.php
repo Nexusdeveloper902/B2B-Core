@@ -42,7 +42,7 @@ return [
     'nlq_not_configured' => 'Natural-language query is not configured: no DEEPSEEK_API_KEY set (blocked, not failed).',
     'nlq_invalid_key' => 'DeepSeek rejected the configured DEEPSEEK_API_KEY (invalid or revoked). Create a fresh key at platform.deepseek.com, put it in .env, and verify with: ./run llm-check',
     'nlq_insufficient_balance' => 'The key is valid but the DeepSeek account balance is empty (pay-as-you-go, no free tier). Top up at platform.deepseek.com and verify with: ./run llm-check',
-    'nlq_model_not_found' => 'The configured DEEPSEEK_MODEL was not found for this account or API version. Use the default (deepseek-v4-flash) and verify with: ./run llm-check',
+    'nlq_model_not_found' => 'The configured DEEPSEEK_MODEL was not found for this account or API version. Use the default (deepseek-flash) and verify with: ./run llm-check',
     'nlq_rate_limited' => 'The language model quota is exhausted, please retry later.',
     'nlq_unavailable' => 'The language model service is unavailable, please retry later.',
 

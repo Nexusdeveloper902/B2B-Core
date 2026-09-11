@@ -28,7 +28,7 @@ Plus two AI components that close real gaps:
   a swappable interface — runs as a **local model** by design
   ([docs/LOCAL_MODEL.md](docs/LOCAL_MODEL.md))
 - A **natural-language query interface** over the event database using
-  DeepSeek (deepseek-v4-flash) tool-calling — the LLM selects functions,
+  DeepSeek (deepseek-flash) tool-calling — the LLM selects functions,
   the backend computes the real answers
 
 The app is fully **bilingual (English / Spanish)**: UI, device-facing API
@@ -68,7 +68,7 @@ section in docs/SCRIPTS.md).
 
 ```dotenv
 DEEPSEEK_API_KEY=             # enables live NL queries (DeepSeek
-                             # deepseek-v4-flash). Pay-as-you-go balance —
+                             # deepseek-flash). Pay-as-you-go balance —
                              # create the key at platform.deepseek.com. After
                              # setting it, verify from THIS machine: ./run llm-check
 RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | deepseek
