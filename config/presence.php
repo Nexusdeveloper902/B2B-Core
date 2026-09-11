@@ -67,4 +67,16 @@ return [
      */
     'locales' => ['en', 'es'],
 
+    /*
+     | TASK-030-A (ADR-044) — automatic student account provisioning.
+     | New enrollments mint a 1:1 login on the established convention
+     | ({first-name}@domain, DemoSeeder's pattern) with this shared
+     | initial password; the account is forced to rotate it on first
+     | login (users.must_change_password), so the shared value never
+     | lingers. Rotation enforcement — not password entropy — is the
+     | control at this scale.
+     */
+    'student_email_domain' => env('STUDENT_EMAIL_DOMAIN', 'presence.test'),
+    'student_initial_password' => env('STUDENT_INITIAL_PASSWORD', 'password'),
+
 ];

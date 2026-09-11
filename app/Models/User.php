@@ -17,7 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
  * intentionally do NOT get accounts in this phase — see
  * .agent/TASKS/TASK-002-core-platform-mvp.md (Phase F simplification).
  */
-#[Fillable(['name', 'email', 'password', 'role', 'student_id'])]
+#[Fillable(['name', 'email', 'password', 'role', 'student_id', 'must_change_password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -65,6 +65,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // TASK-030-A (ADR-044) — forced first-login rotation flag.
+            'must_change_password' => 'boolean',
         ];
     }
 }

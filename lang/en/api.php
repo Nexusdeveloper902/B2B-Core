@@ -72,6 +72,13 @@ return [
     'class_created' => 'Class :name created',
     'class_duplicate' => 'A class named :name already exists',
 
+    // TASK-030-A — automatic student logins (provisioned on
+    // create/import; the temporary password is display-once, exactly
+    // like a reader API key).
+    'student_account_notice' => 'Login ready: :email / initial password :password — it must be changed on first login',
+    'student_account_exists' => 'This student already has a login (:email)',
+    'password_change_required' => 'You must set a new password before continuing.',
+
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',
     'not_found' => 'Resource not found',

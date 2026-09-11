@@ -93,6 +93,12 @@ Route::prefix('v1')->group(function () {
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.students.import');
 
+    // TASK-030-A (ADR-044) — backfill the login for a pre-feature
+    // student row (idempotent; see StudentController::provisionAccount).
+    Route::post('/admin/students/{student}/account', [StudentController::class, 'provisionAccount'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.students.account');
+
     // TASK-029 — class creation (admin-only): the students desk's class
     // select needed a writer; roster frames make it live.
     Route::post('/admin/classes', [ClassController::class, 'store'])

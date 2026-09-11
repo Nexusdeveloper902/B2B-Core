@@ -443,6 +443,49 @@
       }
     },
     {
+      "name": "11 Admin — Backfill student login / Crear acceso de estudiante",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/students/{{student_id}}/account",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "students",
+            "{{student_id}}",
+            "account"
+          ]
+        },
+        "description": "TASK-030-A (ADR-044) — one-click login for a student row with no account (pre-TASK-030 rows). Idempotent: already=true keeps the existing login and never re-issues the temporary password.\n\nResponse 200 fresh: { status, already: false, account: { email, temporary_password, must_change_password } } — the ONLY place the temporary password appears.\nResponse 200 existing: { status, already: true, account: { email } }.\nResponse 401/403: guest / non-admin.\nResponse 404: unknown student.\n\nTip: set Accept-Language: es to receive Spanish messages."
+      }
+    },
+    {
       "name": "07 Health / Salud",
       "request": {
         "method": "GET",

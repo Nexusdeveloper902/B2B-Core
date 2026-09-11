@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -30,6 +31,10 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // Finding 7.1: factory users must be well-formed accounts —
+            // an explicit staff role, never a half-flagged login.
+            'role' => UserRole::Admin->value,
+            'must_change_password' => false,
         ];
     }
 

@@ -51,6 +51,7 @@ barra de cuenta regresiva, tarjeta de login, chips demo, estados vacíos.
 | Leaderboard & Class Standings | `/student/leaderboard` **(nueva)** | `student/leaderboard` |
 | Estudiantes — escritorio de inscripción | `/admin/students` **(nueva, TASK-027)** | `admin/students` |
 | Lectores — escritorio de gestión | `/admin/readers` **(nueva, TASK-027)** | `admin/readers` |
+| Define una nueva contraseña | `/password/change` **(nueva, TASK-030-A)** | `auth/password-change` |
 
 Las dos páginas de TASK-026 y los dos escritorios de TASK-027 son vistas
 sobre datos que ya existían más nuevos endpoints admin de escritura
@@ -123,6 +124,27 @@ puntos por estudiante, no agregados por clase); el estado vacío del
 timeline no cultiva una tabla en vivo desde cero (una recarga lo
 renderiza); el catálogo de recompensas del estudiante es estático por
 naturaleza.
+
+## 3c. TASK-030-A — accesos de estudiantes: la columna de acceso + la página de rotación
+
+La inscripción crea el acceso (ADR-044), y el escritorio lo demuestra:
+la tabla de roster creció con una columna de Acceso que renderiza el
+email aprovisionado por fila, o un "Crear acceso" en un clic para filas
+anteriores a TASK-030 (`POST /api/v1/admin/students/{student}/account`,
+idempotente). Las llegadas en vivo (respuesta fetch o frame de roster)
+pintan la misma celda con un solo renderer, así que una fila creada en
+la pantalla de otro admin igual muestra su acceso aquí. La caja de
+resultado de creación lleva las credenciales de mostrar-una-sola-vez
+(`account_notice`) — el único lugar donde la contraseña temporal
+aparece jamás.
+
+`/password/change` (`auth/password-change`, la misma gramática de
+tarjeta-auth que el login) es donde caen las cuentas marcadas: todas
+las demás páginas rebotan allí hasta rotar a una contraseña personal
+(verificación de la actual, mínimo 8, confirmada). El logout, el cambio
+de idioma y el propio formulario siguen alcanzables; los clientes JSON
+reciben un 403 bilingüe (`password_change_required`) en vez de la
+redirección.
 
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 

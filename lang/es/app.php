@@ -303,6 +303,18 @@ return [
     'class_teacher_optional' => 'Profesor titular (opcional)',
     'class_teacher_none' => 'Sin profesor',
 
+    // Cuentas de estudiantes (TASK-030-A — aprovisionamiento automático + rotación)
+    'account' => 'Acceso',
+    'no_account' => 'sin acceso',
+    'provision_account' => 'Crear acceso',
+    'password_change_title' => 'Define una nueva contraseña',
+    'password_change_subtitle' => 'Tu cuenta aún usa la contraseña inicial. Elige una personal para continuar.',
+    'password_change_band_sub' => 'Una contraseña nueva — y se abre toda la plataforma',
+    'current_password' => 'Contraseña actual',
+    'new_password' => 'Nueva contraseña',
+    'confirm_password' => 'Confirmar nueva contraseña',
+    'save_password' => 'Guardar nueva contraseña',
+
     // Paginación (TASK-029 — la vista de paginador del sistema de diseño)
     'pagination_nav' => 'Paginación',
     'pagination_prev' => 'Página anterior',

@@ -43,9 +43,11 @@ class DocumentationTest extends TestCase
         // TASK-027 — the admin management surface must stay documented in
         // BOTH languages (readers settings, students + CSV import, the
         // per-card unpair, the capture-image door, the PAE gate).
+        // TASK-030-A — the login backfill endpoint joins the contract.
         foreach ([
             'PUT /api/v1/admin/readers/{id}',
             'POST /api/v1/admin/students/import',
+            'POST /api/v1/admin/students/{student}/account',
             'POST /api/v1/admin/classes',
             'DELETE /api/v1/admin/cards/{id}',
             'GET /api/v1/admin/captures/{deposit}/image',
@@ -86,6 +88,7 @@ class DocumentationTest extends TestCase
             '{{base_url}}/api/v1/students/{{student_id}}/redeem',
             '{{base_url}}/api/v1/nl-query',
             '{{base_url}}/api/v1/admin/students/{{student_id}}/arm-pairing',
+            '{{base_url}}/api/v1/admin/students/{{student_id}}/account',
             '{{base_url}}/api/v1/admin/cards/pair',
             '{{base_url}}/api/v1/admin/pairing/status',
         ] as $expected) {

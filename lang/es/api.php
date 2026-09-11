@@ -73,6 +73,12 @@ return [
     'class_created' => 'Clase :name creada',
     'class_duplicate' => 'Ya existe una clase llamada :name',
 
+    // TASK-030-A — accesos automáticos de estudiantes (el password
+    // temporal se muestra una sola vez, como una API key de lector).
+    'student_account_notice' => 'Acceso listo: :email / contraseña inicial :password — debe cambiarse en el primer inicio de sesión',
+    'student_account_exists' => 'Este estudiante ya tiene un acceso (:email)',
+    'password_change_required' => 'Debes definir una nueva contraseña antes de continuar.',
+
     // Genérico
     'forbidden_role' => 'No tienes permiso para realizar esta acción.',
     'not_found' => 'Recurso no encontrado',

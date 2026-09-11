@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
@@ -455,9 +455,14 @@ valid values as the mode endpoint.
 ## POST /api/v1/admin/students — create one student (TASK-027, admin-only)
 
 The end of hand-written SQL INSERTs: the `/admin/students` desk creates
-students through this endpoint. **Admin role required.** The 1:1 student
-ACCOUNT is not created here — accounts are a separate, deliberate step
-(the seeder's pattern), not a silent side effect of enrollment.
+students through this endpoint. **Admin role required.**
+
+TASK-030-A (ADR-044) — enrollment mints the login: the 1:1 student
+account is provisioned in the SAME transaction (convention email
+`{firstname}@presence.test` + shared initial password + forced
+first-login rotation). The response carries the credentials EXACTLY
+ONCE (`account` + `account_notice` — the reader-API-key display-once
+rule); roster frames carry only the email, never the password.
 
 **Request**:
 
@@ -470,13 +475,16 @@ ACCOUNT is not created here — accounts are a separate, deliberate step
 ```json
 {
   "status": "ok",
-  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true },
-  "message": "Student Nueva Estudiante created."
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true, "account_email": "nueva@presence.test" },
+  "account": { "email": "nueva@presence.test", "temporary_password": "password", "must_change_password": true },
+  "message": "Student Nueva Estudiante created.",
+  "account_notice": "Login ready: nueva@presence.test / initial password password — it must be changed on first login"
 }
 ```
 
 `422` — validation errors, or `{"status":"error","reason":"duplicate"}`
-for the same name in the same class (a duplicate is never a silent skip).
+for the same name in the same class (a duplicate is never a silent skip;
+no account is minted for rejected rows).
 
 ---
 
@@ -504,14 +512,48 @@ blocks the good ones; duplicates are row errors.
   "created": 2,
   "failed": 0,
   "errors": [],
-  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B" }],
+  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B", "account_email": "maria@presence.test" }],
+  "accounts_created": 2,
   "message": "Import finished: 2 created, 0 failed."
 }
 ```
 
 `status` is `ok` (all rows in), `partial` (some in, some failed), or
 `error` + 422 (nothing created — bad header, no data rows, unreadable
-file).
+file). TASK-030-A: every created row leaves with a login
+(`account_email` per row, `accounts_created` total); failed rows mint
+nothing. Same-first-name collisions disambiguate (`maria@…`,
+`maria2@…`).
+
+---
+
+## POST /api/v1/admin/students/{student}/account — backfill one login (TASK-030-A, admin-only)
+
+**Admin role required.** One-click login for pre-TASK-030 rows (or any
+account-less student): idempotent — a student that already has an
+account keeps it (`already: true`, and the temporary password is NOT
+re-issued). A freshly minted account carries the display-once pair.
+
+**Response `200` (fresh)**:
+
+```json
+{
+  "status": "ok",
+  "already": false,
+  "account": { "email": "legado@presence.test", "temporary_password": "password", "must_change_password": true },
+  "message": "Login ready: legado@presence.test / initial password password — it must be changed on first login"
+}
+```
+
+**Response `200` (existing)**: `{"status":"ok","already":true,
+"account":{"email":"…"},"message":"This student already has a login
+(…)"}`.
+
+First login with the initial password lands on the student's dashboard
+and is immediately bounced to `GET /password/change`: the account must
+rotate to a personal password (current-password check, minimum 8,
+confirmed) before any other page opens. JSON callers receive `403`
+`password_change_required` instead of the redirect.
 
 ---
 

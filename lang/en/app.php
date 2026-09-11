@@ -303,6 +303,18 @@ return [
     'class_teacher_optional' => 'Homeroom teacher (optional)',
     'class_teacher_none' => 'No teacher',
 
+    // Student logins (TASK-030-A — automatic provisioning + rotation)
+    'account' => 'Login',
+    'no_account' => 'no login',
+    'provision_account' => 'Create login',
+    'password_change_title' => 'Set a new password',
+    'password_change_subtitle' => 'Your account still uses the initial password. Choose a personal one to continue.',
+    'password_change_band_sub' => 'One new password — then the whole platform opens up',
+    'current_password' => 'Current password',
+    'new_password' => 'New password',
+    'confirm_password' => 'Confirm new password',
+    'save_password' => 'Save new password',
+
     // Pagination (TASK-029 — the design-system pager view)
     'pagination_nav' => 'Pagination',
     'pagination_prev' => 'Previous page',

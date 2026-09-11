@@ -49,6 +49,7 @@ drain bar, login auth card, demo chips, empty states.
 | Leaderboard & Class Standings | `/student/leaderboard` **(new)** | `student/leaderboard` |
 | Students — enrollment desk | `/admin/students` **(new, TASK-027)** | `admin/students` |
 | Readers — management desk | `/admin/readers` **(new, TASK-027)** | `admin/readers` |
+| Set a new password | `/password/change` **(new, TASK-030-A)** | `auth/password-change` |
 
 The two TASK-026 pages and the two TASK-027 desks are views over data
 that already existed plus new admin write endpoints (see §4). Nav stays
@@ -113,6 +114,25 @@ class-standings panel stays a snapshot (frames carry student-level
 points, not class aggregates); the timeline's empty state doesn't grow
 a live table from zero (reload renders it); the student rewards
 catalog is static by nature.
+
+## 3c. TASK-030-A — student logins: the desk's account column + the rotation page
+
+Enrollment mints the login (ADR-044), and the desk proves it: the
+roster table grew a Login column rendering the provisioned email per
+row, or a one-click "Create login" backfill for pre-TASK-030 rows
+(`POST /api/v1/admin/students/{student}/account`, idempotent). Live
+arrivals (fetch response or roster frame) paint the same cell through
+one renderer, so a row created on another admin's screen still shows
+its login here. The creation result box carries the display-once
+credentials (`account_notice`) — the only place the temporary password
+ever appears.
+
+`/password/change` (`auth/password-change`, same auth-card grammar as
+the sign-in view) is where flagged accounts land: every other page
+bounces them there until they rotate to a personal password
+(current-password check, minimum 8, confirmed). Logout, the locale
+switcher and the form itself stay reachable; JSON callers get a
+bilingual 403 (`password_change_required`) instead of a redirect.
 
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 
