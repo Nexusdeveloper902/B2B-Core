@@ -24,27 +24,41 @@ translation key parity, firmware LED + capture-endpoint integration.
 
 ## Remainder (this task, in delivery order — one item fully verified
 before the next starts)
-- [ ] **A. Auto-provision student accounts** (ADR-044): create/import
+- [x] **A. Auto-provision student accounts** (ADR-044): create/import
       mints the 1:1 login (convention email + initial password +
       forced first-login rotation + `POST …/students/{student}/account`
-      backfill + desk account column). MISSING by design before.
-- [ ] **B. Reader creation from GUI + API-key-once lifecycle**
-      (generate on create, display once, never again). MISSING.
-- [ ] **C. Oblivion tests for shipped-but-unpinned behavior**: NL
+      backfill + desk account column). Commits 042ebd1 (+1b hardening).
+- [x] **B. Reader creation from GUI + API-key-once lifecycle**
+      (ADR-045: generate on create, display once, never again +
+      rotate-key). Commit 3cd0424.
+- [x] **C. Oblivion tests for shipped-but-unpinned behavior**: NL
       analytical `execute()` paths, PAE rejection, ENTRY/EXIT
-      sessions, intended-URL edges. Code exists; tests do not.
-- [ ] **D. Realistic seeders**: multi-class roster, access/PAE events,
-      EcoStation deposits+ledger, dedicated pae/entry readers —
-      dashboards must not look empty after `db:seed`.
-- [ ] **E. Contact/social presence**: Instagram `puls.e1681` + contact
-      channels as functional links (Core footer; marketplace noted).
-- [ ] **F. Translation micro-gaps**: hardcoded `PTS`, realtime.js
-      string fallbacks on history/leaderboard/ecostation boots.
+      sessions, intended-URL edges. Commit ea6c9ad (production code
+      untouched).
+- [x] **D. Realistic seeders**: `PilotSeeder` + `./run reset --pilot`
+      (multi-class roster, access/PAE events, EcoStation
+      deposits+ledger, dedicated pae/entry readers). Commit da7dcb8.
+- [x] **E. Contact/social presence**: Instagram `puls.e1681`
+      functional footer link EN/ES (Core; marketplace untouched).
+- [x] **F. Translation micro-gaps**: `points_unit` adopted, ecostation
+      `Js::from` rewrite, realtime.js fallbacks proven unreachable.
 - [ ] **G. Deferred (recorded, not this run)**: EcoStation
       bottle-count-event CV rewrite (needs count-sensor hardware;
       backend capture/associate flows stand), NFC cloning posture
       decision, student self-redeem (R1), CV training-data plan,
       trend/anomaly dashboards beyond NL functions.
+
+## Constraints
+- Branches only; `main` untouched. PAT via per-command helper, never
+  persisted or recorded.
+- Full pyramid per item: focused tests → suite → quality → e2e (×3 on
+  flake suspicion) → adversarial subagent audit for A/B.
+
+## Acceptance
+- [x] A–F shipped on the branch with tests pinning each claim
+      (423 passed / 3 skipped, quality PASS, e2e 33/33 after EVERY item)
+- [x] RUN record + STATE snapshot appended; G items filed as follow-ups
+- [ ] Push + remote CI observation (next action — needs PAT at push time)
 
 ## Constraints
 - Branches only; `main` untouched. PAT via per-command helper, never
