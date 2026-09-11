@@ -168,6 +168,30 @@ Límite honesto: la tabla de lectores del panel admin repinta con
 constructor de filas — los nacimientos aparecen allí tras recargar).
 El escritorio de lectores es la superficie en vivo para nacimientos.
 
+## 3e. TASK-030 (Fix 3) — presencia, unidades y una demo vivida
+
+- **Presencia del proyecto**: el pie del shell compartido enlaza el
+  Instagram del proyecto (`@puls.e1681`, pestaña nueva + `noopener`)
+  en ambos idiomas. Es el ÚNICO canal de contacto suministrado — no se
+  inventan emails, teléfonos ni direcciones en ningún lado (la brecha
+  P5 sigue abierta para una superficie real de contacto).
+- **Sin unidades fijas**: la unidad de puntos de EcoStation renderiza
+  vía `app.points_unit` (filas del servidor, tarjeta de tasas y rutas
+  JS en vivo por igual), y el mapa de etiquetas del hub es todo
+  `Js::from` (los últimos literales `{{ }}`-en-JS se fueron — las
+  comillas de los traductores ya no pueden romper el script). Los
+  fallbacks en inglés de `realtime.js` (`just now`, estados del badge)
+  se auditaron: solo renderizan en páginas CON lista/badge en vivo, y
+  cada uno de esos boots lleva el mapa completo de strings
+  localizados — ningún fallback puede aflorar en ES.
+- **Dataset piloto**: `PilotSeeder` (solo BDs frescas — se niega ante
+  BDs no vacías en vez de duplicar) construye tres cursos, 24
+  estudiantes con accesos y tarjetas, cinco lectores y diez días de
+  clase deterministas de toques (~1k eventos, ~70 depósitos, 2 canjes).
+  `./run reset --pilot` es la demo humana en un comando; el pequeño
+  fixture `DemoSeeder` sigue siendo el valor por defecto de las
+  pruebas automatizadas.
+
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 
 Todo lo de abajo fue **omitido o reemplazado con honestidad** (sin datos

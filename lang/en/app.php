@@ -27,6 +27,8 @@ return [
     'footer_note' => 'Core operations console — attendance, PAE meals and recycling rewards for the school day.',
     'demo_credentials' => 'Demo credentials (seeded)',
     'env' => 'Environment',
+    // TASK-030 (Fix 3) — project presence in the footer.
+    'follow_us' => 'Follow the project',
 
     // Login
     'login_title' => 'Sign in to the Presence Platform',

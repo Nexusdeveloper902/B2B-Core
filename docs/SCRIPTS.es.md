@@ -160,12 +160,20 @@ app (`/up`) y del servidor de modelo. Informativo — siempre sale `0`.
 ```bash
 ./run reset                # pide confirmación
 ./run reset --force        # sin pregunta (scripts/CI)
+./run reset --pilot        # dataset piloto rico de 10 días (demo humana)
 ```
 
 Borra **solo la BD sqlite de desarrollo** y la reconstruye con datos demo
 frescos (`migrate:fresh --seed`), reimprimiendo todas las credenciales. La BD
 desechable del e2e no se afecta. Se niega a operar si `DB_CONNECTION` no es
 sqlite.
+
+`--pilot` siembra `PilotSeeder` en vez del pequeño fixture `DemoSeeder`:
+tres cursos, 24 estudiantes con accesos y tarjetas, cinco lectores y diez
+días de clase de toques (entradas/salidas, asistencia con tardanzas,
+comidas PAE, depósitos de reciclaje con puntos, dos canjes) —
+determinista, cada resiembra cuenta la misma historia. El fixture pequeño
+sigue siendo el valor por defecto de las pruebas automatizadas.
 
 ## `unpair`
 

@@ -5,11 +5,14 @@
 #
 # Usage:  ./run reset            # asks for confirmation first
 #         ./run reset --force    # no prompt (CI / scripting)
+#         ./run reset --pilot    # rich 10-day pilot dataset instead of the small fixture
 #
 # Wipes the DEV database only (database/database.sqlite). The real-HTTP e2e
 # suite uses its own throwaway DB and is never affected. DemoSeeder is
 # idempotent, so this lands you in the exact post-setup state with fresh
-# credentials printed bilingually.
+# credentials printed bilingually. --pilot seeds PilotSeeder instead: three
+# classes, 24 students and ten school days of taps (the human demo; the
+# small DemoSeeder fixture stays the automated-test default).
 # ---------------------------------------------------------------------------
 set -Eeuo pipefail
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,10 +20,12 @@ SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${SOURCE_DIR}/_lib/common.sh"
 
 FORCE=0
+PILOT=0
 for arg in "$@"; do
     case "$arg" in
         --help|-h) help_header "$0"; exit 0 ;;
         --force)   FORCE=1 ;;
+        --pilot)   PILOT=1 ;;
         *) die "Unknown flag: $arg (see --help) / Bandera desconocida: $arg (ver --help)" ;;
     esac
 done
@@ -44,7 +49,11 @@ ensure_env_and_key
 log "Fresh migration + seed / Migración fresca + siembra"
 rm -f "$DB_FILE" "$DB_FILE-journal" "$DB_FILE-wal" "$DB_FILE-shm"
 touch "$DB_FILE"
-"$PHP_BIN" artisan migrate:fresh --seed --force
+if [ "$PILOT" -eq 1 ]; then
+    "$PHP_BIN" artisan migrate:fresh --seed --seeder=PilotSeeder --force
+else
+    "$PHP_BIN" artisan migrate:fresh --seed --force
+fi
 ok "Reset complete — credentials reprinted above / Reset completo — credenciales reimpresas arriba"
 bi "Next: ./run serve" "Siguiente: ./run serve"
 exit 0

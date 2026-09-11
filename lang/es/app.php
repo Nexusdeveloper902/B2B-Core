@@ -27,6 +27,8 @@ return [
     'footer_note' => 'Consola de operaciones — asistencia, comidas PAE y recompensas por reciclaje del día escolar.',
     'demo_credentials' => 'Credenciales demo (seeder)',
     'env' => 'Entorno',
+    // TASK-030 (Fix 3) — presencia del proyecto en el pie.
+    'follow_us' => 'Sigue el proyecto',
 
     // Login
     'login_title' => 'Inicia sesión en la Plataforma de Presencia',

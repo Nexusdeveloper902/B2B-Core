@@ -15,6 +15,7 @@
     simulation modal, cryptographic ledger footer (gaps #E2/#E3).
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.ecostation'))
 
@@ -71,7 +72,7 @@
             {{ __('app.recycling_points') }}
             <span class="material-symbols-outlined is-20" aria-hidden="true">eco</span>
         </div>
-        <div class="metric-value"><span id="metric-points">{{ $totalPoints }}</span><span class="unit">PTS</span></div>
+        <div class="metric-value"><span id="metric-points">{{ $totalPoints }}</span><span class="unit">{{ __('app.points_unit') }}</span></div>
         <p class="metric-sub">{{ __('app.ecostation_points_sub') }}</p>
     </div>
 </section>
@@ -102,7 +103,7 @@
                         </td>
                         <td class="num mono" data-label="{{ __('app.ecostation_confidence') }}">{{ $deposit->confidence !== null ? round(100 * $deposit->confidence) . '%' : '—' }}</td>
                         <td class="num ta-right" data-label="{{ __('app.points') }}">
-                            <span class="points-badge">+{{ $deposit->points_awarded }} PTS</span>
+                            <span class="points-badge">+{{ $deposit->points_awarded }} {{ __('app.points_unit') }}</span>
                         </td>
                     </tr>
                 @empty
@@ -139,7 +140,7 @@
                 @foreach($rates as $material => $points)
                     <li>
                         <span class="rate-name"><span class="dot" aria-hidden="true"></span>{{ __('app.material_'.$material) }}</span>
-                        <span class="rate-value {{ $points === 0 ? 'is-zero' : '' }}">+{{ $points }} PTS</span>
+                        <span class="rate-value {{ $points === 0 ? 'is-zero' : '' }}">+{{ $points }} {{ __('app.points_unit') }}</span>
                     </li>
                 @endforeach
             </ul>
@@ -192,15 +193,16 @@
     (function () {
         'use strict';
 
+        // TASK-030 (Fix 3) — server strings ride JSON-encoded vars
+        // only (the TASK-014 Blade lesson: translators' quotes must
+        // never meet a JS literal).
         var labels = {
-            material: {
-                @foreach(\App\Enums\MaterialClass::cases() as $material)
-                    '{{ $material->value }}': '{{ __('app.material_'.$material->value) }}',
-                @endforeach
-            },
-            yes: '{{ __('app.yes') }}',
-            no: '{{ __('app.no') }}',
-            meta: {{ \Illuminate\Support\Js::from(__('app.ecostation_capture_meta')) }},
+            material: {!! Js::from(collect(\App\Enums\MaterialClass::cases())->mapWithKeys(fn ($m) => [$m->value => __('app.material_'.$m->value)])->all()) !!},
+            yes: {!! Js::from(__('app.yes')) !!},
+            no: {!! Js::from(__('app.no')) !!},
+            meta: {!! Js::from(__('app.ecostation_capture_meta')) !!},
+            pointsUnit: {!! Js::from(__('app.points_unit')) !!},
+            captureAlt: {!! Js::from(__('app.ecostation_capture')) !!},
             dash: '—'
         };
 
@@ -236,7 +238,7 @@
                         '<td class="num mono">' + (payload.confidence != null
                             ? Math.round(100 * payload.confidence) + '%' : '—') + '</td>' +
                         '<td class="num ta-right"><span class="points-badge" id="points-' +
-                            esc(String(payload.event_id)) + '">+… PTS</span></td>';
+                            esc(String(payload.event_id)) + '">+… ' + labels.pointsUnit + '</span></td>';
                     body.insertBefore(tr, body.firstChild);
                     while (body.children.length > 15) { body.removeChild(body.lastChild); }
                 }
@@ -251,7 +253,7 @@
                     if (!img) {
                         img = document.createElement('img');
                         img.id = 'capture-image';
-                        img.alt = '{{ __('app.ecostation_capture') }}';
+                        img.alt = labels.captureAlt;
                         img.loading = 'lazy';
                         var slot = panel.querySelector('.capture-none');
                         if (slot) { slot.remove(); }
@@ -273,7 +275,7 @@
         function onPointsAwarded(payload) {
             if (payload.event_id) {
                 var badge = document.getElementById('points-' + payload.event_id);
-                if (badge) { badge.textContent = '+' + payload.points + ' PTS'; }
+                if (badge) { badge.textContent = '+' + payload.points + ' ' + labels.pointsUnit; }
             }
             bump('metric-items', 1);
             bump('metric-points', payload.points || 0);

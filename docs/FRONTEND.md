@@ -154,6 +154,28 @@ Honest limit: the admin dashboard's readers table repaints on
 row-builder — births appear there after a reload). The readers desk is
 the live surface for births.
 
+## 3e. TASK-030 (Fix 3) — presence, units, and a lived-in demo
+
+- **Project presence**: the shared shell footer links the project's
+  Instagram (`@puls.e1681`, new tab + `noopener`) in both languages.
+  It is the ONLY contact channel supplied — no emails, phones or
+  addresses are invented anywhere (gap P5 stays open for a real
+  advisor-contact surface).
+- **No hardcoded units**: the EcoStation points unit renders through
+  `app.points_unit` (server rows, rate card and live JS paths alike),
+  and the hub's label map went fully `Js::from` (the last
+  `{{ }}`-in-JS literals are gone — translators' quotes cannot break
+  the script anymore). `realtime.js` English fallbacks (`just now`,
+  badge states) were audited: they only render on pages WITH a live
+  list/badge, and every such boot carries the full localized strings
+  map — no fallback can surface under ES.
+- **Pilot dataset**: `PilotSeeder` (fresh DBs only — it refuses
+  non-empty ones instead of doubling) builds three classes, 24
+  students with logins and cards, five readers and ten deterministic
+  school days of taps (~1k events, ~70 deposits, 2 redemptions).
+  `./run reset --pilot` is the one-command human demo; the small
+  `DemoSeeder` fixture stays the automated-test default.
+
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 
 Everything below was **omitted or replaced honestly** (no fake data, no

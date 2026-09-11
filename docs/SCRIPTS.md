@@ -158,11 +158,19 @@ model-server health. Informational — always exits `0`.
 ```bash
 ./run reset                # asks for confirmation
 ./run reset --force        # no prompt (scripting/CI)
+./run reset --pilot        # rich 10-day pilot dataset (human demo)
 ```
 
 Wipes **the dev sqlite database only** and rebuilds it with fresh demo data
 (`migrate:fresh --seed`), re-printing all credentials. The e2e throwaway DB is
 unaffected. Refuses to operate when `DB_CONNECTION` is not sqlite.
+
+`--pilot` seeds `PilotSeeder` instead of the small `DemoSeeder` fixture:
+three classes, 24 students with logins and cards, five readers and ten
+school days of taps (entries/exits, attendance with lates, PAE meals,
+recycling deposits with points, two redemptions) — deterministic, so
+every reseed tells the same story. The small fixture stays the
+automated-test default.
 
 ## `unpair`
 
