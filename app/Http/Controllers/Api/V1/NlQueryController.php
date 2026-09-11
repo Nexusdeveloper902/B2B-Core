@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  * their StudentScope (own classes) at every function execution — the
  * data wall is server-side, never prompt-side. Students stay 403.
  *
- * DeepSeek (deepseek-v4-flash) tool-calling. The LLM only selects
+ * DeepSeek (deepseek-flash) tool-calling. The LLM only selects
  * functions and phrases answers; all numbers come from real backend
  * queries. When no DEEPSEEK_API_KEY is configured the endpoint reports
  * a structured blocker (503) instead of pretending to work — see

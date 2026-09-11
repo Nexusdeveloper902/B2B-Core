@@ -59,6 +59,8 @@ class DocumentationTest extends TestCase
             'markdown.js',
             'class_created',
             'reader_updated',
+            // TASK-031 (ADR-046) — the canonical model ID, both languages.
+            'deepseek-flash',
         ] as $needle) {
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");

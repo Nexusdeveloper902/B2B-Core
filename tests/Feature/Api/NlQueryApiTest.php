@@ -46,7 +46,7 @@ class NlQueryApiTest extends TestCase
         // TASK-007: every failure class gets a DISTINCT reason + message,
         // so the owner sees "your key was rejected" instead of a generic
         // "service unavailable" that hides the actual cause.
-        $this->app->instance(DeepSeekClient::class, new class('stale-key', 'deepseek-v4-flash') extends DeepSeekClient
+        $this->app->instance(DeepSeekClient::class, new class('stale-key', 'deepseek-flash') extends DeepSeekClient
         {
             public function generate(array $messages, ?array $tools = null): array
             {
@@ -74,7 +74,7 @@ class NlQueryApiTest extends TestCase
     {
         // DeepSeek's documented 402 — the key is VALID, the account is out
         // of balance (pay-as-you-go, no free tier): the fix is a top-up.
-        $this->app->instance(DeepSeekClient::class, new class('valid-key', 'deepseek-v4-flash') extends DeepSeekClient
+        $this->app->instance(DeepSeekClient::class, new class('valid-key', 'deepseek-flash') extends DeepSeekClient
         {
             public function generate(array $messages, ?array $tools = null): array
             {

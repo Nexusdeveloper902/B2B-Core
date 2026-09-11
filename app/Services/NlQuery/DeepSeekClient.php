@@ -11,11 +11,13 @@ use Illuminate\Support\Facades\Http;
  * "Your First API Call" / "Tool Calls"). The API key is passed via the
  * Authorization: Bearer header, never in URLs.
  *
- * Default model: deepseek-v4-flash (DeepSeek-V4-Flash-0731 — public beta
- * API since 2026-07-31). The legacy deepseek-chat/deepseek-reasoner names
- * were discontinued on 2026-07-24 and must not be used.
+ * Default model: deepseek-flash (DeepSeek-V4.1-Flash — re-verified
+ * against the docs 2026-09-11, ADR-046; the legacy deepseek-v4-flash
+ * name is still accepted but retired). The legacy
+ * deepseek-chat/deepseek-reasoner names were discontinued on
+ * 2026-07-24 and must not be used.
  *
- * Thinking mode is DISABLED for every call: V4 models think by default
+ * Thinking mode is DISABLED for every call: models think by default
  * (effort "high"), which multiplies latency and cost for a
  * function-selection task that does not need chain-of-thought — and
  * thinking mode silently ignores the temperature parameter, so the
@@ -27,7 +29,7 @@ class DeepSeekClient
 
     public function __construct(
         private readonly ?string $apiKey,
-        private readonly string $model = 'deepseek-v4-flash',
+        private readonly string $model = 'deepseek-flash',
         private readonly float $timeout = 20.0,
     ) {}
 

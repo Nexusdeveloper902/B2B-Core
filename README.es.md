@@ -29,7 +29,7 @@ Más dos componentes de IA que cierran huecos reales:
   detrás de una interfaz intercambiable — se ejecuta como **modelo local**
   por diseño ([docs/LOCAL_MODEL.es.md](docs/LOCAL_MODEL.es.md))
 - Una **interfaz de consulta en lenguaje natural** sobre la base de eventos
-  usando tool-calling de DeepSeek (deepseek-v4-flash) — el LLM selecciona funciones, el
+  usando tool-calling de DeepSeek (deepseek-flash) — el LLM selecciona funciones, el
   backend calcula las respuestas reales
 
 La app es completamente **bilingüe (inglés / español)**: interfaz, mensajes
@@ -76,7 +76,7 @@ o a curl.
 
 ```dotenv
 DEEPSEEK_API_KEY=             # habilita consultas NL en vivo (DeepSeek
-                             # deepseek-v4-flash). Saldo de pago por uso —
+                             # deepseek-flash). Saldo de pago por uso —
                              # crea la clave en platform.deepseek.com. Tras
                              # ponerla, verifica desde ESTA máquina: ./run llm-check
 RECYCLING_CLASSIFIER_DRIVER=stub   # stub | local | deepseek
