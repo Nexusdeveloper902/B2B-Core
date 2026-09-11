@@ -10,6 +10,10 @@ use Illuminate\Database\Eloquent\Model;
  * realtime feed should push (student created, students imported,
  * class created, reader updated).
  *
+ * TASK-030-B — reader_created joins the channel: provisioning a reader
+ * announces the birth the same way (the WS server polls rows, not
+ * types, so zero wire changes were needed).
+ *
  * Rows are written inside the SAME transaction as the state change
  * they describe, so realtime:serve only ever polls committed truth.
  * Payloads are precomputed by the writer; this model is the Eloquent
@@ -27,6 +31,8 @@ class RosterUpdate extends Model
     public const TYPE_CLASS_CREATED = 'class_created';
 
     public const TYPE_READER_UPDATED = 'reader_updated';
+
+    public const TYPE_READER_CREATED = 'reader_created';
 
     protected $fillable = ['type', 'payload'];
 

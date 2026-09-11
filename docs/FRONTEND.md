@@ -134,6 +134,26 @@ bounces them there until they rotate to a personal password
 switcher and the form itself stay reachable; JSON callers get a
 bilingual 403 (`password_change_required`) instead of a redirect.
 
+## 3d. TASK-030-B — readers are born here now (provisioning desk)
+
+The readers desk grew a creation panel (name + type + initial mode):
+`POST /api/v1/admin/readers` mints the row with a server-generated key
+and the desk shows the key EXACTLY ONCE in the result box (the
+student-login display-once rule, ADR-045) while prepending the full
+editable row — fetch-first, `reader_created` frame replay no-ops. Each
+row also carries a Rotate key button behind a confirm (rotation bricks
+the fielded reader until re-flashed — the unpair confirm grammar); the
+fresh key renders once in the same result box. The table always renders
+(an empty-row, never no-table) so live arrivals prepend from zero, and
+save/rotate clicks are delegated so live-prepended rows behave like
+server-rendered ones. No key ever reaches the HTML again: the desk
+greps clean by test.
+
+Honest limit: the admin dashboard's readers table repaints on
+`reader_updated` but does not prepend on `reader_created` (it has no
+row-builder — births appear there after a reload). The readers desk is
+the live surface for births.
+
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 
 Everything below was **omitted or replaced honestly** (no fake data, no

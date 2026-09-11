@@ -212,6 +212,82 @@
       }
     },
     {
+      "name": "04b Admin — Create reader / Crear lector",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"label\": \"Aula 12 — Entrada\",\n  \"type\": \"entry\",\n  \"active_event_type\": \"ENTRY\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/readers",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "readers"
+          ]
+        },
+        "description": "TASK-030-B (ADR-045) — provision a reader from the GUI: label + physical type (classroom/pae/recycling/entry) + initial mode. The server generates the 32-char API key and returns it EXACTLY ONCE (api_key + api_key_notice) — copy it now, it is never shown again. Admin-only.\n\nResponse 200: { status, reader: { id, label, type, active_event_type }, api_key, message, api_key_notice } + a reader_created roster frame.\nResponse 422: validation errors (nothing created)."
+      }
+    },
+    {
+      "name": "04c Admin — Rotate reader key / Rotar clave del lector",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/readers/{{reader_id}}/rotate-key",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "readers",
+            "{{reader_id}}",
+            "rotate-key"
+          ]
+        },
+        "description": "TASK-030-B (ADR-045) — lost-key / suspected-leak recovery without SQL. The old key 401s from this moment (re-flash the fielded reader). The new key is returned EXACTLY ONCE. Admin-only.\n\nResponse 200: { status, reader: { id, label }, api_key, message, api_key_notice }.\nResponse 404: unknown reader."
+      }
+    },
+    {
       "name": "05 Desk — Redeem reward / Canjear recompensa",
       "request": {
         "method": "POST",

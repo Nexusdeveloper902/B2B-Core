@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
@@ -449,6 +449,67 @@ valid values as the mode endpoint.
 ```
 
 `422` — validation errors (short label, unknown mode).
+
+---
+
+## POST /api/v1/admin/readers — create one reader (TASK-030-B, admin-only)
+
+Reader provisioning without SQL: the `/admin/readers` desk creates the
+row through this endpoint. **Admin role required.** The API key is
+NEVER accepted from the client — the server generates a 32-char key
+(the seeder's standard) and returns it EXACTLY ONCE (`api_key` +
+`api_key_notice`, the student-login display-once rule). The reader
+object, roster frames, logs and every later response never carry it.
+Creation announces a `reader_created` roster frame (same transaction).
+
+**Request**:
+
+```json
+{ "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" }
+```
+
+`label`: required, 3–255 chars. `type`: required, one of `classroom`
+`pae` `recycling` `entry`. `active_event_type`: required, any event
+type (same set as the settings endpoint).
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" },
+  "api_key": "…32 chars, shown here and never again…",
+  "message": "Reader Aula 12 — Entrada created.",
+  "api_key_notice": "API key (copy it now — it is never shown again)"
+}
+```
+
+`422` — validation errors (nothing is created, no frame is written).
+
+---
+
+## POST /api/v1/admin/readers/{reader}/rotate-key — rotate one key (TASK-030-B, admin-only)
+
+**Admin role required.** Lost-key / suspected-leak recovery without
+SQL: replaces the key and returns the new one EXACTLY ONCE. The old key
+401s from that moment (the deployed reader stops working until it is
+re-flashed — the desk confirms before calling). The rotation is logged
+(reader id + admin id, never key material); no roster frame is written
+(no displayed state changes).
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 7, "label": "Aula 12 — Entrada" },
+  "api_key": "…32 fresh chars, shown here and never again…",
+  "message": "API key rotated for Aula 12 — Entrada.",
+  "api_key_notice": "API key (copy it now — it is never shown again)"
+}
+```
+
+`404` — unknown reader.
 
 ---
 

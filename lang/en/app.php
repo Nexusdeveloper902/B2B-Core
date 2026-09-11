@@ -257,6 +257,13 @@ return [
     'save_reader' => 'Save',
     'reader_updated' => 'Reader updated.',
     'no_readers' => 'No readers registered yet.',
+    // TASK-030-B — reader provisioning (create + key rotation)
+    'create_reader' => 'Add reader',
+    'reader_type_label' => 'Reader type',
+    'reader_mode_label' => 'Initial mode',
+    'rotate_key' => 'Rotate key',
+    'rotate_key_confirm' => 'Rotate the API key of :label? The deployed reader stops working until it is flashed with the new key.',
+    'reader_key_once' => 'Copy it now — this key is never shown again.',
 
     // Students management desk (/admin/students)
     'students_page' => 'Students',

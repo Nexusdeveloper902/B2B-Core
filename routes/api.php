@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ClassController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
 use App\Http\Controllers\Api\V1\NlQueryController;
 use App\Http\Controllers\Api\V1\PairingStatusController;
+use App\Http\Controllers\Api\V1\ReaderController;
 use App\Http\Controllers\Api\V1\ReaderModeController;
 use App\Http\Controllers\Api\V1\ReaderSettingsController;
 use App\Http\Controllers\Api\V1\RecyclingCaptureController;
@@ -77,10 +78,21 @@ Route::prefix('v1')->group(function () {
 
     // TASK-027 — reader management (admin-only): label (name) + active
     // mode in one settings update, backing /admin/readers. The mode-only
-    // endpoint above stays untouched (its contract is pinned by tests).
+    // endpoint above stays untouched (its contract stays pinned).
     Route::put('/admin/readers/{reader}', [ReaderSettingsController::class, 'update'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.readers.update');
+
+    // TASK-030-B (ADR-045) — reader provisioning (admin-only): create
+    // from the GUI with a server-generated display-once API key, and
+    // rotate a lost/compromised key without SQL.
+    Route::post('/admin/readers', [ReaderController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.readers.store');
+
+    Route::post('/admin/readers/{reader}/rotate-key', [ReaderController::class, 'rotateKey'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.readers.rotate-key');
 
     // TASK-027 — student management (admin-only): create single students
     // and bulk-import a CSV from the /admin/students desk (no more

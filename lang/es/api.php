@@ -73,6 +73,11 @@ return [
     'class_created' => 'Clase :name creada',
     'class_duplicate' => 'Ya existe una clase llamada :name',
 
+    // TASK-030-B — aprovisionamiento de lectores (API keys de un solo vistazo)
+    'reader_created' => 'Lector :label creado',
+    'reader_key_notice' => 'API key (cópiala ahora — no se vuelve a mostrar)',
+    'reader_key_rotated' => 'API key rotada para :label',
+
     // TASK-030-A — accesos automáticos de estudiantes (el password
     // temporal se muestra una sola vez, como una API key de lector).
     'student_account_notice' => 'Acceso listo: :email / contraseña inicial :password — debe cambiarse en el primer inicio de sesión',

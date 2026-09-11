@@ -46,6 +46,8 @@ class DocumentationTest extends TestCase
         // TASK-030-A — the login backfill endpoint joins the contract.
         foreach ([
             'PUT /api/v1/admin/readers/{id}',
+            'POST /api/v1/admin/readers',
+            'POST /api/v1/admin/readers/{reader}/rotate-key',
             'POST /api/v1/admin/students/import',
             'POST /api/v1/admin/students/{student}/account',
             'POST /api/v1/admin/classes',
@@ -85,6 +87,8 @@ class DocumentationTest extends TestCase
             '{{base_url}}/api/v1/events/tap',
             '{{base_url}}/api/v1/recycling/classify',
             '{{base_url}}/api/v1/admin/readers/{{reader_id}}/mode',
+            '{{base_url}}/api/v1/admin/readers',
+            '{{base_url}}/api/v1/admin/readers/{{reader_id}}/rotate-key',
             '{{base_url}}/api/v1/students/{{student_id}}/redeem',
             '{{base_url}}/api/v1/nl-query',
             '{{base_url}}/api/v1/admin/students/{{student_id}}/arm-pairing',

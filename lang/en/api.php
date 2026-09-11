@@ -65,6 +65,11 @@ return [
     // TASK-027 — per-card unpair
     'card_unpaired' => 'Card unpaired from :student — the credential is fresh again',
 
+    // TASK-030-B — reader provisioning (display-once API keys)
+    'reader_created' => 'Reader :label created',
+    'reader_key_notice' => 'API key (copy it now — it is never shown again)',
+    'reader_key_rotated' => 'API key rotated for :label',
+
     // TASK-027 (gap E1) — capture image route
     'capture_image_missing' => 'No stored image for this capture',
 

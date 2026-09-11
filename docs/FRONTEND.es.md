@@ -146,6 +146,28 @@ de idioma y el propio formulario siguen alcanzables; los clientes JSON
 reciben un 403 bilingüe (`password_change_required`) en vez de la
 redirección.
 
+## 3d. TASK-030-B — los lectores nacen aquí (escritorio de aprovisionamiento)
+
+El escritorio de lectores creció con un panel de creación (nombre +
+tipo + modo inicial): `POST /api/v1/admin/readers` crea la fila con
+una clave generada por el servidor y el escritorio muestra la clave
+EXACTAMENTE UNA VEZ en la caja de resultado (la regla de
+mostrar-una-sola-vez de los accesos, ADR-045) mientras antepone la fila
+editable completa — fetch primero, el replay del frame
+`reader_created` es no-op. Cada fila lleva además un botón Rotar clave
+tras un confirm (la rotación deja inservible el lector instalado hasta
+regrabarlo — la gramática del confirm de desvincular); la clave fresca
+se renderiza una vez en la misma caja. La tabla siempre renderiza (una
+fila vacía, nunca sin tabla) para que las llegadas en vivo antepongan
+desde cero, y los clics de guardar/rotar son delegados para que las
+filas en vivo se comporten como las del servidor. Ninguna clave vuelve
+al HTML jamás: el escritorio queda limpio por test.
+
+Límite honesto: la tabla de lectores del panel admin repinta con
+`reader_updated` pero no antepone con `reader_created` (no tiene
+constructor de filas — los nacimientos aparecen allí tras recargar).
+El escritorio de lectores es la superficie en vivo para nacimientos.
+
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 
 Todo lo de abajo fue **omitido o reemplazado con honestidad** (sin datos

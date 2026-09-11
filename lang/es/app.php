@@ -257,6 +257,13 @@ return [
     'save_reader' => 'Guardar',
     'reader_updated' => 'Lector actualizado.',
     'no_readers' => 'Aún no hay lectores registrados.',
+    // TASK-030-B — aprovisionamiento de lectores (creación + rotación)
+    'create_reader' => 'Añadir lector',
+    'reader_type_label' => 'Tipo de lector',
+    'reader_mode_label' => 'Modo inicial',
+    'rotate_key' => 'Rotar clave',
+    'rotate_key_confirm' => '¿Rotar la API key de :label? El lector instalado deja de funcionar hasta que se le grabe la clave nueva.',
+    'reader_key_once' => 'Cópiala ahora — esta clave no se vuelve a mostrar.',
 
     // Escritorio de gestión de estudiantes (/admin/students)
     'students_page' => 'Estudiantes',
