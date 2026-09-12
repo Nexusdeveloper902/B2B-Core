@@ -1,10 +1,11 @@
 # STATE SNAPSHOT — RUN-2026-09-11-core-030
 
 ## Overall Status
-Branch `feature/TASK-030-pulse-productization-pass` is 4 commits ahead
+Branch `feature/TASK-030-pulse-productization-pass` is 5 commits ahead
 of main (main untouched): TASK-030 A/B/Fix-3/C delivered, pyramid
 green after every item (423 passed / 3 skipped · quality PASS ·
-e2e 33/33). NOT pushed — push + CI observation is the next action.
+e2e 33/33). PUSHED 2026-09-11 — remote CI run 34660477874 on e7ec0d4
+SUCCESS (13/13, llm-smoke skipped by design). Observation loop closed.
 
 ## Completed
 - A. Student auto-provisioning + forced rotation (ADR-044) + race/

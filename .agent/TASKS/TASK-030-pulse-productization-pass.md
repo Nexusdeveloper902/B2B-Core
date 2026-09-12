@@ -58,7 +58,7 @@ before the next starts)
 - [x] A–F shipped on the branch with tests pinning each claim
       (423 passed / 3 skipped, quality PASS, e2e 33/33 after EVERY item)
 - [x] RUN record + STATE snapshot appended; G items filed as follow-ups
-- [ ] Push + remote CI observation (next action — needs PAT at push time)
+- [x] Push + remote CI observation (run 34660477874 on e7ec0d4 SUCCESS, 13/13)
 
 ## Constraints
 - Branches only; `main` untouched. PAT via per-command helper, never
