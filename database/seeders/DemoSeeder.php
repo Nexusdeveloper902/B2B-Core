@@ -21,18 +21,25 @@ use Illuminate\Support\Str;
  * reader api_key to the console, ready to paste into Postman/curl.
  *
  * Output is bilingual (EN + ES) per the platform requirement.
+ *
+ * DEV/DEMO ONLY (finding 7.2): every credential below is a published,
+ * shared secret — never run this seeder against a production database.
  */
 class DemoSeeder extends Seeder
 {
     public function run(): void
     {
         // ---------- Users ----------
+        // TASK-030-A (ADR-044) — demo accounts opt OUT of the forced
+        // rotation (must_change_password=false): one-tap demo logins
+        // keep working. Real enrollments (desk create/import) opt IN.
         $admin = User::firstOrCreate(
             ['email' => 'admin@presence.test'],
             [
                 'name' => 'School Admin',
                 'password' => 'password',
                 'role' => UserRole::Admin->value,
+                'must_change_password' => false,
             ],
         );
 
@@ -48,6 +55,7 @@ class DemoSeeder extends Seeder
                 'name' => 'Prof. Elena Ramírez',
                 'password' => 'password',
                 'role' => UserRole::Teacher->value,
+                'must_change_password' => false,
             ],
         );
 
@@ -85,6 +93,7 @@ class DemoSeeder extends Seeder
                     'password' => 'password',
                     'role' => UserRole::Student->value,
                     'student_id' => $student->id,
+                    'must_change_password' => false,
                 ],
             );
 

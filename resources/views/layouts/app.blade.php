@@ -180,6 +180,15 @@
                 <span class="dot" aria-hidden="true"></span>
                 {{ __('app.env') }}: <code>{{ config('app.env') }}</code>
             </span>
+            {{-- TASK-030 (Fix 3) — project presence: the owner's Instagram
+                 as a functional link (the only contact channel supplied —
+                 no invented emails/phones, ever). --}}
+            <span class="ops-chip">
+                <span class="material-symbols-outlined is-16" aria-hidden="true">photo_camera</span>
+                {{ __('app.follow_us') }}:
+                <a href="https://www.instagram.com/puls.e1681?stkn=aGNnaW83MTg5OWZu&utm_source=qr"
+                   target="_blank" rel="noopener" lang="en">Instagram @puls.e1681</a>
+            </span>
         </div>
         <div class="footer-legal">
             <p>Presence Platform — Core · EN/ES</p>

@@ -49,6 +49,7 @@ drain bar, login auth card, demo chips, empty states.
 | Leaderboard & Class Standings | `/student/leaderboard` **(new)** | `student/leaderboard` |
 | Students — enrollment desk | `/admin/students` **(new, TASK-027)** | `admin/students` |
 | Readers — management desk | `/admin/readers` **(new, TASK-027)** | `admin/readers` |
+| Set a new password | `/password/change` **(new, TASK-030-A)** | `auth/password-change` |
 
 The two TASK-026 pages and the two TASK-027 desks are views over data
 that already existed plus new admin write endpoints (see §4). Nav stays
@@ -113,6 +114,67 @@ class-standings panel stays a snapshot (frames carry student-level
 points, not class aggregates); the timeline's empty state doesn't grow
 a live table from zero (reload renders it); the student rewards
 catalog is static by nature.
+
+## 3c. TASK-030-A — student logins: the desk's account column + the rotation page
+
+Enrollment mints the login (ADR-044), and the desk proves it: the
+roster table grew a Login column rendering the provisioned email per
+row, or a one-click "Create login" backfill for pre-TASK-030 rows
+(`POST /api/v1/admin/students/{student}/account`, idempotent). Live
+arrivals (fetch response or roster frame) paint the same cell through
+one renderer, so a row created on another admin's screen still shows
+its login here. The creation result box carries the display-once
+credentials (`account_notice`) — the only place the temporary password
+ever appears.
+
+`/password/change` (`auth/password-change`, same auth-card grammar as
+the sign-in view) is where flagged accounts land: every other page
+bounces them there until they rotate to a personal password
+(current-password check, minimum 8, confirmed). Logout, the locale
+switcher and the form itself stay reachable; JSON callers get a
+bilingual 403 (`password_change_required`) instead of a redirect.
+
+## 3d. TASK-030-B — readers are born here now (provisioning desk)
+
+The readers desk grew a creation panel (name + type + initial mode):
+`POST /api/v1/admin/readers` mints the row with a server-generated key
+and the desk shows the key EXACTLY ONCE in the result box (the
+student-login display-once rule, ADR-045) while prepending the full
+editable row — fetch-first, `reader_created` frame replay no-ops. Each
+row also carries a Rotate key button behind a confirm (rotation bricks
+the fielded reader until re-flashed — the unpair confirm grammar); the
+fresh key renders once in the same result box. The table always renders
+(an empty-row, never no-table) so live arrivals prepend from zero, and
+save/rotate clicks are delegated so live-prepended rows behave like
+server-rendered ones. No key ever reaches the HTML again: the desk
+greps clean by test.
+
+Honest limit: the admin dashboard's readers table repaints on
+`reader_updated` but does not prepend on `reader_created` (it has no
+row-builder — births appear there after a reload). The readers desk is
+the live surface for births.
+
+## 3e. TASK-030 (Fix 3) — presence, units, and a lived-in demo
+
+- **Project presence**: the shared shell footer links the project's
+  Instagram (`@puls.e1681`, new tab + `noopener`) in both languages.
+  It is the ONLY contact channel supplied — no emails, phones or
+  addresses are invented anywhere (gap P5 stays open for a real
+  advisor-contact surface).
+- **No hardcoded units**: the EcoStation points unit renders through
+  `app.points_unit` (server rows, rate card and live JS paths alike),
+  and the hub's label map went fully `Js::from` (the last
+  `{{ }}`-in-JS literals are gone — translators' quotes cannot break
+  the script anymore). `realtime.js` English fallbacks (`just now`,
+  badge states) were audited: they only render on pages WITH a live
+  list/badge, and every such boot carries the full localized strings
+  map — no fallback can surface under ES.
+- **Pilot dataset**: `PilotSeeder` (fresh DBs only — it refuses
+  non-empty ones instead of doubling) builds three classes, 24
+  students with logins and cards, five readers and ten deterministic
+  school days of taps (~1k events, ~70 deposits, 2 redemptions).
+  `./run reset --pilot` is the one-command human demo; the small
+  `DemoSeeder` fixture stays the automated-test default.
 
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 

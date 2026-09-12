@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\AdminReadersController;
 use App\Http\Controllers\Web\AdminStudentsController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\ParentViewController;
+use App\Http\Controllers\Web\PasswordController;
 use App\Http\Controllers\Web\RealtimeTokenController;
 use App\Http\Controllers\Web\StudentDashboardController;
 use App\Http\Controllers\Web\TeacherDashboardController;
@@ -45,6 +46,17 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
+
+// TASK-030-A (ADR-044) — first-login password rotation. The form lives
+// outside the `password.changed` group (it IS the exemption target);
+// the update clears the flag and lands on the role's own dashboard.
+Route::middleware(['auth'])->group(function () {
+    Route::get('/password/change', [PasswordController::class, 'edit'])
+        ->name('password.change');
+
+    Route::put('/password/change', [PasswordController::class, 'update'])
+        ->name('password.update');
+});
 
 // Authenticated dashboards.
 Route::middleware(['auth'])->group(function () {

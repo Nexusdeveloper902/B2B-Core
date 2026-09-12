@@ -102,6 +102,7 @@
                     <th scope="col">{{ __('app.student_grade') }}</th>
                     <th scope="col">{{ __('app.pae_enrolled') }}</th>
                     <th scope="col">{{ __('app.card') }}</th>
+                    <th scope="col">{{ __('app.account') }}</th>
                     <th scope="col"></th>
                 </tr>
                 </thead>
@@ -119,12 +120,21 @@
                                 <span class="muted">{{ __('app.no_card') }}</span>
                             @endforelse
                         </td>
+                        {{-- TASK-030-A — the provisioned login, or the
+                             one-click backfill for pre-feature rows. --}}
+                        <td data-label="{{ __('app.account') }}" data-account-cell>
+                            @if($student->account)
+                                <code>{{ $student->account->email }}</code>
+                            @else
+                                <button type="button" class="tiny-link" data-provision="{{ $student->id }}">{{ __('app.provision_account') }}</button>
+                            @endif
+                        </td>
                         <td data-label="">
                             <a class="tiny-link" href="{{ route('parent.timeline', $student) }}">{{ __('app.view_parent') }}</a>
                         </td>
                     </tr>
                 @empty
-                    <tr id="roster-empty"><td colspan="6" class="muted">{{ __('app.no_students_found') }}</td></tr>
+                    <tr id="roster-empty"><td colspan="7" class="muted">{{ __('app.no_students_found') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -150,6 +160,9 @@
         var VIEW_PARENT = {!! Js::from(__('app.view_parent')) !!};
         var PAE_YES = {!! Js::from(__('app.pae_enrolled_yes')) !!};
         var PAE_NO = {!! Js::from(__('app.pae_enrolled_no')) !!};
+        var NO_ACCOUNT = {!! Js::from(__('app.no_account')) !!};
+        var PROVISION_ACCOUNT = {!! Js::from(__('app.provision_account')) !!};
+        var ACCOUNT_LABEL = {!! Js::from(__('app.account')) !!};
 
         function busy(btn, on) {
             btn.disabled = on;
@@ -196,6 +209,12 @@
             noCard.className = 'muted';
             noCard.textContent = NO_CARD;
             card.appendChild(noCard);
+            // TASK-030-A — the login column: live arrivals carry the
+            // provisioned email (account_email); rows without one keep
+            // the one-click backfill (server-rendered rows identical).
+            var account = document.createElement('td');
+            account.setAttribute('data-account-cell', '');
+            renderAccountCell(account, s);
             var action = document.createElement('td');
             var link = document.createElement('a');
             link.className = 'tiny-link';
@@ -208,8 +227,33 @@
             tr.appendChild(grade);
             tr.appendChild(pae);
             tr.appendChild(card);
+            tr.appendChild(account);
             tr.appendChild(action);
             return tr;
+        }
+
+        // TASK-030-A — account cell renderer (shared by live rows,
+        // updates, and the provision backfill below).
+        function renderAccountCell(cell, s) {
+            cell.textContent = '';
+            cell.setAttribute('data-label', ACCOUNT_LABEL);
+            if (s.account_email) {
+                var code = document.createElement('code');
+                code.textContent = s.account_email;
+                cell.appendChild(code);
+            } else if (s.id !== undefined && s.id !== null) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'tiny-link';
+                btn.setAttribute('data-provision', String(s.id));
+                btn.textContent = PROVISION_ACCOUNT;
+                cell.appendChild(btn);
+            } else {
+                var none = document.createElement('span');
+                none.className = 'muted';
+                none.textContent = NO_ACCOUNT;
+                cell.appendChild(none);
+            }
         }
 
         function td(value) {
@@ -230,6 +274,13 @@
                 if (s.class_name !== undefined) { cells[1].textContent = s.class_name || '—'; }
                 if (s.grade !== undefined) { cells[2].textContent = s.grade || '—'; }
                 if (s.pae_enrolled !== undefined) { cells[3].textContent = s.pae_enrolled ? PAE_YES : PAE_NO; }
+            }
+            // TASK-030-A — the account column updates independently of
+            // the positional cells above (it owns its own selector, so
+            // column order can never silently shift it).
+            if (s.account_email !== undefined) {
+                var accountCell = row.querySelector('[data-account-cell]');
+                if (accountCell) { renderAccountCell(accountCell, s); }
             }
             return row;
         }
@@ -294,12 +345,39 @@
                 pae_enrolled: document.getElementById('student-pae').checked
             }).then(function (r) {
                 busy(btn, false);
-                show(box, (r.data && r.data.message) || '{{ __('app.error_generic') }}', r.ok);
+                // TASK-030-A — the display-once credentials ride the
+                // notice line (this response is the only place the
+                // temporary password ever appears).
+                var text = (r.data && r.data.message) || '{{ __('app.error_generic') }}';
+                if (r.ok && r.data && r.data.account_notice) { text += '\n' + r.data.account_notice; }
+                show(box, text, r.ok);
                 if (r.ok) {
                     if (r.data && r.data.student) { applyStudent(r.data.student); }
                     createForm.reset();
                 }
             }).catch(function () { busy(btn, false); });
+        });
+
+        // TASK-030-A — one-click login backfill for pre-feature rows
+        // (delegated: live-prepended rows carry their own buttons too).
+        document.getElementById('roster-body').addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('[data-provision]') : null;
+            if (!btn) { return; }
+            var box = document.getElementById('student-create-result');
+            busy(btn, true);
+            postJson('/api/v1/admin/students/' + btn.getAttribute('data-provision') + '/account', {})
+                .then(function (r) {
+                    busy(btn, false);
+                    var text = (r.data && r.data.message) || '{{ __('app.error_generic') }}';
+                    show(box, text, r.ok);
+                    if (r.ok && r.data && r.data.account) {
+                        var row = btn.closest('tr[data-student-row]');
+                        if (row) {
+                            var cell = row.querySelector('[data-account-cell]');
+                            if (cell) { renderAccountCell(cell, {account_email: r.data.account.email}); }
+                        }
+                    }
+                }).catch(function () { busy(btn, false); });
         });
 
         // TASK-029 — create a class (name + optional homeroom teacher).
@@ -361,7 +439,10 @@
                         applyStudent({
                             id: entry.id,
                             name: entry.name,
-                            class_name: entry.class_name
+                            class_name: entry.class_name,
+                            // TASK-030-A — imported rows arrive with
+                            // their provisioned login.
+                            account_email: entry.account_email
                         });
                     });
                 }

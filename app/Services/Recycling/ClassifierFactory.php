@@ -25,7 +25,7 @@ class ClassifierFactory
             ),
             'deepseek' => new DeepSeekClassifier(
                 config('recycling.classifier.deepseek.api_key'),
-                (string) config('recycling.classifier.deepseek.model'),
+                (string) config('recycling.classifier.deepseek.model', 'deepseek-flash'),
                 (float) config('recycling.classifier.deepseek.timeout'),
             ),
             // A typo'd RECYCLING_CLASSIFIER_DRIVER must surface as the

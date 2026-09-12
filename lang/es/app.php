@@ -27,6 +27,8 @@ return [
     'footer_note' => 'Consola de operaciones — asistencia, comidas PAE y recompensas por reciclaje del día escolar.',
     'demo_credentials' => 'Credenciales demo (seeder)',
     'env' => 'Entorno',
+    // TASK-030 (Fix 3) — presencia del proyecto en el pie.
+    'follow_us' => 'Sigue el proyecto',
 
     // Login
     'login_title' => 'Inicia sesión en la Plataforma de Presencia',
@@ -257,6 +259,13 @@ return [
     'save_reader' => 'Guardar',
     'reader_updated' => 'Lector actualizado.',
     'no_readers' => 'Aún no hay lectores registrados.',
+    // TASK-030-B — aprovisionamiento de lectores (creación + rotación)
+    'create_reader' => 'Añadir lector',
+    'reader_type_label' => 'Tipo de lector',
+    'reader_mode_label' => 'Modo inicial',
+    'rotate_key' => 'Rotar clave',
+    'rotate_key_confirm' => '¿Rotar la API key de :label? El lector instalado deja de funcionar hasta que se le grabe la clave nueva.',
+    'reader_key_once' => 'Cópiala ahora — esta clave no se vuelve a mostrar.',
 
     // Escritorio de gestión de estudiantes (/admin/students)
     'students_page' => 'Estudiantes',
@@ -302,6 +311,18 @@ return [
     'class_name' => 'Nombre de la clase',
     'class_teacher_optional' => 'Profesor titular (opcional)',
     'class_teacher_none' => 'Sin profesor',
+
+    // Cuentas de estudiantes (TASK-030-A — aprovisionamiento automático + rotación)
+    'account' => 'Acceso',
+    'no_account' => 'sin acceso',
+    'provision_account' => 'Crear acceso',
+    'password_change_title' => 'Define una nueva contraseña',
+    'password_change_subtitle' => 'Tu cuenta aún usa la contraseña inicial. Elige una personal para continuar.',
+    'password_change_band_sub' => 'Una contraseña nueva — y se abre toda la plataforma',
+    'current_password' => 'Contraseña actual',
+    'new_password' => 'Nueva contraseña',
+    'confirm_password' => 'Confirmar nueva contraseña',
+    'save_password' => 'Guardar nueva contraseña',
 
     // Paginación (TASK-029 — la vista de paginador del sistema de diseño)
     'pagination_nav' => 'Paginación',

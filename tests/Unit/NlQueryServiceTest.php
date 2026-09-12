@@ -30,7 +30,7 @@ class NlQueryServiceTest extends TestCase
     {
         config(['recycling.nl_query.api_key' => null]);
 
-        $service = $this->makeService(new DeepSeekClient(null, 'deepseek-v4-flash'));
+        $service = $this->makeService(new DeepSeekClient(null, 'deepseek-flash'));
 
         $this->expectException(NlQueryException::class);
         $this->expectExceptionMessage('nl_query.not_configured');
@@ -41,7 +41,7 @@ class NlQueryServiceTest extends TestCase
     #[Test]
     public function executes_the_selected_function_and_phrases_the_answer(): void
     {
-        $fake = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
+        $fake = new class('fake-key', 'deepseek-flash') extends DeepSeekClient
         {
             public int $calls = 0;
 
@@ -119,7 +119,7 @@ class NlQueryServiceTest extends TestCase
     #[Test]
     public function refuses_to_loop_forever(): void
     {
-        $alwaysCalls = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
+        $alwaysCalls = new class('fake-key', 'deepseek-flash') extends DeepSeekClient
         {
             public function generate(array $messages, ?array $tools = null): array
             {
@@ -159,7 +159,7 @@ class NlQueryServiceTest extends TestCase
     #[Test]
     public function empty_model_answer_is_an_error_not_a_fake_success(): void
     {
-        $silent = new class('fake-key', 'deepseek-v4-flash') extends DeepSeekClient
+        $silent = new class('fake-key', 'deepseek-flash') extends DeepSeekClient
         {
             public function generate(array $messages, ?array $tools = null): array
             {

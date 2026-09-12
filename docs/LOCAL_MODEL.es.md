@@ -11,8 +11,8 @@ Laravel nunca llama a un modelo directamente: depende de la interfaz
 ```dotenv
 # stub   → pseudo-clasificador determinista (por defecto; para dev/CI/demos)
 # local  → TU servicio local de inferencia   ← driver de producción previsto
-# deepseek → respaldo opcional en la nube (deepseek-v4-flash-vision-exp — el
-#          único modelo de DeepSeek que acepta imágenes; requiere DEEPSEEK_API_KEY)
+# deepseek → respaldo opcional en la nube (deepseek-flash — DeepSeek-V4.1-Flash,
+#          el modelo Flash con visión; requiere DEEPSEEK_API_KEY; ADR-046)
 RECYCLING_CLASSIFIER_DRIVER=local
 
 LOCAL_CLASSIFIER_URL=http://127.0.0.1:8501/v1/models/material:predict
@@ -64,6 +64,28 @@ uvicorn server:app --port 8501
 Cuando se entrene un modelo real (p. ej. un MobileNet afinado con fotos de
 materiales) y se exporte, despliégalo tras la misma URL y todo el bucle de
 ganancia sigue funcionando sin cambios.
+
+## El respaldo `deepseek` en la nube (ADR-046)
+
+`RECYCLING_CLASSIFIER_DRIVER=deepseek` (+ `DEEPSEEK_API_KEY`) envía la
+captura a `deepseek-flash` (DeepSeek-V4.1-Flash) vía Chat Completions
+compatible con OpenAI — reverificado contra api-docs.deepseek.com el
+2026-09-11:
+
+- imagen como data URL base64 en una parte `image_url` de un mensaje
+  **user** (imágenes en system/assistant dan 400), `detail: high`
+  fijado (precisión primero para la brecha de verificación),
+  `thinking.disabled` + temperatura 0 (el thinking viene activado por
+  defecto e ignora la temperatura).
+- `response_format: json_object` con la palabra "json" + un ejemplo de
+  formato en el prompt; el modelo devuelve `{material_class,
+  confidence, is_bottle, is_recyclable}` — el backend sigue siendo
+  dueño de las reglas de puntos (solo tabla de config).
+- pre-vuelo local: JPEG/PNG/GIF/WebP detectados del **contenido** del
+  archivo, techo de 32 MiB por imagen — las violaciones responden
+  driver-unavailable (503, reintentable), nunca 400s crípticos.
+- `DEEPSEEK_VISION_MODEL` sobrescribe el ID del modelo (el retirado
+  `deepseek-v4-flash-vision-exp` aún sirve si se fija).
 
 ## Por qué existe el stub
 

@@ -42,7 +42,7 @@ return [
     'nlq_not_configured' => 'Natural-language query is not configured: no DEEPSEEK_API_KEY set (blocked, not failed).',
     'nlq_invalid_key' => 'DeepSeek rejected the configured DEEPSEEK_API_KEY (invalid or revoked). Create a fresh key at platform.deepseek.com, put it in .env, and verify with: ./run llm-check',
     'nlq_insufficient_balance' => 'The key is valid but the DeepSeek account balance is empty (pay-as-you-go, no free tier). Top up at platform.deepseek.com and verify with: ./run llm-check',
-    'nlq_model_not_found' => 'The configured DEEPSEEK_MODEL was not found for this account or API version. Use the default (deepseek-v4-flash) and verify with: ./run llm-check',
+    'nlq_model_not_found' => 'The configured DEEPSEEK_MODEL was not found for this account or API version. Use the default (deepseek-flash) and verify with: ./run llm-check',
     'nlq_rate_limited' => 'The language model quota is exhausted, please retry later.',
     'nlq_unavailable' => 'The language model service is unavailable, please retry later.',
 
@@ -65,12 +65,24 @@ return [
     // TASK-027 — per-card unpair
     'card_unpaired' => 'Card unpaired from :student — the credential is fresh again',
 
+    // TASK-030-B — reader provisioning (display-once API keys)
+    'reader_created' => 'Reader :label created',
+    'reader_key_notice' => 'API key (copy it now — it is never shown again)',
+    'reader_key_rotated' => 'API key rotated for :label',
+
     // TASK-027 (gap E1) — capture image route
     'capture_image_missing' => 'No stored image for this capture',
 
     // TASK-029 — class creation (the students desk)
     'class_created' => 'Class :name created',
     'class_duplicate' => 'A class named :name already exists',
+
+    // TASK-030-A — automatic student logins (provisioned on
+    // create/import; the temporary password is display-once, exactly
+    // like a reader API key).
+    'student_account_notice' => 'Login ready: :email / initial password :password — it must be changed on first login',
+    'student_account_exists' => 'This student already has a login (:email)',
+    'password_change_required' => 'You must set a new password before continuing.',
 
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',

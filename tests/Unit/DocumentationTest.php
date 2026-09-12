@@ -43,9 +43,13 @@ class DocumentationTest extends TestCase
         // TASK-027 — the admin management surface must stay documented in
         // BOTH languages (readers settings, students + CSV import, the
         // per-card unpair, the capture-image door, the PAE gate).
+        // TASK-030-A — the login backfill endpoint joins the contract.
         foreach ([
             'PUT /api/v1/admin/readers/{id}',
+            'POST /api/v1/admin/readers',
+            'POST /api/v1/admin/readers/{reader}/rotate-key',
             'POST /api/v1/admin/students/import',
+            'POST /api/v1/admin/students/{student}/account',
             'POST /api/v1/admin/classes',
             'DELETE /api/v1/admin/cards/{id}',
             'GET /api/v1/admin/captures/{deposit}/image',
@@ -55,6 +59,8 @@ class DocumentationTest extends TestCase
             'markdown.js',
             'class_created',
             'reader_updated',
+            // TASK-031 (ADR-046) — the canonical model ID, both languages.
+            'deepseek-flash',
         ] as $needle) {
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");
@@ -83,9 +89,12 @@ class DocumentationTest extends TestCase
             '{{base_url}}/api/v1/events/tap',
             '{{base_url}}/api/v1/recycling/classify',
             '{{base_url}}/api/v1/admin/readers/{{reader_id}}/mode',
+            '{{base_url}}/api/v1/admin/readers',
+            '{{base_url}}/api/v1/admin/readers/{{reader_id}}/rotate-key',
             '{{base_url}}/api/v1/students/{{student_id}}/redeem',
             '{{base_url}}/api/v1/nl-query',
             '{{base_url}}/api/v1/admin/students/{{student_id}}/arm-pairing',
+            '{{base_url}}/api/v1/admin/students/{{student_id}}/account',
             '{{base_url}}/api/v1/admin/cards/pair',
             '{{base_url}}/api/v1/admin/pairing/status',
         ] as $expected) {

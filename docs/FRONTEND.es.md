@@ -51,6 +51,7 @@ barra de cuenta regresiva, tarjeta de login, chips demo, estados vacíos.
 | Leaderboard & Class Standings | `/student/leaderboard` **(nueva)** | `student/leaderboard` |
 | Estudiantes — escritorio de inscripción | `/admin/students` **(nueva, TASK-027)** | `admin/students` |
 | Lectores — escritorio de gestión | `/admin/readers` **(nueva, TASK-027)** | `admin/readers` |
+| Define una nueva contraseña | `/password/change` **(nueva, TASK-030-A)** | `auth/password-change` |
 
 Las dos páginas de TASK-026 y los dos escritorios de TASK-027 son vistas
 sobre datos que ya existían más nuevos endpoints admin de escritura
@@ -123,6 +124,73 @@ puntos por estudiante, no agregados por clase); el estado vacío del
 timeline no cultiva una tabla en vivo desde cero (una recarga lo
 renderiza); el catálogo de recompensas del estudiante es estático por
 naturaleza.
+
+## 3c. TASK-030-A — accesos de estudiantes: la columna de acceso + la página de rotación
+
+La inscripción crea el acceso (ADR-044), y el escritorio lo demuestra:
+la tabla de roster creció con una columna de Acceso que renderiza el
+email aprovisionado por fila, o un "Crear acceso" en un clic para filas
+anteriores a TASK-030 (`POST /api/v1/admin/students/{student}/account`,
+idempotente). Las llegadas en vivo (respuesta fetch o frame de roster)
+pintan la misma celda con un solo renderer, así que una fila creada en
+la pantalla de otro admin igual muestra su acceso aquí. La caja de
+resultado de creación lleva las credenciales de mostrar-una-sola-vez
+(`account_notice`) — el único lugar donde la contraseña temporal
+aparece jamás.
+
+`/password/change` (`auth/password-change`, la misma gramática de
+tarjeta-auth que el login) es donde caen las cuentas marcadas: todas
+las demás páginas rebotan allí hasta rotar a una contraseña personal
+(verificación de la actual, mínimo 8, confirmada). El logout, el cambio
+de idioma y el propio formulario siguen alcanzables; los clientes JSON
+reciben un 403 bilingüe (`password_change_required`) en vez de la
+redirección.
+
+## 3d. TASK-030-B — los lectores nacen aquí (escritorio de aprovisionamiento)
+
+El escritorio de lectores creció con un panel de creación (nombre +
+tipo + modo inicial): `POST /api/v1/admin/readers` crea la fila con
+una clave generada por el servidor y el escritorio muestra la clave
+EXACTAMENTE UNA VEZ en la caja de resultado (la regla de
+mostrar-una-sola-vez de los accesos, ADR-045) mientras antepone la fila
+editable completa — fetch primero, el replay del frame
+`reader_created` es no-op. Cada fila lleva además un botón Rotar clave
+tras un confirm (la rotación deja inservible el lector instalado hasta
+regrabarlo — la gramática del confirm de desvincular); la clave fresca
+se renderiza una vez en la misma caja. La tabla siempre renderiza (una
+fila vacía, nunca sin tabla) para que las llegadas en vivo antepongan
+desde cero, y los clics de guardar/rotar son delegados para que las
+filas en vivo se comporten como las del servidor. Ninguna clave vuelve
+al HTML jamás: el escritorio queda limpio por test.
+
+Límite honesto: la tabla de lectores del panel admin repinta con
+`reader_updated` pero no antepone con `reader_created` (no tiene
+constructor de filas — los nacimientos aparecen allí tras recargar).
+El escritorio de lectores es la superficie en vivo para nacimientos.
+
+## 3e. TASK-030 (Fix 3) — presencia, unidades y una demo vivida
+
+- **Presencia del proyecto**: el pie del shell compartido enlaza el
+  Instagram del proyecto (`@puls.e1681`, pestaña nueva + `noopener`)
+  en ambos idiomas. Es el ÚNICO canal de contacto suministrado — no se
+  inventan emails, teléfonos ni direcciones en ningún lado (la brecha
+  P5 sigue abierta para una superficie real de contacto).
+- **Sin unidades fijas**: la unidad de puntos de EcoStation renderiza
+  vía `app.points_unit` (filas del servidor, tarjeta de tasas y rutas
+  JS en vivo por igual), y el mapa de etiquetas del hub es todo
+  `Js::from` (los últimos literales `{{ }}`-en-JS se fueron — las
+  comillas de los traductores ya no pueden romper el script). Los
+  fallbacks en inglés de `realtime.js` (`just now`, estados del badge)
+  se auditaron: solo renderizan en páginas CON lista/badge en vivo, y
+  cada uno de esos boots lleva el mapa completo de strings
+  localizados — ningún fallback puede aflorar en ES.
+- **Dataset piloto**: `PilotSeeder` (solo BDs frescas — se niega ante
+  BDs no vacías en vez de duplicar) construye tres cursos, 24
+  estudiantes con accesos y tarjetas, cinco lectores y diez días de
+  clase deterministas de toques (~1k eventos, ~70 depósitos, 2 canjes).
+  `./run reset --pilot` es la demo humana en un comando; el pequeño
+  fixture `DemoSeeder` sigue siendo el valor por defecto de las
+  pruebas automatizadas.
 
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 

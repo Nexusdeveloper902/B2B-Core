@@ -27,6 +27,8 @@ return [
     'footer_note' => 'Core operations console — attendance, PAE meals and recycling rewards for the school day.',
     'demo_credentials' => 'Demo credentials (seeded)',
     'env' => 'Environment',
+    // TASK-030 (Fix 3) — project presence in the footer.
+    'follow_us' => 'Follow the project',
 
     // Login
     'login_title' => 'Sign in to the Presence Platform',
@@ -257,6 +259,13 @@ return [
     'save_reader' => 'Save',
     'reader_updated' => 'Reader updated.',
     'no_readers' => 'No readers registered yet.',
+    // TASK-030-B — reader provisioning (create + key rotation)
+    'create_reader' => 'Add reader',
+    'reader_type_label' => 'Reader type',
+    'reader_mode_label' => 'Initial mode',
+    'rotate_key' => 'Rotate key',
+    'rotate_key_confirm' => 'Rotate the API key of :label? The deployed reader stops working until it is flashed with the new key.',
+    'reader_key_once' => 'Copy it now — this key is never shown again.',
 
     // Students management desk (/admin/students)
     'students_page' => 'Students',
@@ -302,6 +311,18 @@ return [
     'class_name' => 'Class name',
     'class_teacher_optional' => 'Homeroom teacher (optional)',
     'class_teacher_none' => 'No teacher',
+
+    // Student logins (TASK-030-A — automatic provisioning + rotation)
+    'account' => 'Login',
+    'no_account' => 'no login',
+    'provision_account' => 'Create login',
+    'password_change_title' => 'Set a new password',
+    'password_change_subtitle' => 'Your account still uses the initial password. Choose a personal one to continue.',
+    'password_change_band_sub' => 'One new password — then the whole platform opens up',
+    'current_password' => 'Current password',
+    'new_password' => 'New password',
+    'confirm_password' => 'Confirm new password',
+    'save_password' => 'Save new password',
 
     // Pagination (TASK-029 — the design-system pager view)
     'pagination_nav' => 'Pagination',

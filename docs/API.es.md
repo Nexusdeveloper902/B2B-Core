@@ -15,7 +15,7 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
 | `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
@@ -375,7 +375,7 @@ estudiante fuera del muro responde con un error explícito de alcance,
 nunca con datos. Los estudiantes siguen en 403.
 
 Flujo: la pregunta + un conjunto fijo de esquemas de funciones va al modelo
-de DeepSeek (por defecto `deepseek-v4-flash`) → el modelo
+de DeepSeek (por defecto `deepseek-flash` — DeepSeek-V4.1-Flash; ADR-046) → el modelo
 **selecciona una función** → el backend ejecuta la
 **consulta Eloquent real** → el resultado vuelve al modelo → el modelo redacta
 la respuesta final. El LLM nunca calcula ni fabrica cifras. Las respuestas
@@ -417,7 +417,7 @@ DeepSeek):
 | `missing_llm_credential` | No hay `DEEPSEEK_API_KEY` en `.env` | Añade la clave y ejecuta `./run llm-check` |
 | `llm_invalid_key` | DeepSeek rechazó la clave (401 Authentication Fails) | Crea una clave nueva en platform.deepseek.com y actualiza `.env` |
 | `llm_insufficient_balance` | 402 — la clave SÍ es válida pero el saldo de la cuenta está vacío (pago por uso) | Recarga el saldo en platform.deepseek.com |
-| `llm_model_not_found` | `DEEPSEEK_MODEL` desconocido para esta cuenta/API (404 Model Not Exist) | Usa el valor por defecto `deepseek-v4-flash` |
+| `llm_model_not_found` | `DEEPSEEK_MODEL` desconocido para esta cuenta/API (404 Model Not Exist) | Usa el valor por defecto `deepseek-flash` |
 | `llm_rate_limited` | Límite de peticiones alcanzado (429) | Reintenta más tarde |
 | `llm_unavailable` | Error de transporte/servidor | Reintenta; el detalle está en `storage/logs/laravel.log` |
 
@@ -465,13 +465,82 @@ mismos valores válidos que el endpoint de modo.
 
 ---
 
+## POST /api/v1/admin/readers — crear un lector (TASK-030-B, solo admin)
+
+Aprovisionamiento de lectores sin SQL: el escritorio `/admin/readers`
+crea la fila por este endpoint. **Requiere rol admin.** La API key
+NUNCA se acepta del cliente — el servidor genera una clave de 32
+caracteres (el estándar del seeder) y la devuelve EXACTAMENTE UNA VEZ
+(`api_key` + `api_key_notice`, la regla de mostrar-una-sola-vez de los
+accesos de estudiantes). El objeto lector, los frames de roster, los
+logs y toda respuesta posterior jamás la llevan. La creación anuncia un
+frame `reader_created` (misma transacción).
+
+**Petición**:
+
+```json
+{ "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" }
+```
+
+`label`: obligatorio, 3–255 caracteres. `type`: obligatorio, uno de
+`classroom` `pae` `recycling` `entry`. `active_event_type`:
+obligatorio, cualquier tipo de evento (el mismo conjunto que el
+endpoint de ajustes).
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" },
+  "api_key": "…32 caracteres, aquí y nunca más…",
+  "message": "Lector Aula 12 — Entrada creado.",
+  "api_key_notice": "API key (cópiala ahora — no se vuelve a mostrar)"
+}
+```
+
+`422` — errores de validación (nada se crea, ningún frame se escribe).
+
+---
+
+## POST /api/v1/admin/readers/{reader}/rotate-key — rotar una clave (TASK-030-B, solo admin)
+
+**Requiere rol admin.** Recuperación de clave perdida o sospechosa sin
+SQL: reemplaza la clave y devuelve la nueva EXACTAMENTE UNA VEZ. La
+clave vieja responde 401 desde ese momento (el lector instalado deja de
+funcionar hasta que se le grabe la nueva — el escritorio confirma antes
+de llamar). La rotación queda en el log (id del lector + id del admin,
+nunca la clave); ningún frame de roster se escribe (ningún estado
+visible cambia).
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "reader": { "id": 7, "label": "Aula 12 — Entrada" },
+  "api_key": "…32 caracteres frescos, aquí y nunca más…",
+  "message": "API key rotada para Aula 12 — Entrada.",
+  "api_key_notice": "API key (cópiala ahora — no se vuelve a mostrar)"
+}
+```
+
+`404` — lector desconocido.
+
+---
+
 ## POST /api/v1/admin/students — crear un estudiante (TASK-027, solo admin)
 
 El fin de los INSERT escritos a mano: el escritorio `/admin/students`
-crea estudiantes por este endpoint. **Requiere rol admin.** La CUENTA de
-estudiante 1:1 NO se crea aquí — las cuentas son un paso separado y
-deliberado (el patrón del seeder), no un efecto silencioso de la
-inscripción.
+crea estudiantes por este endpoint. **Requiere rol admin.**
+
+TASK-030-A (ADR-044) — la inscripción crea el acceso: la cuenta 1:1 del
+estudiante se aprovisiona en la MISMA transacción (email por convención
+`{nombre}@presence.test` + contraseña inicial compartida + rotación
+forzada en el primer inicio de sesión). La respuesta lleva las
+credenciales EXACTAMENTE UNA VEZ (`account` + `account_notice` — la
+regla de mostrar-una-sola-vez de las API keys de lector); los frames de
+roster solo llevan el email, nunca la contraseña.
 
 **Petición**:
 
@@ -484,14 +553,16 @@ inscripción.
 ```json
 {
   "status": "ok",
-  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true },
-  "message": "Estudiante Nueva Estudiante creado."
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true, "account_email": "nueva@presence.test" },
+  "account": { "email": "nueva@presence.test", "temporary_password": "password", "must_change_password": true },
+  "message": "Estudiante Nueva Estudiante creado.",
+  "account_notice": "Acceso listo: nueva@presence.test / contraseña inicial password — debe cambiarse en el primer inicio de sesión"
 }
 ```
 
 `422` — errores de validación, o `{"status":"error","reason":"duplicate"}`
 para el mismo nombre en la misma clase (un duplicado nunca es un salto
-silencioso).
+silencioso; las filas rechazadas no crean ninguna cuenta).
 
 ---
 
@@ -519,14 +590,50 @@ nunca bloquea a las buenas; los duplicados son errores de fila.
   "created": 2,
   "failed": 0,
   "errors": [],
-  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B" }],
+  "students": [{ "id": 9, "name": "María Pérez", "class_name": "5° B", "account_email": "maria@presence.test" }],
+  "accounts_created": 2,
   "message": "Importación terminada: 2 creados, 0 fallidos."
 }
 ```
 
 `status` es `ok` (todas las filas), `partial` (algunas sí, algunas no) o
 `error` + 422 (nada creado — encabezado malo, sin filas de datos, archivo
-ilegible).
+ilegible). TASK-030-A: cada fila creada sale con un acceso
+(`account_email` por fila, `accounts_created` en total); las filas
+fallidas no crean nada. Las colisiones del mismo nombre se desambiguan
+(`maria@…`, `maria2@…`).
+
+---
+
+## POST /api/v1/admin/students/{student}/account — crear un acceso puntual (TASK-030-A, solo admin)
+
+**Requiere rol admin.** Acceso en un clic para filas anteriores a
+TASK-030 (o cualquier estudiante sin cuenta): idempotente — un
+estudiante que ya tiene cuenta la conserva (`already: true`, y la
+contraseña temporal NO se reemite). Una cuenta recién creada lleva el
+par de mostrar-una-sola-vez.
+
+**Respuesta `200` (nueva)**:
+
+```json
+{
+  "status": "ok",
+  "already": false,
+  "account": { "email": "legado@presence.test", "temporary_password": "password", "must_change_password": true },
+  "message": "Acceso listo: legado@presence.test / contraseña inicial password — debe cambiarse en el primer inicio de sesión"
+}
+```
+
+**Respuesta `200` (existente)**: `{"status":"ok","already":true,
+"account":{"email":"…"},"message":"Este estudiante ya tiene un acceso
+(…)"}`.
+
+El primer inicio de sesión con la contraseña inicial cae en el panel
+del estudiante y rebota de inmediato a `GET /password/change`: la
+cuenta debe rotar a una contraseña personal (verificación de la actual,
+mínimo 8, confirmada) antes de que se abra cualquier otra página. Los
+clientes JSON reciben `403` `password_change_required` en vez de la
+redirección.
 
 ---
 

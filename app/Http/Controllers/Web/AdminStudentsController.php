@@ -28,7 +28,9 @@ class AdminStudentsController extends Controller
         $classes = SchoolClass::orderBy('name')->get();
 
         $students = Student::query()
-            ->with(['schoolClass', 'cards'])
+            // TASK-030-A — the account column renders the provisioned
+            // login (or the one-click backfill for pre-feature rows).
+            ->with(['schoolClass', 'cards', 'account'])
             ->when($search !== '', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
             ->orderBy('name')
             ->paginate(25)
