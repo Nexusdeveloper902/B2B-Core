@@ -3,7 +3,9 @@
 ## Overall Status
 Branch `feature/TASK-031-deepseek-flash-model-lineup`: DeepSeek
 Flash migration complete, pyramid green (442/3 · quality · e2e 33/33).
-NOT pushed. Main untouched. TASK-030 branch (5 commits) also unpushed.
+PUSHED 2026-09-11 — remote CI run 34660481546 on 1c55941e SUCCESS
+(13/13, llm-smoke skipped by design). Main untouched. TASK-030 branch
+(6 commits incl. its verdict) also pushed+green.
 
 ## Completed
 - deepseek-flash defaults everywhere; legacy notes where compat matters.
