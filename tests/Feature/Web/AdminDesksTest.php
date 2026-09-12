@@ -94,6 +94,44 @@ class AdminDesksTest extends TestCase
     }
 
     #[Test]
+    public function destructive_actions_use_the_datum_modal_never_native_confirm(): void
+    {
+        // TASK-034 — no view may ship window.confirm anymore: rotate
+        // (readers) and unpair (pairing) open the shared modal.
+        $readers = $this->actingAs($this->admin())->get('/admin/readers')->getContent();
+        $this->assertStringContainsString('id="reader-confirm"', $readers);
+        $this->assertStringContainsString('data-confirm-modal', $readers);
+        $this->assertStringContainsString('role="dialog"', $readers);
+        $this->assertStringContainsString('window.DatumConfirm.open', $readers);
+        $this->assertStringNotContainsString('window.confirm', $readers);
+        // the cramped action cell is a flex row now (Blade + live rows)
+        $this->assertStringContainsString('class="row-actions"', $readers);
+
+        $pairing = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+        $this->assertStringContainsString('id="unpair-confirm"', $pairing);
+        $this->assertStringContainsString('window.DatumConfirm.open', $pairing);
+        $this->assertStringNotContainsString('window.confirm', $pairing);
+    }
+
+    #[Test]
+    public function the_students_desk_couples_grade_to_class_and_searches_live(): void
+    {
+        // TASK-034 — grade 4 filters the class picker to 4° A/B with
+        // grade tags on every option; the roster search is a live
+        // fetch-swap (the GET form stays as the no-JS fallback).
+        $html = $this->actingAs($this->admin())->get('/admin/students')->getContent();
+
+        $this->assertStringContainsString('data-grade="5"', $html);
+        $this->assertStringContainsString('data-grade="1"', $html);
+        $this->assertStringContainsString('data-grade="11"', $html);
+        $this->assertStringContainsString('syncClassesToGrade', $html);
+        $this->assertStringContainsString('id="roster-search-form"', $html);
+        $this->assertStringContainsString('id="roster-search"', $html);
+        $this->assertStringContainsString('id="roster-pages"', $html);
+        $this->assertStringContainsString('fetchRoster', $html);
+    }
+
+    #[Test]
     public function the_layout_nav_links_both_desks_for_admins_only(): void
     {
         // TASK-028 regression: the desks shipped reachable ONLY by URL

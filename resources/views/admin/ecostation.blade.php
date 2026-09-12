@@ -112,7 +112,7 @@
                 </tbody>
             </table>
         </div>
-        <div class="table-note" style="margin-top: var(--sp-sm); border-radius: var(--radius-sm);">
+        <div class="table-note table-note--inset">
             <span class="material-symbols-outlined is-16" aria-hidden="true">shield</span>
             <span>{{ __('app.ecostation_ledger_note') }}</span>
         </div>
@@ -124,7 +124,7 @@
             <ul class="ruled">
                 @forelse($readers as $reader)
                     <li>
-                        <span class="rate-name" style="display:inline-flex;align-items:center;gap:6px;">
+                        <span class="rate-name">
                             <span class="dot" aria-hidden="true"></span>{{ $reader->label }}
                         </span>
                         <span class="meta mono">{{ $reader->active_event_type }}</span>
@@ -144,7 +144,7 @@
                     </li>
                 @endforeach
             </ul>
-            <div class="table-note" style="margin-top: var(--sp-sm); border-radius: var(--radius-sm);">
+            <div class="table-note table-note--inset">
                 <span class="material-symbols-outlined is-16" aria-hidden="true">tune</span>
                 <span>{{ __('app.ecostation_rates_note') }}</span>
             </div>
@@ -171,7 +171,7 @@
                         <span id="capture-caption-time">{{ $latestCapture->event?->occurred_at?->format('Y-m-d H:i') }}</span>
                     </div>
                 </div>
-                <p class="muted small" style="margin-top: var(--sp-2xs);" id="capture-meta">
+                <p class="muted small capture-meta" id="capture-meta">
                     {{ __('app.ecostation_capture_meta', [
                         'student' => $latestCapture->event?->student?->name ?? '—',
                         'bottle' => $latestCapture->is_bottle ? __('app.yes') : __('app.no'),

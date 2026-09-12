@@ -32,7 +32,6 @@ class AdminDashboardController extends Controller
             'paeBreakfastToday' => $this->attendance->paeCount('breakfast', $today),
             'paeLunchToday' => $this->attendance->paeCount('lunch', $today),
             'recyclingToday' => $recyclingToday,
-            'readers' => Reader::orderBy('label')->get(),
             'students' => Student::orderBy('name')->with('schoolClass')->get(),
             'rewards' => Reward::orderBy('point_cost')->get(),
             'nlQueryConfigured' => ! empty(config('recycling.nl_query.api_key')),

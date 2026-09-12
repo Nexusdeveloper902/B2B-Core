@@ -119,7 +119,7 @@ class StudentAccountProvisioningTest extends TestCase
     public function a_duplicate_create_mints_no_account(): void
     {
         $usersBefore = User::count();
-        $class = SchoolClass::firstOrFail();
+        $class = SchoolClass::where('name', '5° B')->firstOrFail();
 
         $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/students', [
@@ -204,7 +204,7 @@ class StudentAccountProvisioningTest extends TestCase
     {
         // Finding 3.2: the advisory pre-check can lose a race — the
         // invariant below it must hold regardless of application code.
-        $class = SchoolClass::firstOrFail();
+        $class = SchoolClass::where('name', '5° B')->firstOrFail();
 
         $this->expectException(QueryException::class);
 

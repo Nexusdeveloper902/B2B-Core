@@ -43,11 +43,22 @@ class DemoSeeder extends Seeder
             ],
         );
 
-        // ---------- Class ----------
-        $class = SchoolClass::firstOrCreate(
-            ['name' => '5° B'],
-            ['teacher_user_id' => null],
-        );
+        // ---------- Classes ----------
+        // TASK-033 — one A/B pair per grade (1–11, no grade 0): the
+        // class dropdown actually changes now. 5° B stays the demo
+        // home (teacher + the four seeded students live there).
+        $class = null;
+        foreach (range(1, 11) as $gradeNumber) {
+            foreach (['A', 'B'] as $variant) {
+                $row = SchoolClass::firstOrCreate(
+                    ['name' => "{$gradeNumber}° {$variant}"],
+                    ['teacher_user_id' => null],
+                );
+                if ($row->name === '5° B') {
+                    $class = $row;
+                }
+            }
+        }
 
         $teacher = User::firstOrCreate(
             ['email' => 'teacher@presence.test'],

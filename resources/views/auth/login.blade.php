@@ -21,7 +21,7 @@
                 <p class="auth-band-title">{{ __('app.app_name') }}</p>
                 <p class="auth-band-sub">{{ __('app.login_band_sub') }}</p>
             </div>
-            <span class="material-symbols-outlined is-16" aria-hidden="true" style="margin-left:auto; color: var(--text-meta);">verified_user</span>
+            <span class="material-symbols-outlined is-16 auth-band-icon" aria-hidden="true">verified_user</span>
         </div>
 
         <div class="auth-body">

@@ -6,9 +6,13 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', __('app.app_name')) — {{ __('app.app_name') }}</title>
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
-    <link rel="stylesheet" href="{{ asset('css/fonts.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/tokens.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    {{-- Versioned asset URLs (filemtime): browsers heuristically cache
+         unversioned CSS/JS for days — without this, a stylesheet pass
+         like TASK-032 is invisible until a force-refresh. Each file
+         busts only when IT changes. --}}
+    <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ @filemtime(public_path('css/fonts.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/tokens.css') }}?v={{ @filemtime(public_path('css/tokens.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) }}">
     {{-- Motion gate (Signal, marketplace pattern): flags motion availability
          before first paint so reveal states never flash. Never adds the flag
          under prefers-reduced-motion. --}}
@@ -19,7 +23,7 @@
             }
         } catch (e) { /* no motion flags without JS APIs */ }
     </script>
-    <script type="module" src="{{ asset('js/motion.js') }}"></script>
+    <script type="module" src="{{ asset('js/motion.js') }}?v={{ @filemtime(public_path('js/motion.js')) }}"></script>
 </head>
 <body>
 <a class="skip" href="#main">{{ __('app.skip_to_content') }}</a>

@@ -51,7 +51,7 @@
                 <span class="reward-meta-icon" aria-hidden="true">
                     <span class="material-symbols-outlined is-20">{{ $affordable ? 'check_circle' : 'lock' }}</span>
                 </span>
-                <span style="min-width:0;">
+                <span class="min-w-0">
                     <span class="reward-meta-label">{{ __('app.student_reward_stock') }}</span>
                     <span class="reward-meta-value">
                         @if(! $reward->active)

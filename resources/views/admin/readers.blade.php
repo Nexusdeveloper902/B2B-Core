@@ -1,8 +1,8 @@
 {{--
     TASK-027 — the reader management desk (/admin/readers): rename a
-    reader and switch its active mode in one update. The dashboard's
-    quick mode-form stays; this is the full management surface (gap
-    closed: "change a reader's mode and name"). Writes go to
+    reader and switch its active mode in one update. Since TASK-035
+    this is the ONLY readers surface (the admin dashboard's quick
+    mode-form is gone). Writes go to
     PUT /api/v1/admin/readers/{id} (label + active_event_type).
 
     TASK-030-B (ADR-045) — the desk grows up: readers are CREATED here
@@ -25,7 +25,10 @@
     <p class="lede-sub">{{ __('app.readers_page_sub') }}</p>
 </div>
 
-<section class="grid-2 grid-2-wide-left" data-reveal>
+{{-- TASK-034 — even split (not wide-left): the 4-column editable
+      roster needs the width more than the create form does; the
+      action buttons were scrolling out of the narrow panel. --}}
+<section class="grid-2" data-reveal>
     {{-- Create a reader (the key comes back exactly once). --}}
     <x-panel :label="__('app.create_reader')" rule>
         <form id="reader-create-form" class="tool-form">
@@ -79,7 +82,7 @@
                                 @endforeach
                             </select>
                         </td>
-                        <td data-label="">
+                        <td data-label="" class="row-actions">
                             <button type="button" class="btn btn-primary btn-small reader-save"
                                     data-reader="{{ $reader->id }}">
                                 {{ __('app.save_reader') }}
@@ -99,6 +102,8 @@
         <div id="reader-result" class="nl-answer hidden" aria-live="polite"></div>
     </x-panel>
 </section>
+
+<x-confirm-modal id="reader-confirm" />
 
 {{-- TASK-029 — the desk is LIVE: reader changes (from either surface —
       this page or the admin dashboard's mode form) repaint the row the
@@ -204,6 +209,7 @@
             modeCell.appendChild(buildModeSelect(r.id, r.active_event_type));
 
             var actionCell = document.createElement('td');
+            actionCell.className = 'row-actions';
             var save = document.createElement('button');
             save.type = 'button';
             save.className = 'btn btn-primary btn-small reader-save';
@@ -303,27 +309,30 @@
                 return;
             }
 
-            // TASK-030-B — rotate the key behind a confirm (the deployed
-            // reader bricks until re-flashed — same grammar as unpair).
-            // The new key renders EXACTLY ONCE, in this result box.
+            // TASK-034 — rotate the key behind the Datum confirm modal
+            // (the deployed reader bricks until re-flashed). The new key
+            // renders EXACTLY ONCE, in this result box.
             if (rotateBtn) {
-                var really = window.confirm(
-                    ROTATE_CONFIRM.replace(':LABEL:', rotateBtn.dataset.label || '')
-                );
-                if (!really) { return; }
-                busy(rotateBtn, true);
-                postJson('/api/v1/admin/readers/' + rotateBtn.dataset.reader + '/rotate-key', {})
-                    .then(function (r) {
-                        busy(rotateBtn, false);
-                        var text = (r.data && r.data.message) || ERROR_GENERIC_MSG;
-                        if (r.ok && r.data && r.data.api_key) {
-                            text += '\n' + r.data.api_key_notice + '\n' + r.data.api_key;
-                        }
-                        show(resultBox, text, r.ok);
-                    }).catch(function () {
-                        busy(rotateBtn, false);
-                        show(resultBox, ERROR_GENERIC_MSG, false);
-                    });
+                window.DatumConfirm.open('reader-confirm', {
+                    title: ROTATE_LABEL,
+                    message: ROTATE_CONFIRM.replace(':LABEL:', rotateBtn.dataset.label || ''),
+                    confirmLabel: ROTATE_LABEL,
+                    onConfirm: function () {
+                        busy(rotateBtn, true);
+                        postJson('/api/v1/admin/readers/' + rotateBtn.dataset.reader + '/rotate-key', {})
+                            .then(function (r) {
+                                busy(rotateBtn, false);
+                                var text = (r.data && r.data.message) || ERROR_GENERIC_MSG;
+                                if (r.ok && r.data && r.data.api_key) {
+                                    text += '\n' + r.data.api_key_notice + '\n' + r.data.api_key;
+                                }
+                                show(resultBox, text, r.ok);
+                            }).catch(function () {
+                                busy(rotateBtn, false);
+                                show(resultBox, ERROR_GENERIC_MSG, false);
+                            });
+                    }
+                });
             }
         });
 

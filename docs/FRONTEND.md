@@ -82,7 +82,7 @@ state now boots the realtime client and updates live:
 
 | Page | Live channel(s) | What moves without a reload |
 |---|---|---|
-| Admin dashboard | tap + recycling + roster | KPI strip (distinct-student Sets for attendance/PAE), recycling totals, readers table, live feed |
+| Admin dashboard | tap + recycling | KPI strip (distinct-student Sets for attendance/PAE), recycling totals, live feed (the readers table moved to the /admin/readers desk — TASK-035) |
 | Teacher dashboard | tap | attendance rows, per-class summary chips, KPI strip (all scope-fenced server-side, as before) |
 | Students desk | roster (admin frames + hello replay) | created/imported students prepend idempotently; created classes join the select |
 | Readers desk | roster | label/mode repaint (never clobbers the input you're typing in) |
@@ -100,9 +100,15 @@ it describes (`student_created`, `students_imported`, `class_created`,
 connections only (same exposure discipline as pairing frames), with the
 recent snapshot riding the admin hello (idempotent replay).
 
-GUI completion: grade is a SELECT (`0°`–`11°` — no more typing the
-degree sign), class creation lives in the students desk
-(`POST /api/v1/admin/classes`, optional homeroom teacher), the CSV
+GUI completion: grade is a SELECT (`1°`–`11°`, no grade 0 — no more
+typing the degree sign), the seeder ships an A/B class pair per
+grade (`1° A`…`11° B`), class creation lives in the students desk
+(`POST /api/v1/admin/classes`, optional homeroom teacher), the grade
+picker filters the class picker to that grade's A/B with the first
+match auto-selected (TASK-034 — `data-grade` tags; custom names show
+all), the roster search filters live as you type (debounced
+fetch-swap of tbody + pagination, same URL, no new endpoint; the
+GET form stays as the no-JS fallback), the CSV
 import file input got the design-system surface, and the paginator now
 renders in Datum (a `pagination::tailwind` vendor override — the stock
 Tailwind pager markup never matched this CSS; students desk + history
@@ -141,18 +147,24 @@ The readers desk grew a creation panel (name + type + initial mode):
 and the desk shows the key EXACTLY ONCE in the result box (the
 student-login display-once rule, ADR-045) while prepending the full
 editable row — fetch-first, `reader_created` frame replay no-ops. Each
-row also carries a Rotate key button behind a confirm (rotation bricks
-the fielded reader until re-flashed — the unpair confirm grammar); the
-fresh key renders once in the same result box. The table always renders
+row also carries a Rotate key button behind the shared Datum confirm
+modal (TASK-034 — `x-confirm-modal`: panel card, alert-box message,
+quiet Cancel + danger Confirm, Esc/backdrop cancel, focus return; the
+pairing desk's Unpair uses the same modal, and no view ships
+`window.confirm` anymore — pinned by test). Rotation bricks the
+fielded reader until re-flashed; the fresh key renders once in the
+same result box. The roster panel takes
+an even grid split (the 4-column table scrolled its action buttons
+out of the narrow panel), action cells are a flex row with gap, and
+the label input flexes with its column. The table always renders
 (an empty-row, never no-table) so live arrivals prepend from zero, and
 save/rotate clicks are delegated so live-prepended rows behave like
 server-rendered ones. No key ever reaches the HTML again: the desk
 greps clean by test.
 
-Honest limit: the admin dashboard's readers table repaints on
-`reader_updated` but does not prepend on `reader_created` (it has no
-row-builder — births appear there after a reload). The readers desk is
-the live surface for births.
+Readers live on their own desk only (TASK-035 removed the dashboard's
+readers table — mode changes happen at /admin/readers, whose rows
+repaint AND prepend live).
 
 ## 3e. TASK-030 (Fix 3) — presence, units, and a lived-in demo
 

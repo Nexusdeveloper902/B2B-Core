@@ -20,7 +20,7 @@
                 <p class="auth-band-title">{{ __('app.app_name') }}</p>
                 <p class="auth-band-sub">{{ __('app.password_change_band_sub') }}</p>
             </div>
-            <span class="material-symbols-outlined is-16" aria-hidden="true" style="margin-left:auto; color: var(--text-meta);">key</span>
+            <span class="material-symbols-outlined is-16 auth-band-icon" aria-hidden="true">key</span>
         </div>
 
         <div class="auth-body">

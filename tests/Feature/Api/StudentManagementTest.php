@@ -80,7 +80,7 @@ class StudentManagementTest extends TestCase
     #[Test]
     public function a_duplicate_name_in_the_same_class_is_rejected(): void
     {
-        $class = SchoolClass::firstOrFail();
+        $class = SchoolClass::where('name', '5° B')->firstOrFail();
 
         $response = $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/students', [

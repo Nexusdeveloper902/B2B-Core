@@ -25,8 +25,8 @@
 <section class="grid-2 grid-2-wide-left" data-reveal>
     {{-- Arming table: one click per student (replaces the curl+PAT dance) --}}
     <x-panel :label="__('app.students')" rule>
-        <div class="filterbar" style="margin-bottom: var(--sp-sm); box-shadow:none; padding: var(--sp-2xs);">
-            <div class="searchbox" style="flex:1 1 auto;">
+        <div class="filterbar filterbar--flush">
+            <div class="searchbox">
                 <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
                 <input type="search" id="roster-search" aria-label="{{ __('app.search_students') }}"
                        placeholder="{{ __('app.search_students') }}" autocomplete="off">
@@ -175,6 +175,8 @@
     </x-panel>
 </section>
 
+<x-confirm-modal id="unpair-confirm" />
+
 <script src="{{ asset('js/realtime.js') }}"></script>
 <script>
     (function () {
@@ -201,6 +203,7 @@
         // text come from the same lang files the server renders with.
         var unpairBtns = Array.prototype.slice.call(document.querySelectorAll('.unpair-btn'));
         var UNPAIRED_TEXT = {!! Js::from(__('app.unpaired')) !!};
+        var UNPAIR_LABEL = {!! Js::from(__('app.unpair')) !!};
         var NO_CARD_TEXT = {!! Js::from(__('app.no_card')) !!};
 
         // TASK-017 — the armed window as a draining progress bar.
@@ -485,34 +488,38 @@
         unpairBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var confirmTpl = {!! Js::from(__('app.unpair_confirm', ['uid' => ':UID:', 'student' => ':NAME:'])) !!};
-                var really = window.confirm(
-                    confirmTpl.replace(':UID:', btn.dataset.uid || '').replace(':NAME:', btn.dataset.name || '')
-                );
-                if (!really) { return; }
-
-                btn.disabled = true;
-                deleteJson('/api/v1/admin/cards/' + btn.dataset.unpair)
-                    .then(function (r) {
-                        btn.disabled = false;
-                        if (r.ok) {
-                            var row = document.querySelector('tr[data-student-row="' + btn.dataset.student + '"]');
-                            var chip = row ? row.querySelector('[data-card-chip="' + btn.dataset.unpair + '"]') : null;
-                            if (chip) { chip.remove(); }
-                            var cell = row ? row.querySelector('[data-card-cell]') : null;
-                            if (cell && !cell.querySelector('[data-card-chip]')) {
-                                cell.textContent = NO_CARD_TEXT;
-                            }
-                            setState(UNPAIRED_TEXT, true);
-                        } else {
-                            setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
-                        }
-                    })
-                    .catch(function () {
-                        btn.disabled = false;
-                        setState({!! Js::from(__('app.error_generic')) !!}, false);
-                    });
+                window.DatumConfirm.open('unpair-confirm', {
+                    title: UNPAIR_LABEL,
+                    message: confirmTpl.replace(':UID:', btn.dataset.uid || '').replace(':NAME:', btn.dataset.name || ''),
+                    confirmLabel: UNPAIR_LABEL,
+                    onConfirm: function () { doUnpair(btn); }
+                });
             });
         });
+
+        function doUnpair(btn) {
+            btn.disabled = true;
+            deleteJson('/api/v1/admin/cards/' + btn.dataset.unpair)
+                .then(function (r) {
+                    btn.disabled = false;
+                    if (r.ok) {
+                        var row = document.querySelector('tr[data-student-row="' + btn.dataset.student + '"]');
+                        var chip = row ? row.querySelector('[data-card-chip="' + btn.dataset.unpair + '"]') : null;
+                        if (chip) { chip.remove(); }
+                        var cell = row ? row.querySelector('[data-card-cell]') : null;
+                        if (cell && !cell.querySelector('[data-card-chip]')) {
+                            cell.textContent = NO_CARD_TEXT;
+                        }
+                        setState(UNPAIRED_TEXT, true);
+                    } else {
+                        setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    setState({!! Js::from(__('app.error_generic')) !!}, false);
+                });
+        }
 
         // Start following immediately: ACTIVE when a window is live (page
         // load / F5 mid-window — the rejection note comes with it), else

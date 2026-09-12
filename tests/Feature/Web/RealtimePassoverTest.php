@@ -53,8 +53,11 @@ class RealtimePassoverTest extends TestCase
         $page->assertOk()
             // The grade SELECT (no more typing "5°" with the degree sign)
             ->assertSee('id="student-grade"', false)
-            ->assertSee('<option value="0°">0°</option>', false)
+            ->assertSee('<option value="1°">1°</option>', false)
+            ->assertSee('>5° A</option>', false)
+            ->assertSee('>11° B</option>', false)
             ->assertSee('<option value="11°">11°</option>', false)
+            ->assertDontSee('<option value="0°">', false)
             // The class creation form (with the optional teacher select)
             ->assertSee('id="class-create-form"', false)
             ->assertSee('id="class-name"', false)
@@ -103,8 +106,11 @@ class RealtimePassoverTest extends TestCase
     }
 
     #[Test]
-    public function the_admin_dashboard_kpi_strip_and_readers_table_go_live(): void
+    public function the_admin_dashboard_kpi_strip_goes_live_without_a_readers_table(): void
     {
+        // TASK-035 — the readers table left the admin dashboard (the
+        // /admin/readers desk is the readers surface now): KPIs stay
+        // live, no reader rows/mode forms ride this page anymore.
         $page = $this->actingAs($this->admin())->get('/admin');
 
         $page->assertOk()
@@ -113,11 +119,11 @@ class RealtimePassoverTest extends TestCase
             ->assertSee('data-stat="pae_lunch"', false)
             ->assertSee('data-stat="recycling_items"', false)
             ->assertSee('data-stat="recycling_points"', false)
-            ->assertSee('data-reader-row', false)
+            ->assertDontSee('data-reader-row', false)
+            ->assertDontSee('mode-form', false)
             // the PAE/attendance taps are distinct-student counts — the
             // JS must keep per-student seen sets, not raw ++ counters
             ->assertSee('seen.attendance')
-            ->assertSee('realtime:roster')
             ->assertSee('realtime:recycling');
     }
 

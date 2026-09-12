@@ -118,7 +118,7 @@ class FunctionRegistryTest extends TestCase
     #[Test]
     public function attendance_count_scopes_to_class(): void
     {
-        $classId = SchoolClass::first()->id;
+        $classId = SchoolClass::where('name', '5° B')->firstOrFail()->id;
         $today = now()->toDateString();
 
         $result = $this->registry->execute('get_attendance_count', ['date' => $today, 'class_id' => $classId]);

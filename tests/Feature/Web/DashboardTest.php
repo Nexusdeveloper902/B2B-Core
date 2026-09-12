@@ -73,8 +73,10 @@ class DashboardTest extends TestCase
     }
 
     #[Test]
-    public function the_admin_dashboard_shows_school_wide_stats_and_reader_controls(): void
+    public function the_admin_dashboard_shows_school_wide_stats_without_reader_controls(): void
     {
+        // TASK-035 — the readers table left this page (the
+        // /admin/readers desk is the readers surface now).
         PresenceEvent::create([
             'card_id' => $this->cardOf('Maria González')->id,
             'reader_id' => $this->reader('classroom')->id,
@@ -91,8 +93,11 @@ class DashboardTest extends TestCase
         $response = $this->actingAs($this->user('admin'))->get('/admin');
 
         $response->assertOk()
-            ->assertSee('Demo Reader — Classroom/PAE')
-            ->assertSee('Demo Reader — Recycling')
+            ->assertDontSee('mode-form', false)
+            ->assertDontSee('reader-mode-result', false)
+            // TASK-035 follow-up: the full-width NL section carries the
+            // page's section rhythm itself (bare sections touch).
+            ->assertSee('class="section-gap"', false)
             ->assertSee('CLASS_ATTENDANCE')
             ->assertSee('PAE_BREAKFAST')
             ->assertSeeText('1'); // attendance + pae counts
@@ -351,7 +356,10 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString('ledger-table" data-stack', $teacherHtml);
         $this->assertStringContainsString('data-label="Status"', $teacherHtml);
         $this->assertStringContainsString('data-label="Tapped at"', $teacherHtml);
-        $this->assertStringContainsString('ledger-table" data-stack', $adminHtml);
+        // TASK-035 — the admin dashboard carries no table anymore (its
+        // readers table moved to the /admin/readers desk), so there is
+        // nothing to stack here — and nothing that can h-scroll.
+        $this->assertStringNotContainsString('ledger-table', $adminHtml);
 
         $css = file_get_contents(public_path('css/app.css'));
         $this->assertStringContainsString('.ledger-table[data-stack] tbody td::before', $css);
@@ -457,6 +465,49 @@ class DashboardTest extends TestCase
         // the chip tone mapping rides the semantic roles too
         $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="PAE_"\]\s*{[^}]*var\(--surface-variant\)/', $css);
         $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="RECYCLING_"\]\s*{[^}]*var\(--primary\)[^}]*var\(--tertiary-fixed\)/', $css);
+    }
+
+    #[Test]
+    public function text_boxes_and_dropdowns_share_the_alert_surface_language(): void
+    {
+        // TASK-032 — inputs, dropdowns, search and file controls render
+        // the .nl-answer/.notice surface (lowest fill, 1px border, 2px
+        // radius); dropdowns carry a CSS chevron (native arrows differ
+        // per browser); the alerts themselves are untouched. Previously
+        // unstyled bits (.check-line, hr.rule, the pairing idle note)
+        // and the table→answer gap are pinned too.
+        $css = file_get_contents(public_path('css/app.css'));
+
+        $this->assertMatchesRegularExpression(
+            '/\.field input, \.field select, \.field textarea,\s*\.bare-input, \.bare-select,\s*\.searchbox input,\s*\.file-row input\[type="file"\]\s*{[^}]*background:\s*var\(--surface-container-lowest\);[^}]*border:\s*1px solid var\(--border\);[^}]*border-radius:\s*var\(--radius-sm\);/',
+            $css,
+        );
+        $this->assertStringContainsString('.field select, .bare-select', $css);
+        $this->assertStringContainsString('appearance: none;', $css);
+        $this->assertStringContainsString('.check-line input[type="checkbox"]', $css);
+        $this->assertStringContainsString('.rule {', $css);
+        $this->assertMatchesRegularExpression('/^\.live-empty\s*{/m', $css);
+        $this->assertStringContainsString('.ledger-wrap + .nl-answer', $css);
+        // the answer/alert tones are unchanged (gold ok, error-container)
+        $this->assertMatchesRegularExpression('/\.answer-ok\s*{[^}]*var\(--tertiary-fixed\)/', $css);
+        $this->assertMatchesRegularExpression('/\.answer-error\s*{[^}]*var\(--error-container\)/', $css);
+
+        // the desks actually render the shared classes (no layout
+        // inline styles survive — the goal-meter width is data, not
+        // layout, and keeps its style attribute by design)
+        $pairingHtml = $this->actingAs($this->user('admin'))->get('/admin/pairing')->getContent();
+        $this->assertStringContainsString('filterbar filterbar--flush', $pairingHtml);
+        $studentsHtml = $this->actingAs($this->user('admin'))->get('/admin/students')->getContent();
+        $this->assertStringContainsString('class="check-line"', $studentsHtml);
+        $this->assertStringContainsString('<hr class="rule">', $studentsHtml);
+        $this->assertStringNotContainsString('style="margin-bottom', $pairingHtml);
+        $this->assertStringNotContainsString('style="flex:1 1 auto', $pairingHtml);
+        // stylesheets ship versioned (filemtime): without this, a CSS
+        // pass is invisible behind the browser's heuristic cache until
+        // a force-refresh — exactly the "still looks the same" report.
+        $this->assertMatchesRegularExpression('/css\/app\.css\?v=\d+/', $pairingHtml);
+        $this->assertMatchesRegularExpression('/css\/tokens\.css\?v=\d+/', $pairingHtml);
+        $this->assertMatchesRegularExpression('/js\/motion\.js\?v=\d+/', $pairingHtml);
     }
 
     private function user(string $role): User

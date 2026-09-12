@@ -89,7 +89,7 @@ actualiza en vivo:
 
 | Página | Canal(es) en vivo | Qué se mueve sin recargar |
 |---|---|---|
-| Panel admin | tap + reciclaje + roster | franja KPI (Sets de estudiantes distintos para asistencia/PAE), totales de reciclaje, tabla de lectores, feed en vivo |
+| Panel admin | tap + reciclaje | franja KPI (Sets de estudiantes distintos para asistencia/PAE), totales de reciclaje, feed en vivo (la tabla de lectores se mudó al escritorio /admin/readers — TASK-035) |
 | Panel del profesor | tap | filas de asistencia, chips de resumen por clase, franja KPI (todo con alcance por rol en el servidor, como siempre) |
 | Escritorio de estudiantes | roster (marcos admin + replay del hello) | los estudiantes creados/importados se anteponen de forma idempotente; las clases creadas se unen al select |
 | Escritorio de lectores | roster | etiqueta/modo se repintan (nunca pisa el input que estás tecleando) |
@@ -108,8 +108,14 @@ entregada solo a conexiones admin (la misma disciplina de exposición
 del canal de emparejamiento), con el snapshot reciente viajando en el
 hello del admin (replay idempotente).
 
-Completación de GUI: el grado es un SELECT (`0°`–`11°` — se acabó
-teclear el signo de grado), la creación de clases vive en el escritorio
+Completación de GUI: el grado es un SELECT (`1°`–`11°`, sin grado 0 —
+se acabó teclear el signo de grado), el seeder trae un par de clases
+A/B por grado (`1° A`…`11° B`), el selector de grado filtra el de
+clases al A/B de ese grado con el primer match auto-seleccionado
+(TASK-034 — tags `data-grade`; los nombres custom muestran todas),
+la búsqueda del roster filtra en vivo al teclear (fetch-swap con
+debounce de tbody + paginación, misma URL, sin endpoint nuevo; el
+form GET queda como fallback sin-JS), la creación de clases vive en el escritorio
 de estudiantes (`POST /api/v1/admin/classes`, profesor titular
 opcional), el input de archivo del importador CSV recibió la superficie
 del sistema de diseño, y el paginador ahora renderiza en Datum (una
@@ -155,18 +161,24 @@ EXACTAMENTE UNA VEZ en la caja de resultado (la regla de
 mostrar-una-sola-vez de los accesos, ADR-045) mientras antepone la fila
 editable completa — fetch primero, el replay del frame
 `reader_created` es no-op. Cada fila lleva además un botón Rotar clave
-tras un confirm (la rotación deja inservible el lector instalado hasta
-regrabarlo — la gramática del confirm de desvincular); la clave fresca
-se renderiza una vez en la misma caja. La tabla siempre renderiza (una
+tras el modal de confirmación compartido de Datum (TASK-034 —
+`x-confirm-modal`: tarjeta de panel, mensaje con gramática de alerta,
+Cancelar quieto + Confirmar danger, Esc/fondo cancelan, el foco
+vuelve; Desvincular del escritorio de pairing usa el mismo modal, y
+ninguna vista trae `window.confirm` — pineado por test). La rotación
+deja inservible el lector instalado hasta regrabarlo; la clave fresca
+se renderiza una vez en la misma caja. El panel del roster toma split
+even de grilla (la tabla de 4 columnas sacaba sus botones de acción
+fuera del panel angosto), las celdas de acción son fila flex con gap,
+y el input de nombre flexiona con su columna. La tabla siempre renderiza (una
 fila vacía, nunca sin tabla) para que las llegadas en vivo antepongan
 desde cero, y los clics de guardar/rotar son delegados para que las
 filas en vivo se comporten como las del servidor. Ninguna clave vuelve
 al HTML jamás: el escritorio queda limpio por test.
 
-Límite honesto: la tabla de lectores del panel admin repinta con
-`reader_updated` pero no antepone con `reader_created` (no tiene
-constructor de filas — los nacimientos aparecen allí tras recargar).
-El escritorio de lectores es la superficie en vivo para nacimientos.
+Los lectores viven solo en su escritorio (TASK-035 quitó la tabla de
+lectores del panel — los cambios de modo se hacen en /admin/readers,
+cuyas filas repintan Y anteponen en vivo).
 
 ## 3e. TASK-030 (Fix 3) — presencia, unidades y una demo vivida
 

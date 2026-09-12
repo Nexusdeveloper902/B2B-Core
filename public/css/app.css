@@ -14,8 +14,7 @@
      .js-tap-status, .js-tap-time, tr[data-student-row], .js-row-flash.
    - admin scripts toggle .is-loading on .btn, write .nl-answer
      answer-ok|answer-error, read #nl-query-form/#nl-question/#nl-answer/
-     #redeem-form/#redeem-student/#redeem-reward/#redeem-result/.mode-form/
-     .mode-select.
+     #redeem-form/#redeem-student/#redeem-reward/#redeem-result.
    - pairing desk: #pairing-state .nl-answer answer-ok|error,
      #pairing-countdown.countdown .countdown-fill .is-low, .arm-btn,
      [data-card-cell], #recent-body, #pairing-idle/.live-empty.
@@ -942,6 +941,12 @@ img { max-width: 100%; }
 }
 
 /* ---------- Forms ---------- */
+/* One control surface across the app: text boxes, dropdowns, search
+   and file inputs share the alert/result-box language (lowest-surface
+   fill, 1px border, 2px radius, body type) — the alerts themselves
+   (.nl-answer/.notice) are unchanged. Sizes stay role-based (.field =
+   44px auth fields, .bare-* = 38px dense desk controls); the surface
+   itself never changes. */
 .field { display: flex; flex-direction: column; gap: var(--sp-2xs); margin-bottom: var(--sp-md); }
 .field label {
     font: 600 var(--fs-label-md)/var(--lh-label-md) var(--font-label);
@@ -951,27 +956,50 @@ img { max-width: 100%; }
 }
 input, select, textarea { font-family: var(--font-body); font-size: var(--fs-body-md); color: var(--text); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: 0; }
+::placeholder { color: var(--text-meta); opacity: 1; }
+input:disabled, select:disabled, textarea:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.field input, .field select {
-    width: 100%;
-    min-height: 44px;
-    padding: 10px var(--sp-md);
+.field input, .field select, .field textarea,
+.bare-input, .bare-select,
+.searchbox input,
+.file-row input[type="file"] {
     background: var(--surface-container-lowest);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    color: var(--text);
     transition: border-color var(--dur);
 }
-.field input:hover, .field select:hover { border-color: var(--border-strong); }
-.field input[aria-invalid="true"] { border-color: var(--error); }
+.field input:hover, .field select:hover, .field textarea:hover,
+.bare-input:hover, .bare-select:hover,
+.searchbox input:hover,
+.file-row input[type="file"]:hover { border-color: var(--border-strong); }
+.field input[aria-invalid="true"], .bare-input[aria-invalid="true"] { border-color: var(--error); }
+
+.field input, .field select, .field textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px var(--sp-md);
+}
 
 .bare-select, .bare-input {
     min-height: 38px;
     padding: 7px var(--sp-sm);
-    background: var(--surface-container-lowest);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
     max-width: 100%;
 }
+
+/* Dropdowns carry their own chevron (native arrows differ per
+   browser — the unstyled-select complaint); the right gutter stays
+   wide on every control so mixed input/select rows align. */
+.field select, .bare-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: var(--sp-xl);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235d5f5c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--sp-sm) center;
+    background-size: 16px 16px;
+}
+select::-ms-expand { display: none; }
 .field-hint { font-size: var(--fs-body-sm); color: var(--text-muted); }
 .field-error { color: var(--on-error-container); font-size: var(--fs-body-sm); background: var(--error-container); padding: 4px 8px; border-radius: var(--radius-sm); margin: 0; }
 
@@ -990,10 +1018,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     max-width: 100%;
     min-height: 38px;
     padding: 7px var(--sp-sm);
-    background: var(--surface-container-lowest);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    max-width: 100%;
     color: var(--text-muted);
 }
 .file-row input[type="file"]::file-selector-button {
@@ -1014,11 +1038,96 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
    style="text-align:right" on ledger cells — one rule, one truth). */
 .ta-right { text-align: right; }
 
+/* Shared bits the views used to inline (same pattern: one rule,
+   one truth — nothing here restyles the alerts themselves). */
+.min-w-0 { min-width: 0; }
+.t-uppercase { text-transform: uppercase; }
+.rule { border: none; border-top: 1px solid var(--border); margin: var(--sp-md) 0; }
+.check-line {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2xs);
+    font-size: var(--fs-body-sm);
+    color: var(--text-body);
+    cursor: pointer;
+}
+.check-line input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); flex-shrink: 0; }
+/* The pairing desk's idle note owns this grammar directly (the feed's
+   empty row keeps its own .live-row.live-empty rule). */
+.live-empty {
+    margin: 0;
+    padding: var(--sp-md);
+    text-align: center;
+    font: 500 var(--fs-body-sm)/var(--lh-body-sm) var(--font-mono);
+    color: var(--text-meta);
+}
+/* Nested filterbar inside the pairing roster panel (flush variant). */
+.filterbar--flush { margin-bottom: var(--sp-sm); box-shadow: none; padding: var(--sp-2xs); }
+.filterbar--flush .searchbox { flex: 1 1 auto; }
+.table-note--inset { margin-top: var(--sp-sm); border-radius: var(--radius-sm); }
+.auth-band-icon { margin-left: auto; color: var(--text-meta); }
+.capture-meta { margin-top: var(--sp-2xs); }
+.metric-value--inline { display: inline-flex; align-items: center; gap: 6px; }
+.metric-value--inline .material-symbols-outlined { color: var(--tertiary-fixed-dim); }
+/* A result box under a ledger table sits one step below it — the
+   same gap a tool-form's own bottom margin gives form-led answers. */
+.ledger-wrap + .nl-answer { margin-top: var(--sp-sm); }
+/* Single-panel sections (no grid to carry the rhythm): the same
+   sp-md section step the grids put below themselves. Vertical
+   margins collapse, so stacked sections never double the gap. */
+.section-gap { margin-block: var(--sp-md); }
+
+/* ---------- Confirm modal (TASK-034) ---------- */
+/* Shared Datum replacement for window.confirm(): a panel-surface
+   card on a dimmed backdrop, the message in alert-box grammar,
+   quiet Cancel + destructive Confirm. Opened via
+   window.DatumConfirm.open() — focus moves in, Esc/backdrop cancel,
+   focus returns to the trigger. */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-md);
+    background: rgba(18, 21, 15, 0.55);
+}
+.modal-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--surface-container-lowest);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: var(--sp-lg);
+}
+.modal-title {
+    margin: 0 0 var(--sp-sm);
+    font-family: var(--font-display);
+    font-size: var(--fs-headline-sm);
+    line-height: var(--lh-headline-sm);
+    letter-spacing: var(--ls-headline-sm);
+    font-weight: var(--fw-headline-sm);
+    color: var(--text);
+}
+/* Double class on purpose: .nl-answer's own margin: 0 sits later in
+   this file and ties specificity — this must win regardless. */
+.modal-message.nl-answer { margin: 0 0 var(--sp-md); }
+.modal-actions { display: flex; gap: var(--sp-2xs); justify-content: flex-end; flex-wrap: wrap; }
+.btn-danger { background: var(--error); color: var(--on-error); }
+.btn-danger:hover { background: var(--on-error-container); }
+/* Cramped action cells (readers desk): two small buttons share one
+   narrow td — flex + gap keeps them side by side with air, wrapping
+   with rhythm instead of touching when the cell runs out. */
+.row-actions { display: flex; gap: var(--sp-2xs); flex-wrap: wrap; align-items: center; }
+/* Editable ledger cells (readers desk): the label input flexes with
+   its column instead of forcing its intrinsic width on the table —
+   that forced width is what pushed the actions out of the panel. */
+.ledger-table .bare-input { width: 100%; min-width: 120px; }
+
 /* The teacher dashboard's searchbox owned its flex sizing inline; the
    rule belongs to the filterbar pair it lives in. */
 .filterbar .searchbox { flex: 1 1 320px; }
-.mode-form { display: flex; gap: var(--sp-2xs); align-items: center; flex-wrap: wrap; }
-.mode-form .mode-select { flex: 1 1 130px; min-width: 0; }
 
 .pw-wrap { position: relative; display: flex; }
 .pw-wrap input { padding-right: 76px; }
@@ -1061,7 +1170,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     color: var(--on-error-container);
 }
 
-.notices { display: flex; flex-direction: column; gap: var(--sm, var(--sp-sm)); }
+.notices { display: flex; flex-direction: column; gap: var(--sp-sm); }
 .notice {
     display: flex;
     align-items: flex-start;
@@ -1088,12 +1197,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     width: 100%;
     min-height: 38px;
     padding: 7px var(--sp-sm) 7px 34px;
-    background: var(--surface-container);
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
     font-size: var(--fs-body-sm);
 }
-.searchbox input:focus { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--surface-container-lowest); }
 
 /* Filter pills (mockup "Interactive Filters and Search Tooling") */
 .filterbar {
@@ -1396,7 +1501,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
 .reward-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--sp-lg);
+    gap: var(--sp-md);
     margin-bottom: var(--sp-md);
 }
 .reward-card {
@@ -1629,8 +1734,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); o
     .stat-strip .stat:first-child { grid-column: span 1; }
     .reward-grid { grid-template-columns: 1fr; }
     .demo-chips { grid-template-columns: 1fr; }
-    .tool-form, .mode-form { flex-direction: column; align-items: stretch; }
-    .tool-form .bare-input, .mode-form .mode-select { width: 100%; flex: 1 1 auto; min-width: 0; }
+    .tool-form { flex-direction: column; align-items: stretch; }
+    .tool-form .bare-input { width: 100%; flex: 1 1 auto; min-width: 0; }
     .btn, .linklike { width: 100%; }
     .linklike { min-height: var(--tap); }
     .stat-value { font-size: 28px; }

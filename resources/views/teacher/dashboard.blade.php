@@ -55,7 +55,7 @@
         <input type="search" id="student-search" aria-label="{{ __('app.search_students') }}"
                placeholder="{{ __('app.search_students') }}" autocomplete="off">
     </div>
-    <span class="t-label-sm muted" style="text-transform:uppercase;">{{ __('app.today_attendance') }}</span>
+    <span class="t-label-sm muted t-uppercase">{{ __('app.today_attendance') }}</span>
 </div>
 
 {{-- TASK-027 — the teacher's own NL query desk: same endpoint as the

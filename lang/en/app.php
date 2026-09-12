@@ -159,6 +159,7 @@ return [
     'welcome_short' => 'Welcome',
     'yes' => 'Yes',
     'no' => 'No',
+    'modal_cancel' => 'Cancel',
     'enrolled' => 'Enrolled',
     'search_students' => 'Search students…',
 
@@ -207,7 +208,7 @@ return [
     'leaderboard_top3' => 'Top 3',
 
     // Admin
-    'admin_dashboard_sub' => 'Campus-wide attendance, PAE meals, recycling yields and reader hardware.',
+    'admin_dashboard_sub' => 'Campus-wide attendance, PAE meals and recycling yields.',
 
     // EcoStation
     'ecostation' => 'EcoStation',

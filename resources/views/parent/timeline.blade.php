@@ -24,7 +24,7 @@
 {{-- 01 // Bilingual scope notice banner --}}
 <section class="scope-banner" aria-label="{{ __('app.parent_timeline', ['name' => $student->name]) }}">
     <span class="scope-icon" aria-hidden="true"><span class="material-symbols-outlined is-20">info</span></span>
-    <div style="min-width:0;">
+    <div class="min-w-0">
         <div class="scope-tags">
             <span class="scope-tag">{{ __('app.scope_tag') }}</span>
             <span class="scope-tag mono">{{ __('app.student_record') }} #{{ $student->id }}</span>
@@ -40,13 +40,13 @@
         <div class="profile-avatar" aria-hidden="true">
             {{ strtoupper(mb_substr(explode(' ', trim($student->name))[0], 0, 1) . mb_substr(explode(' ', trim($student->name))[1] ?? '', 0, 1)) }}
         </div>
-        <div style="min-width:0;">
+        <div class="min-w-0">
             <div class="profile-eyebrow">
                 {{ __('app.student_record') }}
                 <span class="sep">·</span>
                 {{ __('app.student_id') }} #{{ $student->id }}
             </div>
-            <h2 class="profile-name" style="margin:0;">{{ $student->name }}</h2>
+            <h2 class="profile-name">{{ $student->name }}</h2>
             <div class="profile-meta">
                 <span>{{ __('app.class') }}: <strong>{{ $student->schoolClass?->name ?? '—' }}</strong></span>
                 <span class="sep">/</span>
@@ -85,8 +85,8 @@
         </div>
         <div>
             @if($student->pae_enrolled)
-                <span class="metric-value" style="display:inline-flex;align-items:center;gap:6px;">
-                    <span class="material-symbols-outlined is-20" aria-hidden="true" style="color:var(--tertiary-fixed-dim);">check_circle</span>
+                <span class="metric-value metric-value--inline">
+                    <span class="material-symbols-outlined is-20" aria-hidden="true">check_circle</span>
                     {{ __('app.pae_enrolled_yes') }}
                 </span>
             @else

@@ -34,13 +34,17 @@
                    placeholder="{{ __('app.student_name') }}" required
                    aria-label="{{ __('app.student_name') }}">
             <select id="student-grade" class="bare-select" required aria-label="{{ __('app.student_grade') }}">
-                @foreach(range(0, 11) as $gradeNumber)
+                {{-- TASK-033 — grades 1–11 (grade 0 does not exist). --}}
+                @foreach(range(1, 11) as $gradeNumber)
                     <option value="{{ $gradeNumber }}°">{{ $gradeNumber }}°</option>
                 @endforeach
             </select>
             <select id="student-class" class="bare-select" required aria-label="{{ __('app.student_class') }}">
                 @foreach($classes as $class)
-                    <option value="{{ $class->id }}">{{ $class->name }}</option>
+                    {{-- TASK-034 — data-grade couples this select to the
+                          grade picker above (custom names carry ''). --}}
+                    @php($classGrade = preg_match('/^(\d+)\s*°/', $class->name, $gradeMatch) ? $gradeMatch[1] : '')
+                    <option value="{{ $class->id }}" data-grade="{{ $classGrade }}">{{ $class->name }}</option>
                 @endforeach
             </select>
             <label class="check-line">
@@ -84,9 +88,11 @@
 
     {{-- Roster --}}
     <x-panel :label="__('app.students')" rule>
-        <form method="GET" action="{{ route('admin.students') }}" class="tool-form">
-            <input type="search" class="bare-input" name="q" value="{{ $search }}"
-                   placeholder="{{ __('app.search_students') }}" aria-label="{{ __('app.search_students') }}">
+        {{-- TASK-034 — the search filters live (debounced fetch-swap
+              below); the GET form stays as the no-JS fallback. --}}
+        <form method="GET" action="{{ route('admin.students') }}" class="tool-form" id="roster-search-form">
+            <input type="search" class="bare-input" id="roster-search" name="q" value="{{ $search }}"
+                   placeholder="{{ __('app.search_students') }}" aria-label="{{ __('app.search_students') }}" autocomplete="off">
             <button type="submit" class="btn btn-quiet">{{ __('app.search') }}</button>
             @if($search !== '')
                 <a class="btn btn-quiet" href="{{ route('admin.students') }}">{{ __('app.clear') }}</a>
@@ -140,7 +146,9 @@
             </table>
         </div>
 
-        {{ $students->links() }}
+        <div id="roster-pages">
+            {{ $students->links() }}
+        </div>
     </x-panel>
 </section>
 
@@ -309,13 +317,42 @@
             if (!select) { return; }
             var existing = select.querySelector('option[value="' + c.id + '"]');
             if (existing) {
-                if (c.name !== undefined) { existing.textContent = c.name; }
+                if (c.name !== undefined) {
+                    existing.textContent = c.name;
+                    var eg = /^(\d+)\s*°/.exec(String(c.name || ''));
+                    existing.dataset.grade = eg ? eg[1] : '';
+                }
+                syncClassesToGrade();
                 return;
             }
             var opt = document.createElement('option');
             opt.value = String(c.id);
             opt.textContent = String(c.name);
+            var g = /^(\d+)\s*°/.exec(String(c.name || ''));
+            opt.dataset.grade = g ? g[1] : '';
             select.appendChild(opt);
+            syncClassesToGrade();
+        }
+
+        // TASK-034 — grade/class coupling: picking a grade filters the
+        // class picker to that grade's A/B (first match auto-selected).
+        // Custom names with no grade prefix match nothing — then every
+        // class stays visible instead of stranding the picker empty.
+        var gradeSel = document.getElementById('student-grade');
+        var classSel = document.getElementById('student-class');
+        function syncClassesToGrade() {
+            if (!gradeSel || !classSel) { return; }
+            var g = String(gradeSel.value || '').replace('°', '');
+            var options = Array.prototype.slice.call(classSel.options);
+            var matches = options.filter(function (o) { return o.dataset.grade === g; });
+            var pool = matches.length ? matches : options;
+            options.forEach(function (o) { o.hidden = pool.indexOf(o) === -1; });
+            var current = classSel.selectedOptions && classSel.selectedOptions[0];
+            if (pool.indexOf(current) === -1 && pool.length) { classSel.value = pool[0].value; }
+        }
+        if (gradeSel) {
+            gradeSel.addEventListener('change', syncClassesToGrade);
+            syncClassesToGrade();
         }
 
         // The roster channel (admin-only frames; the hello snapshot
@@ -354,9 +391,65 @@
                 if (r.ok) {
                     if (r.data && r.data.student) { applyStudent(r.data.student); }
                     createForm.reset();
+                    syncClassesToGrade();
                 }
             }).catch(function () { busy(btn, false); });
         });
+
+        // TASK-034 — live roster search: debounced fetch against the
+        // SAME url the GET form submits (no new endpoint), swapping
+        // tbody + pagination in place. Race-guarded (a slow reply never
+        // overwrites newer typing), history kept shareable. Pagination
+        // links ride the same swap so the list never full-reloads.
+        var rosterForm = document.getElementById('roster-search-form');
+        var rosterInput = document.getElementById('roster-search');
+        var rosterPages = document.getElementById('roster-pages');
+        var searchTimer = null;
+        function paintRoster(html) {
+            var doc = null;
+            try {
+                doc = new DOMParser().parseFromString(html, 'text/html');
+            } catch (e) { return; }
+            var body = doc.getElementById('roster-body');
+            var live = document.getElementById('roster-body');
+            if (body && live) { live.innerHTML = body.innerHTML; }
+            var pages = doc.getElementById('roster-pages');
+            if (pages && rosterPages) { rosterPages.innerHTML = pages.innerHTML; }
+        }
+        function fetchRoster(url, q) {
+            fetch(url, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    if (rosterInput && rosterInput.value !== q) { return; }
+                    paintRoster(html);
+                    history.replaceState(null, '', url);
+                })
+                .catch(function () { /* keep the rendered rows on failure */ });
+        }
+        if (rosterForm && rosterInput) {
+            rosterInput.addEventListener('input', function () {
+                clearTimeout(searchTimer);
+                var q = rosterInput.value;
+                searchTimer = setTimeout(function () {
+                    var url = rosterForm.action + (q ? ('?q=' + encodeURIComponent(q)) : '');
+                    fetchRoster(url, q);
+                }, 220);
+            });
+            rosterForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearTimeout(searchTimer);
+                var q = rosterInput.value;
+                fetchRoster(rosterForm.action + (q ? ('?q=' + encodeURIComponent(q)) : ''), q);
+            });
+        }
+        if (rosterPages) {
+            rosterPages.addEventListener('click', function (e) {
+                var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+                if (!a) { return; }
+                e.preventDefault();
+                fetchRoster(a.href, rosterInput ? rosterInput.value : '');
+            });
+        }
 
         // TASK-030-A — one-click login backfill for pre-feature rows
         // (delegated: live-prepended rows carry their own buttons too).

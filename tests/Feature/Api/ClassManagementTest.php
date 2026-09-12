@@ -16,6 +16,9 @@ use Tests\TestCase;
  * the student desk's rule), teacher assignment is optional and
  * teacher-role-checked, and every committed create rides the roster
  * channel (one roster_updates row in the same transaction).
+ *
+ * TASK-033 — the seeder ships an A/B class pair per grade, so
+ * fresh-name fixtures here use the C variant.
  */
 class ClassManagementTest extends TestCase
 {
@@ -42,21 +45,21 @@ class ClassManagementTest extends TestCase
     {
         $response = $this->actingAs($this->admin(), 'sanctum')
             ->postJson('/api/v1/admin/classes', [
-                'name' => '6° A',
+                'name' => '6° C',
                 'teacher_user_id' => $this->teacher()->id,
             ]);
 
         $response->assertOk()
             ->assertJsonPath('status', 'ok')
-            ->assertJsonPath('class.name', '6° A')
+            ->assertJsonPath('class.name', '6° C')
             ->assertJsonPath('class.teacher_name', 'Prof. Elena Ramírez');
 
-        $this->assertDatabaseHas('classes', ['name' => '6° A']);
+        $this->assertDatabaseHas('classes', ['name' => '6° C']);
 
         // The roster channel frame — committed with the class.
         $frame = RosterUpdate::where('type', 'class_created')->latest('id')->first();
         $this->assertNotNull($frame, 'no class_created roster frame was written');
-        $this->assertSame('6° A', $frame->payload['name']);
+        $this->assertSame('6° C', $frame->payload['name']);
         $this->assertSame('Prof. Elena Ramírez', $frame->payload['teacher_name']);
     }
 
@@ -96,13 +99,13 @@ class ClassManagementTest extends TestCase
 
         $this->actingAs($this->admin(), 'sanctum')
             ->postJson('/api/v1/admin/classes', [
-                'name' => '8° A',
+                'name' => '8° C',
                 'teacher_user_id' => $student->id,
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('teacher_user_id');
 
-        $this->assertDatabaseMissing('classes', ['name' => '8° A']);
+        $this->assertDatabaseMissing('classes', ['name' => '8° C']);
     }
 
     #[Test]

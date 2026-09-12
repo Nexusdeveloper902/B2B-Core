@@ -952,3 +952,73 @@ The owner's eight HTML mockups are now the design source of truth:
 - Durable rule: a live page has THREE arrival paths (SSR, fetch
   response, WS frame) — idempotent update-or-prepend handlers are not
   optional polish, they are the correctness condition.
+
+## RUN-032 — TASK-032: UI controls & spacing passover (2026-09-12)
+
+- Owner: whole-UI pass — inconsistent spacing, text boxes + dropdowns
+  not styled like the alerts/pop-ups ("change those and keep the
+  same style"), docs per repo convention (docs/ twins + .agent
+  records — the "also .agent docs btw" half of the ask).
+- Controls moved TO the alerts, never the reverse: one shared
+  surface selector (field + bare + search + file + textarea —
+  lowest fill, 1px border, 2px radius), CSS chevron for dropdowns
+  (native arrows differ per browser), shared placeholder/disabled/
+  invalid. Sizes stay role-based (44px auth / 38px dense desks).
+  `.nl-answer`/`.notice` untouched — the reference did not move.
+- Unstyled, not mis-styled: `.check-line`, `hr.rule` and the pairing
+  idle `.live-empty` had NO rules (browser defaults); all three now
+  exist. 13 layout inline styles across 7 views → one-rule classes
+  (goal-meter `width: %` stays inline — the width IS the data).
+  `.ledger-wrap + .nl-answer` gap; reward-grid `sp-md`; `.notices`
+  undefined-var fix.
+- Out of scope by decision: native `confirm()` dialogs (browser
+  chrome — a Datum replacement is a product/a11y call, recorded as
+  follow-up in the docs).
+- Suite 443/3 (delta is exactly the new DashboardTest pin), quality
+  PASS. Records: docs/UI-PASSOVER-2026-09-12.md + .es.md,
+  .agent/TASKS/TASK-032-*, .agent/RUNS/RUN-2026-09-12-core-032.md.
+
+## RUN-033 — TASK-033: A/B class per grade, grade 0 removed (2026-09-12)
+
+- Owner: only "5B" existed and never changed. DemoSeeder now ships
+  an A/B class pair per grade 1–11 (`1° A`…`11° B`, 22 classes);
+  5° B stays the demo home (Elena's homeroom + 4 students, grade
+  `5°`). Grade SELECT is 1–11 (server side never constrained
+  grades — free text by design, no backend change).
+- The seeder change broke 9 tests, all single-class-world fixture
+  assumptions (`SchoolClass::first()`, "fresh" `6° A`/`8° A`
+  names) — fixed with explicit 5° B lookups + C-variant fresh
+  names; no production logic touched. Suite 443/3, quality PASS.
+- Durable rule: never assert on positional `first()` over seeded
+  tables — name the fixture row explicitly.
+
+## RUN-034 — TASK-034: confirms, readers fit, coupling, live search (2026-09-12)
+
+- Owner, 4 items: native confirms still shown (TASK-032 had
+  deferred them — now built); readers right panel cramped;
+  grade 4 should offer/auto 4° A-B; searches should feel realtime.
+- Shared `x-confirm-modal` (alert-box message, quiet Cancel +
+  danger Confirm, Esc/backdrop/focus-return) on readers Rotate +
+  pairing Unpair; `window.confirm` absence test-pinned.
+- Readers defect measured, not guessed: 638px table in a 507px
+  panel scrolled the actions out (even split + flex input +
+  `.row-actions` → 0 overflow; mobile 390px shot clean).
+- Grade→class `data-grade` coupling (change/load/reset/create/
+  rename; custom names show all); roster search is a debounced
+  same-URL fetch-swap (tbody + pagination, race-guarded,
+  replaceState; GET form = no-JS fallback). Other desks' searches
+  were already live — verified, untouched.
+- Suite 445/3, quality PASS. Records: FRONTEND.md + .es.md,
+  .agent/TASKS/TASK-034-*, .agent/RUNS/RUN-2026-09-12-core-034.md.
+
+## RUN-035 — TASK-035: readers table off the admin dashboard (2026-09-12)
+
+- Owner: drop the readers part from /admin. Removed the panel +
+  mode-form JS + roster repaint listener (NL panel full width),
+  the dead controller query, dead `.mode-form` CSS, and updated
+  the subtitle EN+ES. Mode API endpoint + e2e stay (backend
+  contract, out of scope).
+- Tests repointed (3 files); one self-caught overreach — pin
+  removed artifacts, not reader names (feed contexts show them).
+- Suite 445/3, quality PASS. Records: FRONTEND.md + .es.md,
+  .agent/TASKS/TASK-035-*, .agent/RUNS/RUN-2026-09-12-core-035.md.

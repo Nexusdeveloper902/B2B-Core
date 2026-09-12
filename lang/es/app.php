@@ -159,6 +159,7 @@ return [
     'welcome_short' => 'Bienvenido',
     'yes' => 'Sí',
     'no' => 'No',
+    'modal_cancel' => 'Cancelar',
     'enrolled' => 'Matriculados',
     'search_students' => 'Buscar estudiantes…',
 
@@ -207,7 +208,7 @@ return [
     'leaderboard_top3' => 'Top 3',
 
     // Admin
-    'admin_dashboard_sub' => 'Asistencia, comidas PAE, reciclaje y hardware de lectores a nivel institucional.',
+    'admin_dashboard_sub' => 'Asistencia, comidas PAE y reciclaje a nivel institucional.',
 
     // EcoStation
     'ecostation' => 'EcoStation',

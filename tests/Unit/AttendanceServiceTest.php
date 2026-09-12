@@ -37,7 +37,7 @@ class AttendanceServiceTest extends TestCase
             'occurred_at' => now()->setTime(7, 55),
         ]);
 
-        $rows = $this->service->classAttendanceToday(SchoolClass::first()->id);
+        $rows = $this->service->classAttendanceToday($this->homeClass()->id);
         $byName = collect($rows)->keyBy(fn ($r) => $r['student']->name);
 
         $this->assertSame('present', $byName['Maria González']['status']);
@@ -57,7 +57,7 @@ class AttendanceServiceTest extends TestCase
             'occurred_at' => now()->setTime(8, 40),
         ]);
 
-        $rows = $this->service->classAttendanceToday(SchoolClass::first()->id);
+        $rows = $this->service->classAttendanceToday($this->homeClass()->id);
         $byName = collect($rows)->keyBy(fn ($r) => $r['student']->name);
 
         $this->assertSame('late', $byName['Carlos Pérez']['status']);
@@ -66,7 +66,7 @@ class AttendanceServiceTest extends TestCase
     #[Test]
     public function students_without_a_tap_today_are_absent(): void
     {
-        $rows = $this->service->classAttendanceToday(SchoolClass::first()->id);
+        $rows = $this->service->classAttendanceToday($this->homeClass()->id);
         $byName = collect($rows)->keyBy(fn ($r) => $r['student']->name);
 
         $this->assertSame('absent', $byName['Ana Martínez']['status']);
@@ -96,5 +96,13 @@ class AttendanceServiceTest extends TestCase
         $this->assertSame('plastic', $timeline[0]['material']);
         $this->assertSame(10, $timeline[0]['points']);
         $this->assertSame('Demo Reader — Recycling', $timeline[0]['reader']);
+    }
+
+    /** The seeded demo home class (TASK-033: the seeder ships a full
+        A/B pair per grade, so positional `first()` no longer lands on
+        the class that owns the seeded students). */
+    private function homeClass(): SchoolClass
+    {
+        return SchoolClass::where('name', '5° B')->firstOrFail();
     }
 }

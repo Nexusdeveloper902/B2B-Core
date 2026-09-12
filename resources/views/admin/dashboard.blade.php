@@ -1,12 +1,16 @@
 {{--
     TASK-026 — mockup "Admin Dashboard — School Today": 5-KPI hero strip
-    (attendance black card + PAE + recycling), readers hardware table,
-    NL query panel, redemption module, student directory, shared live
-    feed. Every id/class/form contract is unchanged (nl-query-form,
-    redeem-form, mode-form…). Mockup parts with no data source are
-    omitted and documented (docs/FRONTEND.md): node/telemetry strip,
-    "Force Telemetry Poll" and "Global Thresholds" buttons, campus
-    operations summary card (gaps #A1-A3).
+    (attendance black card + PAE + recycling), NL query panel,
+    redemption module, student directory, shared live feed. Every
+    id/class/form contract is unchanged (nl-query-form, redeem-form…).
+    Mockup parts with no data source are omitted and documented
+    (docs/FRONTEND.md): node/telemetry strip, "Force Telemetry Poll"
+    and "Global Thresholds" buttons, campus operations summary card
+    (gaps #A1-A3).
+
+    TASK-035 — the readers hardware table is gone from this page (the
+    /admin/readers desk is the readers surface now); reader mode
+    changes happen there, not here.
 --}}
 @extends('layouts.app')
 
@@ -57,52 +61,8 @@
 {{-- TASK-016 — live activity: server-rendered, then WebSocket-live --}}
 @include('partials.live-feed')
 
-<section class="grid-2 grid-2-wide-left" data-reveal>
-    {{-- Reader list + mode control --}}
-    <x-panel :label="__('app.readers')" rule>
-        <div class="ledger-wrap">
-            <table class="ledger-table" data-stack>
-                <thead>
-                <tr>
-                    <th scope="col">{{ __('app.reader') }}</th>
-                    <th scope="col">{{ __('app.reader_type') }}</th>
-                    <th scope="col">{{ __('app.active_mode') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                @forelse($readers as $reader)
-                    <tr data-reader-row="{{ $reader->id }}">
-                        <td data-label="{{ __('app.reader') }}" class="reader-label-cell">{{ $reader->label }}</td>
-                        <td data-label="{{ __('app.reader_type') }}"><code>{{ __('app.reader_type_'.$reader->type->value) }}</code></td>
-                        <td data-label="{{ __('app.active_mode') }}">
-                            <form class="mode-form tool-form" data-reader="{{ $reader->id }}">
-                                <select name="active_event_type" class="mode-select bare-select"
-                                        id="mode-{{ $reader->id }}" aria-label="{{ __('app.active_mode') }}">
-                                    @foreach(\App\Enums\EventType::cases() as $eventType)
-                                        <option value="{{ $eventType->value }}"
-                                                @selected($reader->active_event_type === $eventType->value)>
-                                            {{ __('app.event_type_'.$eventType->value) }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <button type="submit" class="btn btn-quiet btn-small"
-                                        data-endpoint="{{ '/api/v1/admin/readers/'.$reader->id.'/mode' }}">
-                                    {{ __('app.change_mode') }}
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                @empty
-                    <tr><td colspan="3" class="muted">{{ __('app.no_readers') }}</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        <p class="nl-answer hidden" id="reader-mode-result" role="status" aria-live="polite"></p>
-    </x-panel>
-
-    {{-- NL query box --}}
+{{-- NL query box (full width since TASK-035 removed the readers panel) --}}
+<section class="section-gap" data-reveal>
     <x-panel :label="__('app.nl_query')" rule>
         @unless($nlQueryConfigured)
             <div class="notice notice-warn" role="alert">{{ __('app.nl_query_not_configured') }}</div>
@@ -202,32 +162,6 @@
             }
         }
 
-        // Reader mode change (calls the Phase B mode endpoint).
-        document.querySelectorAll('.mode-form').forEach(function (form) {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var select = form.querySelector('.mode-select');
-                var btn = form.querySelector('button');
-                busy(btn, true);
-                postJson(btn.dataset.endpoint, {active_event_type: select.value}).then(function (r) {
-                    busy(btn, false);
-                    // Reader feedback announces in the READERS panel's own
-                    // live region — the NL-query answer box is a different
-                    // panel with different semantics.
-                    var result = document.getElementById('reader-mode-result');
-                    if (r.ok) {
-                        show(result, '{{ __('app.mode_updated') }}', true);
-                    } else {
-                        show(result, (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
-                    }
-                }).catch(function () {
-                busy(btn, false);
-                // Close the aria-live region on network failure too.
-                show(box, '{{ __('app.error_generic') }}', false);
-            });
-            });
-        });
-
         // NL query box (Phase E). TASK-027 — the pending state says what
         // is happening; the answer renders Markdown.
         var nlForm = document.getElementById('nl-query-form');
@@ -280,8 +214,8 @@
         // ---- TASK-029 — the KPI strip is LIVE. Attendance and the PAE
         // meals are DISTINCT-STUDENT counts, so a per-student Set keeps
         // a second tap from double-counting; recycling totals ride the
-        // recycling channel's committed frames; the readers table follows
-        // roster frames (a mode/label change made anywhere repaints here). ----
+        // recycling channel's committed frames. (TASK-035: the readers
+        // table this comment used to mention lives on /admin/readers.) ----
         function bumpStat(name, delta) {
             var stat = document.querySelector('[data-stat="' + name + '"]');
             if (!stat) { return; }
@@ -321,22 +255,6 @@
             }
         });
 
-        document.addEventListener('realtime:roster', function (e) {
-            var update = e.detail || {};
-            if (update.type !== 'reader_updated') { return; }
-            var r = update.payload || {};
-            if (r.id === undefined) { return; }
-            var row = document.querySelector('tr[data-reader-row="' + r.id + '"]');
-            if (!row) { return; }
-            var label = row.querySelector('.reader-label-cell');
-            if (label && r.label !== undefined && document.activeElement !== label) {
-                label.textContent = r.label;
-            }
-            var mode = document.getElementById('mode-' + r.id);
-            if (mode && document.activeElement !== mode && r.active_event_type !== undefined) {
-                mode.value = r.active_event_type;
-            }
-        });
     })();
 </script>
 @endsection
