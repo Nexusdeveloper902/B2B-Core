@@ -36,6 +36,7 @@ command to run is always printed for you — and it's usually `./run doctor`.
 | `./run doctor` | reading error messages | Environment diagnostics + exact fixes |
 | `./run status` | guessing | App state: toolchain, .env, DB, servers, classifier |
 | `./run reset` | `migrate:fresh --seed` | Fresh DB + demo data (asks first) |
+| `./run seed-realistic` | `migrate:fresh --seeder=RealisticSeeder` | Full-semester realistic dataset (asks first) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Local model server: start/stop/status/run |
 | `./run llm-check` | reading a generic "unavailable" | One live DeepSeek call — exact verdict for THIS machine |
 | `./run unpair` | `php artisan cards:unpair` | Testing reset: deletes every card (+ its events) so credentials are fresh again |
@@ -177,6 +178,30 @@ school days of taps (entries/exits, attendance with lates, PAE meals,
 recycling deposits with points, two redemptions) — deterministic, so
 every reseed tells the same story. The small fixture stays the
 automated-test default.
+
+## `seed-realistic`
+
+```bash
+./run seed-realistic                  # asks for confirmation
+./run seed-realistic --force          # no prompt (scripting/CI)
+./run seed-realistic --students 300 --months 6   # tune the size (defaults)
+```
+
+Wipes **the dev database only** — like `reset`, but rebuilds it with
+`RealisticSeeder` (`migrate:fresh --seeder=RealisticSeeder`) instead of
+the small fixture: the analytics playground, deliberately NOT the setup
+path. Defaults to ~300 students across grades 1–11 (lower-grades-heavy,
+A/B per grade, one teacher per class plus admin and kitchen staff) with
+per-meal PAE enrollment (breakfast-only / lunch-only / both / neither)
+and ~6 months of complete school days shaped like a real semester —
+Monday/Friday dips, a May flu wave, holiday gaps plus a mid-year recess
+week, exam-week recycling slumps, an August eco-campaign spike,
+mid-year transfers and leavers, replaced cards, flagged PAE attempts,
+deposits with points, ~70 redemptions (including an exhausted and an
+inactive reward), pairing/capture history and realtime feed frames.
+Deterministic: the same flags always produce the same semester. Slow by
+design (tens of thousands of taps — minutes, not seconds); the summary
+re-prints staff logins, reader keys, grade and PAE distributions.
 
 ## `unpair`
 
@@ -421,6 +446,7 @@ scripts/
 ├── _lib/common.sh               # shared lib: resolution chain, OS detect, logging
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh
 ├── doctor.sh · status.sh · reset.sh
+├── seed-realistic.sh           # full-semester realistic dataset (fresh DB)
 ├── unpair.sh                   # testing reset (cards:unpair)
 ├── model-server.sh              # local classifier lifecycle
 ├── provision-toolchain.sh       # hermetic PHP+Composer provisioner

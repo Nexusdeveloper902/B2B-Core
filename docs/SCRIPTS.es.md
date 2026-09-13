@@ -36,6 +36,7 @@ comando siempre se te imprime — y normalmente es `./run doctor`.
 | `./run doctor` | interpretar mensajes de error | Diagnóstico del entorno + soluciones exactas |
 | `./run status` | adivinar | Estado de la app: toolchain, .env, BD, servidores, clasificador |
 | `./run reset` | `migrate:fresh --seed` | BD nueva + datos demo (pregunta primero) |
+| `./run seed-realistic` | `migrate:fresh --seeder=RealisticSeeder` | Dataset realista del semestre (pregunta primero) |
 | `./run model` | venv + pip + uvicorn (3 cmds) | Servidor del modelo local: start/stop/status/run |
 | `./run llm-check` | leer un «no disponible» genérico | Una llamada en vivo a DeepSeek — veredicto exacto para ESTA máquina |
 | `./run unpair` | `php artisan cards:unpair` | Reset de pruebas: borra todas las tarjetas (+ sus eventos) para que las credenciales vuelvan a estar frescas |
@@ -180,6 +181,32 @@ días de clase de toques (entradas/salidas, asistencia con tardanzas,
 comidas PAE, depósitos de reciclaje con puntos, dos canjes) —
 determinista, cada resiembra cuenta la misma historia. El fixture pequeño
 sigue siendo el valor por defecto de las pruebas automatizadas.
+
+## `seed-realistic`
+
+```bash
+./run seed-realistic                  # pide confirmación
+./run seed-realistic --force          # sin pregunta (scripts/CI)
+./run seed-realistic --students 300 --months 6   # ajusta el tamaño (valores por defecto)
+```
+
+Borra **solo la BD de desarrollo** — como `reset`, pero la reconstruye con
+`RealisticSeeder` (`migrate:fresh --seeder=RealisticSeeder`) en vez del
+fixture pequeño: el patio de juegos de analítica, deliberadamente NO la
+ruta del setup. Por defecto ~300 estudiantes en grados 1–11 (más peso en
+los grados bajos, A/B por grado, un profesor por curso más personal
+admin y de cocina) con inscripción PAE por comida (solo desayuno / solo
+almuerzo / ambos / ninguno) y ~6 meses de días de clase completos con
+forma de semestre real — caídas de lunes/viernes, ola de gripa en mayo,
+festivos más semana de receso de mitad de año, bajones de reciclaje en
+semanas de exámenes, pico de eco-campaña en agosto, traslados y retiros
+a mitad de año, tarjetas reemplazadas, intentos PAE marcados, depósitos
+con puntos, ~70 canjes (incluyendo una recompensa agotada y una
+inactiva), historial de emparejamientos/capturas y tramas del canal en
+vivo. Determinista: las mismas banderas siempre producen el mismo
+semestre. Lento por diseño (decenas de miles de toques — minutos, no
+segundos); el resumen reimprime accesos del personal, claves de
+lectores y distribuciones por grado y PAE.
 
 ## `unpair`
 
@@ -431,6 +458,7 @@ scripts/
 ├── _lib/common.sh               # librería: cadena de resolución, logging, detección de distro
 ├── setup.sh · serve.sh · test.sh · e2e.sh · quality.sh
 ├── doctor.sh · status.sh · reset.sh
+├── seed-realistic.sh           # dataset realista del semestre (BD nueva)
 ├── unpair.sh                   # testing reset (cards:unpair)
 ├── model-server.sh              # ciclo de vida del clasificador local
 ├── provision-toolchain.sh       # provisionador hermético de PHP+Composer

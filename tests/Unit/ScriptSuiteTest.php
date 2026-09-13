@@ -32,6 +32,7 @@ class ScriptSuiteTest extends TestCase
         'doctor' => 'scripts/doctor.sh',
         'status' => 'scripts/status.sh',
         'reset' => 'scripts/reset.sh',
+        'seed-realistic' => 'scripts/seed-realistic.sh',
         'unpair' => 'scripts/unpair.sh',
         'model' => 'scripts/model-server.sh',
         'llm-check' => 'scripts/llm-check.sh',
