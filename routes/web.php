@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AdminDashboardController;
 use App\Http\Controllers\Web\AdminPairingController;
 use App\Http\Controllers\Web\AdminReadersController;
 use App\Http\Controllers\Web\AdminSettingsController;
+use App\Http\Controllers\Web\AdminStaffController;
 use App\Http\Controllers\Web\AdminStudentsController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\KitchenController;
@@ -103,6 +104,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/readers', [AdminReadersController::class, 'page'])
         ->middleware('role:admin')
         ->name('admin.readers');
+
+    // TASK-038 — the staff accounts desk: create admin/teacher/
+    // kitchen logins (+ homeroom assignment for teachers) without SQL.
+    Route::get('/admin/staff', [AdminStaffController::class, 'page'])
+        ->middleware('role:admin')
+        ->name('admin.staff');
 
     // TASK-037 — the settings desk: every safe presence/PAE knob
     // (meal windows, late cutoff, pairing window, account conventions).

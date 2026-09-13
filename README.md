@@ -111,6 +111,7 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 | `/kitchen` | kitchen (or admin) | **Kitchen desk** (TASK-037): the meal-service workflow — a fullscreen glanceable green/red accept-reject state driven by realtime tap frames (with the rejection reason), the detected meal, and a recent-taps list. Kitchen users are restricted to this desk |
 | `/admin/settings` | admin | **Settings desk** (TASK-037): the safe presence/PAE knobs — meal serving windows, late cutoff, pairing window, student account conventions — saved through the API and live immediately |
 | `/admin/reports/pae` | admin | **PAE reports** (TASK-037): daily/monthly meals served with charts, missed meals (list + trend), excluded attempts by reason, per-meal enrollment, per-student meal history — with PDF and CSV exports |
+| `/admin/staff` | admin | **Staff accounts** (TASK-038): create admin/teacher/kitchen logins with a temporary password (forced first-login rotation); teachers optionally take homeroom classes in the same request |
 | `/admin/pairing` | admin | **Pairing desk** (TASK-011): one-click "Arm pairing" per student, live 45 s countdown, the moment the paired card lands, and recent pairing history — pairs new cards without curl or a PAT. Live over the realtime WebSocket channel (TASK-020): armed / paired / rejected updates arrive within ~300 ms, with the status poll as the honest fallback |
 | `/parent/students/{id}` | admin/teacher | One student's full event timeline (simplified parent stand-in — a real parent-auth system is intentionally out of scope) |
 

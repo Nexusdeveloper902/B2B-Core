@@ -695,6 +695,47 @@
       }
     },
     {
+      "name": "12 Admin — Create staff login / Crear acceso de personal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Prof. Luis Gómez\",\n  \"email\": \"luis.g@presence.test\",\n  \"role\": \"teacher\",\n  \"password\": \"cambia-ya-01\",\n  \"password_confirmation\": \"cambia-ya-01\",\n  \"class_ids\": []\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/staff",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "staff"
+          ]
+        },
+        "description": "TASK-038 (ADR-058) — create an admin, teacher or kitchen login from the /admin/staff desk (no seeder, no SQL). The admin chooses the temporary password (min 8, confirmed); first login forces rotation.\n\nResponse 200: { status, staff: { id, name, email, role, classes }, account: { email, temporary_password, must_change_password }, message, account_notice } — the ONLY place the temporary password appears. Teachers may take homeroom classes via class_ids (same transaction; class_ids on any other role is 422 classes_teacher_only).\nResponse 422 duplicate: the email already exists (case-insensitive).\nResponse 401/403: guest / non-admin.\n\nTip: set Accept-Language: es to receive Spanish messages."
+      }
+    },
+    {
       "name": "07 Health / Salud",
       "request": {
         "method": "GET",

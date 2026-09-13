@@ -356,6 +356,22 @@ return [
     'confirm_password' => 'Confirm new password',
     'save_password' => 'Save new password',
 
+    // Staff accounts desk (TASK-038 — /admin/staff)
+    'staff_page' => 'Staff accounts',
+    'staff_page_sub' => 'Create admin, teacher and kitchen logins — no seeder or database console needed. Student logins still come from the Students desk.',
+    'create_staff_account' => 'Create staff login',
+    'staff_name' => 'Full name',
+    'staff_email' => 'Email',
+    'staff_role' => 'Role',
+    'staff_temp_password' => 'Temporary password (min 8)',
+    'staff_temp_password_confirm' => 'Confirm temporary password',
+    'staff_classes_optional' => 'Homeroom classes (teachers only)',
+    'staff_classes_hint' => 'Checked classes are re-homed to this teacher — a class keeps exactly one homeroom teacher.',
+    'staff_list' => 'Staff logins',
+    'staff_no_classes' => '—',
+    'toast_staff_created' => 'Staff login created.',
+    'toast_staff_create_failed' => 'Unable to create the staff login.',
+
     // Pagination (TASK-029 — the design-system pager view)
     'pagination_nav' => 'Pagination',
     'pagination_prev' => 'Previous page',

@@ -15,7 +15,7 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/staff`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
 | `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
@@ -824,6 +824,51 @@ estudiantes). Cada creación confirmada escribe un marco `class_created`
 del canal roster en la misma transacción (ver Marcos en vivo del canal
 roster abajo) — el SELECT de clases del escritorio se actualiza en vivo
 en cuanto la clase existe.
+
+---
+
+## POST /api/v1/admin/staff — crear un acceso de personal (TASK-038, solo admin)
+
+El fin de los accesos de personal por seeder o SQL: el escritorio
+`/admin/staff` crea accesos de admin, profesor y cocina con este
+endpoint. **Requiere rol admin.** El admin elige la contraseña temporal
+(mínimo 8, confirmada); el primer inicio de sesión obliga a rotarla por
+una personal. La respuesta lleva las credenciales EXACTAMENTE UNA VEZ
+(`account` + `account_notice` — la regla de un solo vistazo de las API
+keys de lector); nada más (logs, marcos, otros endpoints) lleva jamás
+la contraseña.
+
+Los profesores pueden tomar clases a cargo en la misma petición
+(`class_ids` — las clases marcadas pasan al nuevo profesor en la MISMA
+transacción; `class_ids` en cualquier otro rol es `422
+{"status":"error","reason":"classes_teacher_only"}`). Los accesos de
+estudiantes deliberadamente NO están aquí — son la capa de cuentas 1:1
+que crea el escritorio de estudiantes (ver `POST /api/v1/admin/students`).
+
+**Petición**:
+
+```json
+{ "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "password": "cambia-ya-01", "password_confirmation": "cambia-ya-01", "class_ids": [3] }
+```
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "staff": { "id": 12, "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "classes": ["5° A"] },
+  "account": { "email": "luis.g@presence.test", "temporary_password": "cambia-ya-01", "must_change_password": true },
+  "message": "Acceso de personal Prof. Luis Gómez creado.",
+  "account_notice": "Acceso listo: luis.g@presence.test / contraseña temporal cambia-ya-01 — debe cambiarse en el primer inicio de sesión"
+}
+```
+
+`422` — errores de validación, `{"status":"error","reason":"duplicate"}`
+si el correo ya existe (sin distinguir mayúsculas), o
+`{"status":"error","reason":"classes_teacher_only"}` por `class_ids`
+en un rol no profesor. Deliberadamente solo-creación (el precedente de
+creación de clases): editar personal y reasignar clases quedan para otra
+tarea.
 
 ---
 

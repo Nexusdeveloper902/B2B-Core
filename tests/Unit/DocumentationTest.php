@@ -71,6 +71,7 @@ class DocumentationTest extends TestCase
             'POST /api/v1/admin/students/import',
             'POST /api/v1/admin/students/{student}/account',
             'POST /api/v1/admin/classes',
+            'POST /api/v1/admin/staff',
             'DELETE /api/v1/admin/cards/{id}',
             'GET /api/v1/admin/captures/{deposit}/image',
             'not_enrolled',

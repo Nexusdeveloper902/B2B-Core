@@ -2069,7 +2069,12 @@ select::-ms-expand { display: none; }
     margin-bottom: var(--sp-md);
 }
 
-.report-controls .field { min-width: 150px; }
+.report-controls .field { min-width: 150px; margin-bottom: 0; }
+
+/* The Apply button is a bare flex item next to stacked label+input
+   fields: without this it sinks by the fields' bottom margin and sits
+   4px short of the 44px inputs. */
+.report-controls > .btn { min-height: 44px; }
 
 .report-exports { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 
@@ -2131,6 +2136,8 @@ select::-ms-expand { display: none; }
 }
 
 .report-student-pick { display: flex; align-items: flex-end; gap: var(--sp-sm); flex-wrap: wrap; }
+.report-student-pick .field { margin-bottom: 0; }
+.report-student-pick > .btn { min-height: 44px; }
 
 /* Per-student participation strip: one column per day, two cells
    (breakfast/lunch). Green = served; amber = flagged; hollow = no meal. */

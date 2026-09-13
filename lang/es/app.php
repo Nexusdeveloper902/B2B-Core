@@ -357,6 +357,22 @@ return [
     'confirm_password' => 'Confirmar nueva contraseña',
     'save_password' => 'Guardar nueva contraseña',
 
+    // Cuentas de personal (TASK-038 — /admin/staff)
+    'staff_page' => 'Cuentas de personal',
+    'staff_page_sub' => 'Crea accesos de admin, profesor y cocina — sin seeder ni consola de base de datos. Los accesos de estudiantes siguen creándose en el escritorio de Estudiantes.',
+    'create_staff_account' => 'Crear acceso de personal',
+    'staff_name' => 'Nombre completo',
+    'staff_email' => 'Correo',
+    'staff_role' => 'Rol',
+    'staff_temp_password' => 'Contraseña temporal (mín 8)',
+    'staff_temp_password_confirm' => 'Confirmar contraseña temporal',
+    'staff_classes_optional' => 'Clases a cargo (solo profesores)',
+    'staff_classes_hint' => 'Las clases marcadas pasan a este profesor — cada clase tiene exactamente un profesor a cargo.',
+    'staff_list' => 'Accesos de personal',
+    'staff_no_classes' => '—',
+    'toast_staff_created' => 'Acceso de personal creado.',
+    'toast_staff_create_failed' => 'No se pudo crear el acceso de personal.',
+
     // Paginación (TASK-029 — la vista de paginador del sistema de diseño)
     'pagination_nav' => 'Paginación',
     'pagination_prev' => 'Página anterior',

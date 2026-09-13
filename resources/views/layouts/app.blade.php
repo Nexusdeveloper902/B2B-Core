@@ -101,6 +101,10 @@
                            @class(['is-active' => request()->routeIs('admin.students')])>
                             {{ __('app.students_page') }}
                         </a>
+                        <a href="{{ route('admin.staff') }}"
+                           @class(['is-active' => request()->routeIs('admin.staff')])>
+                            {{ __('app.staff_page') }}
+                        </a>
                         <a href="{{ route('admin.readers') }}"
                            @class(['is-active' => request()->routeIs('admin.readers')])>
                             {{ __('app.readers_page') }}
@@ -180,6 +184,7 @@
                                 @if(auth()->user()->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
                                     <a href="{{ route('admin.students') }}">{{ __('app.students_page') }}</a>
+                                    <a href="{{ route('admin.staff') }}">{{ __('app.staff_page') }}</a>
                                     <a href="{{ route('admin.readers') }}">{{ __('app.readers_page') }}</a>
                                     <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
                                     <a href="{{ route('admin.ecostation') }}">{{ __('app.ecostation') }}</a>

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\RecyclingCaptureController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
 use App\Http\Controllers\Api\V1\RedemptionController;
 use App\Http\Controllers\Api\V1\SettingsController;
+use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\StudentController;
 use App\Http\Controllers\Api\V1\TapEventController;
 use Illuminate\Http\Request;
@@ -115,6 +116,13 @@ Route::prefix('v1')->group(function () {
     Route::post('/admin/students/{student}/account', [StudentController::class, 'provisionAccount'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.students.account');
+
+    // TASK-038 — staff account provisioning (admin-only): create
+    // admin/teacher/kitchen logins from the /admin/staff desk (no more
+    // seeder-or-SQL staff accounts).
+    Route::post('/admin/staff', [StaffController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.staff.store');
 
     // TASK-029 — class creation (admin-only): the students desk's class
     // select needed a writer; roster frames make it live.

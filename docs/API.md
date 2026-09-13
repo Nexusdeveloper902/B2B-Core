@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/staff`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
@@ -798,6 +798,49 @@ for an existing name (case-insensitive, mirroring the student rule).
 Every committed create writes one `class_created` roster frame in the
 same transaction (see Realtime roster frames below) — the students
 desk's class select goes live the moment the class exists.
+
+---
+
+## POST /api/v1/admin/staff — create one staff login (TASK-038, admin-only)
+
+The end of seeder-or-SQL staff accounts: the `/admin/staff` desk creates
+admin, teacher and kitchen logins through this endpoint. **Admin role
+required.** The admin chooses the temporary password (minimum 8,
+confirmed); first login forces rotation to a personal password. The
+response carries the credentials EXACTLY ONCE (`account` +
+`account_notice` — the reader-API-key display-once rule); nothing else
+(logs, frames, other endpoints) ever carries the password.
+
+Teachers may take homeroom classes in the same request (`class_ids` —
+checked classes are re-homed to the new teacher in the SAME transaction;
+`class_ids` on any other role is `422
+{"status":"error","reason":"classes_teacher_only"}`). Student logins are
+deliberately NOT here — they are the 1:1 account layer minted by the
+students desk (see `POST /api/v1/admin/students`).
+
+**Request**:
+
+```json
+{ "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "password": "cambia-ya-01", "password_confirmation": "cambia-ya-01", "class_ids": [3] }
+```
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "staff": { "id": 12, "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "classes": ["5° A"] },
+  "account": { "email": "luis.g@presence.test", "temporary_password": "cambia-ya-01", "must_change_password": true },
+  "message": "Staff login Prof. Luis Gómez created.",
+  "account_notice": "Login ready: luis.g@presence.test / temporary password cambia-ya-01 — it must be changed on first login"
+}
+```
+
+`422` — validation errors, `{"status":"error","reason":"duplicate"}`
+for an existing email (case-insensitive), or
+`{"status":"error","reason":"classes_teacher_only"}` for `class_ids`
+on a non-teacher role. Deliberately create-only (the class-creation
+precedent): editing staff and re-homing classes stay a separate task.
 
 ---
 

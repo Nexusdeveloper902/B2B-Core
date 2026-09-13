@@ -85,6 +85,14 @@ return [
     'student_account_exists' => 'Este estudiante ya tiene un acceso (:email)',
     'password_change_required' => 'Debes definir una nueva contraseña antes de continuar.',
 
+    // TASK-038 — aprovisionamiento de personal (el escritorio /admin/staff).
+    // La contraseña temporal se muestra una sola vez, como un acceso de
+    // estudiante o una API key de lector.
+    'staff_created' => 'Acceso de personal :name creado',
+    'staff_duplicate' => 'Ya existe un acceso con el correo :email',
+    'staff_account_notice' => 'Acceso listo: :email / contraseña temporal :password — debe cambiarse en el primer inicio de sesión',
+    'staff_classes_teacher_only' => 'Solo los profesores pueden tener clases a cargo',
+
     // Genérico
     'forbidden_role' => 'No tienes permiso para realizar esta acción.',
     'not_found' => 'Recurso no encontrado',

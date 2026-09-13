@@ -85,6 +85,14 @@ return [
     'student_account_exists' => 'This student already has a login (:email)',
     'password_change_required' => 'You must set a new password before continuing.',
 
+    // TASK-038 — staff account provisioning (the /admin/staff desk).
+    // The temporary password is display-once, exactly like a student
+    // login or a reader API key.
+    'staff_created' => 'Staff login :name created',
+    'staff_duplicate' => 'A login with the email :email already exists',
+    'staff_account_notice' => 'Login ready: :email / temporary password :password — it must be changed on first login',
+    'staff_classes_teacher_only' => 'Only teachers can be assigned homeroom classes',
+
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',
     'not_found' => 'Resource not found',
