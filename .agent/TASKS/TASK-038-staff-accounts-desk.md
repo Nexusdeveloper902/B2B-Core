@@ -21,7 +21,9 @@ first-login rotation, role-correct landing and data walls.
    enforcement — no new auth machinery).
 4. Teachers optionally take homeroom classes (`class_ids`) in the SAME
    transaction (user + `classes.teacher_user_id` commit atomically);
-   `class_ids` on any other role is an honest 422.
+   the desk lists ONLY classes without a teacher (one class, one
+   teacher — no full-grade dump); `class_ids` on any other role is an
+   honest 422.
 5. Display-once credentials: the temporary password appears ONLY in
    the minting response (`account` + `account_notice` — the
    reader-API-key rule, ADR-044); never in logs, frames, or other

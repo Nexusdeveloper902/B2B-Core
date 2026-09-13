@@ -25,39 +25,56 @@
 </div>
 
 <section class="grid-2 grid-2-wide-left" data-reveal>
-    {{-- Create --}}
+    {{-- Create (roomy stacked form — the dense tool-form row read as cramped). --}}
     <x-panel :label="__('app.create_staff_account')" rule>
-        <form id="staff-create-form" class="tool-form" autocomplete="off">
-            <input type="text" class="bare-input" id="staff-name" autocomplete="off"
-                   placeholder="{{ __('app.staff_name') }}" required
-                   aria-label="{{ __('app.staff_name') }}">
-            <input type="email" class="bare-input" id="staff-email" autocomplete="off"
-                   placeholder="{{ __('app.staff_email') }}" required
-                   aria-label="{{ __('app.staff_email') }}">
-            <select id="staff-role" class="bare-select" required aria-label="{{ __('app.staff_role') }}">
-                @foreach($roles as $role)
-                    <option value="{{ $role }}">{{ __('app.role_'.$role) }}</option>
-                @endforeach
-            </select>
-            <input type="password" class="bare-input" id="staff-password" autocomplete="new-password"
-                   placeholder="{{ __('app.staff_temp_password') }}" required minlength="8"
-                   aria-label="{{ __('app.staff_temp_password') }}">
-            <input type="password" class="bare-input" id="staff-password-confirmation" autocomplete="new-password"
-                   placeholder="{{ __('app.staff_temp_password_confirm') }}" required minlength="8"
-                   aria-label="{{ __('app.staff_temp_password_confirm') }}">
+        <form id="staff-create-form" class="settings-panel" autocomplete="off">
+            <label class="field">
+                <span>{{ __('app.staff_name') }}</span>
+                <input type="text" id="staff-name" autocomplete="off" required
+                       aria-label="{{ __('app.staff_name') }}">
+            </label>
+            <label class="field">
+                <span>{{ __('app.staff_email') }}</span>
+                <input type="email" id="staff-email" autocomplete="off" required
+                       data-email-domain="{{ $emailDomain }}"
+                       aria-label="{{ __('app.staff_email') }}">
+                <span class="muted small">{{ __('app.staff_email_hint') }}</span>
+            </label>
+            <label class="field">
+                <span>{{ __('app.staff_role') }}</span>
+                <select id="staff-role" required aria-label="{{ __('app.staff_role') }}">
+                    @foreach($roles as $role)
+                        <option value="{{ $role }}">{{ __('app.role_'.$role) }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <div class="settings-row">
+                <label class="field">
+                    <span>{{ __('app.staff_temp_password') }}</span>
+                    <input type="password" id="staff-password" autocomplete="new-password"
+                           required minlength="8" aria-label="{{ __('app.staff_temp_password') }}">
+                </label>
+                <label class="field">
+                    <span>{{ __('app.staff_temp_password_confirm') }}</span>
+                    <input type="password" id="staff-password-confirmation" autocomplete="new-password"
+                           required minlength="8" aria-label="{{ __('app.staff_temp_password_confirm') }}">
+                </label>
+            </div>
             <div class="staff-classes">
-                <p class="panel-sub"><strong>{{ __('app.staff_classes_optional') }}</strong> — {{ __('app.staff_classes_hint') }}</p>
-                @foreach($classes as $class)
+                <span class="staff-classes-title">{{ __('app.staff_classes_optional') }}</span>
+                <p class="muted small">{{ __('app.staff_classes_hint') }}</p>
+                @forelse($classes as $class)
                     <label class="check-line">
                         <input type="checkbox" name="staff-classes" value="{{ $class->id }}">
                         {{ $class->name }}
-                        @if($class->teacher)
-                            <span class="muted">({{ $class->teacher->name }})</span>
-                        @endif
                     </label>
-                @endforeach
+                @empty
+                    <p class="muted small">{{ __('app.staff_all_assigned') }}</p>
+                @endforelse
             </div>
-            <button type="submit" class="btn btn-primary">{{ __('app.create_staff_account') }}</button>
+            <div>
+                <button type="submit" class="btn btn-primary">{{ __('app.create_staff_account') }}</button>
+            </div>
         </form>
         <div id="staff-create-result" class="nl-answer hidden" aria-live="polite"></div>
     </x-panel>
@@ -162,6 +179,29 @@
         }
 
         var form = document.getElementById('staff-create-form');
+        // Email auto-suggest: {ascii-name}.{role}@{settings-domain},
+        // refreshed while the admin hasn't typed a custom address
+        // (first manual edit wins and sticks).
+        var nameInput = document.getElementById('staff-name');
+        var roleInput = document.getElementById('staff-role');
+        var emailInput = document.getElementById('staff-email');
+        var emailDirty = false;
+        function slugifyName(value) {
+            var ascii = String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            var slug = ascii.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '');
+            return slug === '' ? 'staff' : slug;
+        }
+        function suggestEmail() {
+            if (emailDirty || !nameInput || !roleInput || !emailInput) { return; }
+            var domain = emailInput.dataset.emailDomain || '';
+            emailInput.value = slugifyName(nameInput.value) + '.' + roleInput.value + '@' + domain;
+        }
+        if (emailInput) {
+            emailInput.addEventListener('input', function () { emailDirty = true; });
+        }
+        if (nameInput) { nameInput.addEventListener('input', suggestEmail); }
+        if (roleInput) { roleInput.addEventListener('change', suggestEmail); }
+        suggestEmail();
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             var btn = form.querySelector('button[type="submit"]');
@@ -189,6 +229,8 @@
                 if (r.ok) {
                     if (r.data && r.data.staff) { applyStaff(r.data.staff); }
                     form.reset();
+                    emailDirty = false;
+                    suggestEmail();
                     if (window.PulseToast) { PulseToast.success(TOAST_CREATED); }
                 } else if (window.PulseToast) {
                     PulseToast.error(TOAST_FAILED, (r.data && r.data.message) || '');

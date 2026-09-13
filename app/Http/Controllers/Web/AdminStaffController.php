@@ -30,12 +30,18 @@ class AdminStaffController extends Controller
             ->orderBy('name')
             ->get();
 
-        $classes = SchoolClass::with('teacher')->orderBy('name')->get();
+        // The picker offers ONLY classes without a homeroom teacher —
+        // one class, one teacher; already-homed classes never appear.
+        $classes = SchoolClass::orderBy('name')->whereNull('teacher_user_id')->get();
 
         return view('admin.staff', [
             'staff' => $staff,
             'classes' => $classes,
             'roles' => [UserRole::Admin->value, UserRole::Teacher->value, UserRole::Kitchen->value],
+            // The email-domain preset from the settings desk (the same
+            // accounts preset family as the initial password): the form
+            // auto-suggests {name}.{role}@{domain}, editable.
+            'emailDomain' => (string) settings()->studentEmailDomain(),
         ]);
     }
 }

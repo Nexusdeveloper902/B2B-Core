@@ -833,14 +833,17 @@ El fin de los accesos de personal por seeder o SQL: el escritorio
 `/admin/staff` crea accesos de admin, profesor y cocina con este
 endpoint. **Requiere rol admin.** El admin elige la contraseña temporal
 (mínimo 8, confirmada); el primer inicio de sesión obliga a rotarla por
-una personal. La respuesta lleva las credenciales EXACTAMENTE UNA VEZ
+una personal. El escritorio sugiere `{nombre}.{rol}@{accounts.student_email_domain}`
+(editable — una dirección ocupada es un honesto 422). La respuesta lleva las credenciales EXACTAMENTE UNA VEZ
 (`account` + `account_notice` — la regla de un solo vistazo de las API
 keys de lector); nada más (logs, marcos, otros endpoints) lleva jamás
 la contraseña.
 
 Los profesores pueden tomar clases a cargo en la misma petición
-(`class_ids` — las clases marcadas pasan al nuevo profesor en la MISMA
-transacción; `class_ids` en cualquier otro rol es `422
+(`class_ids` — el escritorio solo lista clases sin profesor, una clase
+un profesor; el endpoint las asigna en la MISMA transacción, reasignar
+una clase con profesor por llamada directa a la API sobrescribe;
+`class_ids` en cualquier otro rol es `422
 {"status":"error","reason":"classes_teacher_only"}`). Los accesos de
 estudiantes deliberadamente NO están aquí — son la capa de cuentas 1:1
 que crea el escritorio de estudiantes (ver `POST /api/v1/admin/students`).

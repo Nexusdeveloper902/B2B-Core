@@ -807,12 +807,16 @@ The end of seeder-or-SQL staff accounts: the `/admin/staff` desk creates
 admin, teacher and kitchen logins through this endpoint. **Admin role
 required.** The admin chooses the temporary password (minimum 8,
 confirmed); first login forces rotation to a personal password. The
+desk auto-suggests `{name}.{role}@{accounts.student_email_domain}`
+(editable — a taken address is an honest 422). The
 response carries the credentials EXACTLY ONCE (`account` +
 `account_notice` — the reader-API-key display-once rule); nothing else
 (logs, frames, other endpoints) ever carries the password.
 
 Teachers may take homeroom classes in the same request (`class_ids` —
-checked classes are re-homed to the new teacher in the SAME transaction;
+the desk lists only teacherless classes, one class one teacher; the
+endpoint assigns them in the SAME transaction, re-homing an
+already-homed class via direct API call overwrites;
 `class_ids` on any other role is `422
 {"status":"error","reason":"classes_teacher_only"}`). Student logins are
 deliberately NOT here — they are the 1:1 account layer minted by the

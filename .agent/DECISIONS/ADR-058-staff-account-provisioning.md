@@ -33,8 +33,10 @@ GUI path with everything an account implies — not just the users row.
    `account_notice`; never in the staff object, logs, or frames.
 5. **Teacher homerooms in the same transaction**: `class_ids` sets
    `classes.teacher_user_id` atomically with the user row (an account
-   can never commit without its classes; overwrite is explicit — the
-   desk warns that a class keeps exactly one homeroom teacher).
+   can never commit without its classes). The desk lists ONLY classes
+   without a teacher — one class, one teacher, never a dump of every
+   grade; re-homing an already-homed class stays API-only (overwrite,
+   documented in the API docs).
    `class_ids` on a non-teacher role is `422 classes_teacher_only`
    (a client bug, the ClassStoreRequest teacher-guard precedent).
 6. **Race honesty** (the StudentController 3.2 rule): advisory

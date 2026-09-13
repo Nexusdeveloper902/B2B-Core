@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Web;
 
+use App\Models\SchoolClass;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -59,6 +60,31 @@ class StaffDeskTest extends TestCase
 
         $student = User::where('role', 'student')->firstOrFail();
         $this->actingAs($student)->get('/admin/staff')->assertForbidden();
+    }
+
+    #[Test]
+    public function the_homeroom_picker_lists_only_classes_without_a_teacher(): void
+    {
+        // Seeded truth: 5° B is homed to teacher@presence.test, 5° A
+        // is free — one class, one teacher, no full-grade dump.
+        $homed = SchoolClass::where('name', '5° B')->firstOrFail();
+        $free = SchoolClass::where('name', '5° A')->firstOrFail();
+
+        $html = $this->actingAs($this->admin())->get('/admin/staff')->getContent();
+
+        $this->assertStringNotContainsString('name="staff-classes" value="'.$homed->id.'"', $html);
+        $this->assertStringContainsString('name="staff-classes" value="'.$free->id.'"', $html);
+    }
+
+    #[Test]
+    public function the_email_field_auto_suggests_from_name_role_and_settings_domain(): void
+    {
+        $html = $this->actingAs($this->admin())->get('/admin/staff')->getContent();
+
+        // The settings preset rides a data attribute the desk script
+        // reads: {name}.{role}@{domain}, editable before submit.
+        $this->assertStringContainsString('data-email-domain="presence.test"', $html);
+        $this->assertStringContainsString(__('app.staff_email_hint'), $html);
     }
 
     #[Test]

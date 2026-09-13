@@ -2139,6 +2139,25 @@ select::-ms-expand { display: none; }
 .report-student-pick .field { margin-bottom: 0; }
 .report-student-pick > .btn { min-height: 44px; }
 
+/* TASK-038 — the homeroom picker: a tidy scrollable box (one class,
+   one teacher — only teacherless classes are listed), not a flex-row
+   dump of every grade. */
+.staff-classes {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-container-lowest);
+    padding: var(--sp-sm) var(--sp-md);
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 220px; overflow-y: auto;
+}
+.staff-classes-title {
+    font: 600 var(--fs-label-md)/var(--lh-label-md) var(--font-label);
+    letter-spacing: var(--ls-label-md);
+    text-transform: uppercase;
+    color: var(--text);
+}
+.staff-classes p { margin: 0; }
+
 /* Per-student participation strip: one column per day, two cells
    (breakfast/lunch). Green = served; amber = flagged; hollow = no meal. */
 .report-participation {
