@@ -45,12 +45,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // TASK-010 — card pairing window (seconds) is configuration, not
-        // code: ADR-020 documents the 45 s default choice.
-        $this->app->singleton(PairingService::class, function () {
-            return new PairingService(
-                (int) config('presence.pairing_window_seconds', 45),
-            );
-        });
+        // code: ADR-020 documents the 45 s default choice. TASK-037: the
+        // effective value is runtime-configurable through /admin settings
+        // (ADR-055); the service resolves it per arm call.
+        $this->app->singleton(PairingService::class, fn () => new PairingService);
     }
 
     /**

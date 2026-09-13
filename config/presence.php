@@ -21,29 +21,45 @@ return [
      |
      | Mirrored by App\Enums\EventType (the enum is canonical in code; this
      | config listing exists for documentation and external tooling).
+     |
+     | TASK-037 — ENTRY/EXIT removed (supersedes ADR-038); PAE_ATTEMPT is
+     | engine-written only (flagged out-of-window rows — never a reader
+     | mode; see EventType::validReaderModes()).
      */
     'event_types' => [
         'CLASS_ATTENDANCE',
         'PAE_BREAKFAST',
         'PAE_LUNCH',
         'RECYCLING_DEPOSIT',
-        'ENTRY',
-        // TASK-027 — the exit half of the entry/exit pair (time-in-school
-        // derivations pair ENTRY with the following EXIT per day).
-        'EXIT',
+        'PAE_ATTEMPT',
     ],
 
     /*
      | Readers of type `classroom` may be relabeled between these modes.
-     | Currently any known event type is a valid mode for any reader (the
-     | relabeling feature is the point); tighten per-type here if the school
-     | ever wants stricter rules.
+     | TASK-037: `entry` removed with the ENTRY/EXIT workflow.
      */
     'reader_types' => [
         'classroom',
         'pae',
         'recycling',
-        'entry',
+    ],
+
+    /*
+     | TASK-037 — PAE meal serving windows (ADR-053). School-local wall
+     | time (America/Bogota, no DST — ADR-025). These are the CONFIG
+     | DEFAULTS: admins override them at runtime through /admin/settings
+     | (settings table, ADR-055); the serving engine never reads these
+     | values directly — it goes through SettingsService.
+     |
+     | Format "HH:MM", 24h. Window boundaries: start inclusive, end
+     | exclusive. Breakfast/lunch windows must not overlap (validated on
+     | save; the engine flags any residual overlap as window_overlap).
+     */
+    'pae' => [
+        'breakfast_start' => env('PAE_BREAKFAST_START', '06:30'),
+        'breakfast_end' => env('PAE_BREAKFAST_END', '08:30'),
+        'lunch_start' => env('PAE_LUNCH_START', '11:30'),
+        'lunch_end' => env('PAE_LUNCH_END', '13:30'),
     ],
 
     /*

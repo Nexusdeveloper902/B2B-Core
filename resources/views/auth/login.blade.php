@@ -76,6 +76,12 @@
                             title="{{ __('app.demo_chip_hint') }}">
                         <span class="chip-role">{{ __('app.role_teacher') }}</span>teacher@presence.test
                     </button>
+                    {{-- TASK-037 — the kitchen demo account (restricted to
+                         the /kitchen meal-service workflow). --}}
+                    <button type="button" class="demo-chip" data-email="kitchen@presence.test"
+                            title="{{ __('app.demo_chip_hint') }}">
+                        <span class="chip-role">{{ __('app.role_kitchen') }}</span>kitchen@presence.test
+                    </button>
                 </div>
             </dd>
             <dd>{{ __('app.password') }}: <code>password</code></dd>

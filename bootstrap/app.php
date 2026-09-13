@@ -27,12 +27,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // /login, most commonly) go to their OWN dashboard. The framework
         // default sends everyone to /dashboard — staff-only, so students
         // used to land on a bare 403 with no way out.
+        // TASK-037 — kitchen users have their own desk too.
         $middleware->redirectUsersTo(function (Request $request) {
             $user = $request->user();
 
-            return $user && $user->isStudent()
-                ? route('student.dashboard')
-                : route('dashboard');
+            if ($user && $user->isStudent()) {
+                return route('student.dashboard');
+            }
+
+            if ($user && $user->isKitchen()) {
+                return route('kitchen');
+            }
+
+            return route('dashboard');
         });
 
         // Dashboard UI locale: session-based (EN / ES language switcher).

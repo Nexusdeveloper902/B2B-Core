@@ -119,7 +119,10 @@ pruebas con LLM real siguen siendo opcionales (`RUN_LIVE_LLM_TESTS=1` +
 
 Arranca `php artisan serve` contra `database/e2e.sqlite` (tu base de datos de
 desarrollo **nunca se toca**) y luego ejercita toda la historia de la plataforma
-por HTTP plano con 30 verificaciones bilingües: tap → clasificar → otorgo
+por HTTP plano con 33 verificaciones bilingües: tap → clasificar → otorgo
+idempotente → motor de servicio de comidas (comida auto-detectada, marca de
+duplicado, marca de fin de semana, rechazo en español que nombra la comida —
+TASK-37) →
 idempotente → reetiquetar lector → canje → estado bloqueado honesto de NL-query
 → enrutado de paneles. Sale con código distinto de cero si algo falla.
 

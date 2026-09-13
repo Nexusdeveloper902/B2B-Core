@@ -21,8 +21,19 @@ use Illuminate\Support\Facades\DB;
 class PairingService
 {
     public function __construct(
-        private readonly int $windowSeconds,
+        private readonly ?int $windowSeconds = null,
     ) {}
+
+    /**
+     * TASK-037 — the window is runtime-configurable (ADR-055): admins
+     * tune it in /admin settings instead of .env. Resolved per call so
+     * a settings change is live for the very next arm, without process
+     * restarts; the constructor value stays as the legacy override seam.
+     */
+    private function window(): int
+    {
+        return $this->windowSeconds ?? settings()->pairingWindowSeconds();
+    }
 
     /**
      * Arm a pending pairing for a student: the next fresh card scanned
@@ -47,7 +58,7 @@ class PairingService
 
             return PendingPairing::create([
                 'student_id' => $student->id,
-                'expires_at' => now()->addSeconds($this->windowSeconds),
+                'expires_at' => now()->addSeconds($this->window()),
             ]);
         });
     }

@@ -82,7 +82,7 @@ class AdminDesksTest extends TestCase
         $page->assertOk()
             ->assertSee(__('app.readers_page'))
             ->assertSee(__('app.reader_name'))
-            ->assertSee('Demo Reader — Classroom/PAE')
+            ->assertSee('Demo Reader — Classroom')
             ->assertSee('Demo Reader — Recycling')
             // the write endpoint the desk's script calls
             ->assertSee('/api/v1/admin/readers/');

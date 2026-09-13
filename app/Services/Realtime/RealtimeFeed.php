@@ -76,6 +76,8 @@ final class RealtimeFeed
                 'events.id',
                 'events.type',
                 'events.occurred_at',
+                'events.served',
+                'events.reason',
                 'students.id as student_id',
                 'students.name as student_name',
                 'students.class_id as class_id',
@@ -91,6 +93,12 @@ final class RealtimeFeed
                 return [
                     'id' => (int) $row->id,
                     'type' => (string) $row->type,
+                    // TASK-037 — meal semantics on the wire: served=false
+                    // + reason marks a flagged/excluded attempt; the
+                    // kitchen page colors its big state from these and
+                    // the dashboards style flagged chips differently.
+                    'served' => (bool) $row->served,
+                    'reason' => $row->reason !== null ? (string) $row->reason : null,
                     'student_id' => (int) $row->student_id,
                     'student_name' => (string) $row->student_name,
                     // TASK-027 — class_id lets the realtime server apply

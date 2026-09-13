@@ -14,6 +14,7 @@ use App\Models\RecyclingDeposit;
 use App\Models\Reward;
 use App\Models\RewardRedemption;
 use App\Models\SchoolClass;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\StudentAccountService;
@@ -23,13 +24,17 @@ use Illuminate\Database\Seeder;
 /**
  * TASK-030 (Fix 3) — the pilot seeder: a school that looks ALIVE.
  *
- * DemoSeeder is the small, stable, test-pinned fixture (4 students, no
- * events — the suite counts on it). THIS seeder is the human-facing one:
- * three classes, 24 students with logins and cards, five readers, ten
- * school days of taps (entries/exits, attendance with lates, PAE meals
- * honoring enrollment, recycling deposits with ledger points, two
+ * DemoSeeder is the small, stable, test-pinned fixture. THIS seeder is
+ * the human-facing one: three classes, 24 students with logins and
+ * cards, four readers, ten school days of taps (attendance with lates,
+ * PAE meals honoring per-meal enrollment and the same-day attendance
+ * prerequisite, recycling deposits with ledger points, two
  * redemptions), all deterministic (mt_srand) so every reseed produces
  * the same volumes on the same floating ten-weekday window.
+ *
+ * TASK-037 — ENTRY/EXIT is gone from the platform (supersedes ADR-038):
+ * no gate reader, no gate taps; PAE enrollment is per meal (breakfast
+ * / lunch independently) and meals only happen for present students.
  *
  * Fresh databases only: refuses to run when students already exist
  * (events/deposits are append-only rows — re-running would double the
@@ -48,38 +53,38 @@ class PilotSeeder extends Seeder
 
     private const SCHOOL_DAYS = 10;
 
-    /** [name, grade, pae] x8 per class. */
+    /** [name, grade, breakfast, lunch] x8 per class — TASK-037: per-meal. */
     private const ROSTER_5A = [
-        ['Sofía Herrera', '5°', true],
-        ['Mateo Rojas', '5°', true],
-        ['Valentina Castro', '5°', true],
-        ['Santiago Morales', '5°', false],
-        ['Isabella Ortiz', '5°', true],
-        ['Sebastián Guzmán', '5°', true],
-        ['Camila Vargas', '5°', true],
-        ['Nicolás Peña', '5°', false],
+        ['Sofía Herrera', '5°', true, true],
+        ['Mateo Rojas', '5°', true, false],
+        ['Valentina Castro', '5°', true, true],
+        ['Santiago Morales', '5°', false, false],
+        ['Isabella Ortiz', '5°', true, true],
+        ['Sebastián Guzmán', '5°', false, true],
+        ['Camila Vargas', '5°', true, true],
+        ['Nicolás Peña', '5°', false, false],
     ];
 
     private const ROSTER_5B = [
-        ['Maria González', '5°', true],
-        ['Carlos Pérez', '5°', true],
-        ['Ana Martínez', '5°', false],
-        ['Diego López', '5°', true],
-        ['Luciana Ríos', '5°', true],
-        ['Emiliano Soto', '5°', true],
-        ['Antonia Vega', '5°', false],
-        ['Joaquín Cortés', '5°', true],
+        ['Maria González', '5°', true, true],
+        ['Carlos Pérez', '5°', true, false],
+        ['Ana Martínez', '5°', false, true],
+        ['Diego López', '5°', false, false],
+        ['Luciana Ríos', '5°', true, true],
+        ['Emiliano Soto', '5°', true, true],
+        ['Antonia Vega', '5°', false, true],
+        ['Joaquín Cortés', '5°', true, true],
     ];
 
     private const ROSTER_6A = [
-        ['Fernanda Silva', '6°', true],
-        ['Martín Bravo', '6°', true],
-        ['Paula Fuentes', '6°', false],
-        ['Andrés Paredes', '6°', true],
-        ['Daniela Soto', '6°', true],
-        ['Gabriel Méndez', '6°', true],
-        ['Renata Díaz', '6°', true],
-        ['Tomás Aguirre', '6°', false],
+        ['Fernanda Silva', '6°', true, true],
+        ['Martín Bravo', '6°', true, false],
+        ['Paula Fuentes', '6°', false, false],
+        ['Andrés Paredes', '6°', true, true],
+        ['Daniela Soto', '6°', true, true],
+        ['Gabriel Méndez', '6°', true, false],
+        ['Renata Díaz', '6°', true, true],
+        ['Tomás Aguirre', '6°', false, false],
     ];
 
     /** material => weight for the deterministic draw. */
@@ -106,6 +111,25 @@ class PilotSeeder extends Seeder
             ['email' => 'admin@presence.test'],
             ['name' => 'School Admin', 'password' => 'password', 'role' => UserRole::Admin->value, 'must_change_password' => false],
         );
+
+        // TASK-037 — kitchen account (ADR-054) + runtime settings rows.
+        User::firstOrCreate(
+            ['email' => 'kitchen@presence.test'],
+            ['name' => 'Sofía Vargas', 'password' => 'password', 'role' => UserRole::Kitchen->value, 'must_change_password' => false],
+        );
+
+        foreach ([
+            'pae.breakfast_start' => config('presence.pae.breakfast_start', '06:30'),
+            'pae.breakfast_end' => config('presence.pae.breakfast_end', '08:30'),
+            'pae.lunch_start' => config('presence.pae.lunch_start', '11:30'),
+            'pae.lunch_end' => config('presence.pae.lunch_end', '13:30'),
+            'attendance.late_cutoff' => config('presence.late_cutoff', '08:15'),
+            'pairing.window_seconds' => config('presence.pairing_window_seconds', 45),
+            'accounts.student_email_domain' => config('presence.student_email_domain', 'presence.test'),
+            'accounts.student_initial_password' => config('presence.student_initial_password', 'password'),
+        ] as $key => $value) {
+            Setting::firstOrCreate(['key' => $key], ['value' => $value]);
+        }
 
         $classes = $this->seedClasses();
         $students = $this->seedStudents($classes);
@@ -171,11 +195,12 @@ class PilotSeeder extends Seeder
         ];
 
         foreach ($rosters as $className => $roster) {
-            foreach ($roster as [$name, $grade, $pae]) {
+            foreach ($roster as [$name, $grade, $breakfast, $lunch]) {
                 $student = Student::create([
                     'name' => $name,
                     'grade' => $grade,
-                    'pae_enrolled' => $pae,
+                    'pae_breakfast_enrolled' => $breakfast,
+                    'pae_lunch_enrolled' => $lunch,
                     'class_id' => $classes[$className]->id,
                 ]);
 
@@ -208,11 +233,14 @@ class PilotSeeder extends Seeder
     /** @return array<string, Reader> */
     private function seedReaders(): array
     {
+        // TASK-037 — the gate reader is gone with ENTRY/EXIT; the two PAE
+        // readers stay as separate cafeteria stations (both auto-detect
+        // the meal from the serving windows; their labels are the human
+        // hint, not the meal authority).
         $defs = [
             'classroom' => ['Pilot — Classroom', ReaderType::Classroom->value, EventType::ClassAttendance->value],
-            'pae_breakfast' => ['Pilot — PAE Breakfast', ReaderType::Pae->value, EventType::PaeBreakfast->value],
-            'pae_lunch' => ['Pilot — PAE Lunch', ReaderType::Pae->value, EventType::PaeLunch->value],
-            'entry' => ['Pilot — Gate', ReaderType::Entry->value, EventType::Entry->value],
+            'pae_breakfast' => ['Pilot — Cafeteria North', ReaderType::Pae->value, EventType::PaeBreakfast->value],
+            'pae_lunch' => ['Pilot — Cafeteria South', ReaderType::Pae->value, EventType::PaeLunch->value],
             'recycling' => ['Pilot — EcoStation', ReaderType::Recycling->value, EventType::RecyclingDeposit->value],
         ];
 
@@ -298,28 +326,30 @@ class PilotSeeder extends Seeder
             ]);
         };
 
-        // Gate in (ENTRY) — the 08:15 late line is read off the class tap.
-        if (mt_rand(1, 100) <= 97) {
-            $tap($readers['entry'], EventType::Entry->value, $at(6, 40, 55));
-        }
-
-        // Classroom attendance: most on time, a real late tail.
+        // Classroom attendance: most on time, a real late tail. The
+        // meal events below only happen when this tap exists — the
+        // engine's same-day attendance prerequisite, honored by the
+        // seed (TASK-037).
+        $attended = false;
+        $attendedAt = null;
         if (mt_rand(1, 100) <= 95) {
             $late = mt_rand(1, 100) <= 16;
-            $tap(
-                $readers['classroom'],
-                EventType::ClassAttendance->value,
-                $late ? $at(8, 16, 40) : $at(7, 0, 14)
-            );
+            $attendedAt = $late ? $at(8, 16, 40) : $at(7, 0, 14);
+            $tap($readers['classroom'], EventType::ClassAttendance->value, $attendedAt);
+            $attended = true;
         }
 
-        // PAE meals honor enrollment — a non-enrolled tap never appears
-        // (the gate's 422 is the point, not seed fiction).
-        if ($student->pae_enrolled) {
-            if (mt_rand(1, 100) <= 85) {
-                $tap($readers['pae_breakfast'], EventType::PaeBreakfast->value, $at(7, 5, 55));
+        // PAE meals honor PER-MEAL enrollment and the attendance
+        // prerequisite: a non-enrolled or absent student's meal never
+        // appears (the engine's 422 is the point, not seed fiction).
+        if ($attended) {
+            if ($student->pae_breakfast_enrolled && mt_rand(1, 100) <= 85) {
+                $breakfastAt = $at(7, 5, 55);
+                if ($attendedAt === null || $breakfastAt->gt($attendedAt)) {
+                    $tap($readers['pae_breakfast'], EventType::PaeBreakfast->value, $breakfastAt);
+                }
             }
-            if (mt_rand(1, 100) <= 80) {
+            if ($student->pae_lunch_enrolled && mt_rand(1, 100) <= 80) {
                 $tap($readers['pae_lunch'], EventType::PaeLunch->value, $at(12, 5, 50));
             }
         }
@@ -349,11 +379,6 @@ class PilotSeeder extends Seeder
             ]);
 
             $deposits++;
-        }
-
-        // Gate out (EXIT) — usually, not always (open sessions exist).
-        if (mt_rand(1, 100) <= 88) {
-            $tap($readers['entry'], EventType::Departure->value, $atRange(14, 16));
         }
 
         return [$events, $deposits];

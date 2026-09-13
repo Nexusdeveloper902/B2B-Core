@@ -88,4 +88,33 @@ return [
     // Generic
     'forbidden_role' => 'You do not have permission to perform this action.',
     'not_found' => 'Resource not found',
+
+    /* TASK-037 — the meal-serving engine (ADR-053): device-facing,
+       Accept-Language localized. Meal rejections always NAME THE MEAL. */
+    'meal_breakfast' => 'Breakfast',
+    'meal_lunch' => 'Lunch',
+    'pae_meal_served' => ':student received :meal',
+    'pae_weekend' => 'No meal service today — the feeding program runs Monday to Friday',
+    'pae_out_of_window' => 'No meal is being served right now. Breakfast :breakfast · Lunch :lunch',
+    'pae_window_overlap' => 'Meal serving windows overlap — check the settings desk',
+    'pae_no_student' => 'This card is not linked to a student',
+    'pae_not_enrolled_meal' => ':student is not enrolled for :meal',
+    'pae_no_attendance' => ':student must check in at class before receiving :meal',
+    'pae_duplicate' => ':student already received :meal today',
+
+    // Machine-stable rejection reasons (labels for reports/kitchen)
+    'pae_reason_weekend' => 'Weekend (no service)',
+    'pae_reason_out_of_window' => 'Outside serving window',
+    'pae_reason_window_overlap' => 'Windows overlap',
+    'pae_reason_no_student' => 'Card without student',
+    'pae_reason_not_enrolled' => 'Not enrolled',
+    'pae_reason_no_attendance' => 'No prior attendance',
+    'pae_reason_duplicate' => 'Duplicate meal',
+
+    // Settings surface (ADR-055)
+    'settings_empty' => 'No settings were provided',
+    'settings_invalid' => 'The settings were not valid',
+    'settings_saved' => 'Settings saved — they are live immediately',
+    'settings_unknown_key' => 'Unknown setting key: :key',
+    'settings_windows_overlap' => 'The breakfast and lunch windows must not overlap',
 ];

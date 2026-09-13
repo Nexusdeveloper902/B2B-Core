@@ -1971,3 +1971,190 @@ select::-ms-expand { display: none; }
     .toast-region { right: 0; bottom: 0; left: 0; width: auto; gap: 0; }
     .toast { border-radius: var(--radius) var(--radius) 0 0; border-left: none; border-right: none; border-bottom: none; }
 }
+
+/* ==========================================================================
+   TASK-037 — PAE full program additions
+
+   1. Flagged meal chips (served=false rows in feeds/timelines/reports):
+      muted + dashed outline — visually distinct from real meals so a
+      duplicate/out-of-window attempt can never read as a served meal.
+   2. Kitchen desk (/kitchen): the glanceable fullscreen state —
+      green accept / red reject / waiting, huge type, motion-gated.
+   3. Settings desk + PAE reports (charts, tables, participation strip).
+   ========================================================================== */
+
+/* ---- 1. Flagged meal chips ---- */
+.live-chip.is-flagged,
+.live-chip[data-event-type="PAE_ATTEMPT"] {
+    background: color-mix(in srgb, var(--error-container) 55%, var(--surface-container-lowest));
+    color: var(--on-error-container);
+    border: 1px dashed var(--error);
+    font-style: italic;
+}
+
+/* ---- 2. Kitchen desk ---- */
+.kitchen { display: flex; flex-direction: column; gap: var(--sp-md); }
+
+.kitchen-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: var(--sp-md); flex-wrap: wrap;
+}
+
+.kitchen-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; min-height: 54vh; padding: var(--sp-xl) var(--sp-lg);
+    border-radius: var(--radius-lg); text-align: center;
+    background: var(--surface-container); color: var(--text);
+    transition: background-color 200ms ease;
+}
+
+.kitchen-state .kitchen-glyph { font-size: 96px; line-height: 1; }
+.kitchen-state .kitchen-verdict {
+    font-size: var(--fs-headline-lg); font-weight: var(--fw-headline-lg);
+    letter-spacing: var(--ls-headline-lg); line-height: 1.1;
+}
+.kitchen-state .kitchen-student {
+    font-size: clamp(32px, 7vw, 64px); font-weight: 600;
+    line-height: 1.05; overflow-wrap: anywhere;
+}
+.kitchen-state .kitchen-detail { font-size: 18px; max-width: 60ch; }
+.kitchen-state .kitchen-time { font-family: var(--font-mono); opacity: .8; }
+
+.kitchen-state.is-accepted {
+    background: #1e7a41; color: #ffffff;
+}
+.kitchen-state.is-accepted .kitchen-glyph { color: #d6f5e0; }
+
+.kitchen-state.is-rejected {
+    background: var(--error); color: var(--on-error);
+}
+.kitchen-state.is-rejected .kitchen-glyph { color: var(--error-container); }
+
+@media (prefers-reduced-motion: no-preference) {
+    .kitchen-state.is-accepted, .kitchen-state.is-rejected { animation: kitchen-pop 240ms ease-out; }
+    @keyframes kitchen-pop {
+        from { transform: scale(.985); }
+        to   { transform: scale(1); }
+    }
+}
+
+.kitchen-recent .panel-label { margin-bottom: var(--sp-sm); }
+.kitchen-list { max-height: 34vh; overflow-y: auto; }
+
+@media (max-width: 640px) {
+    .kitchen-state { min-height: 46vh; }
+    .kitchen-state .kitchen-glyph { font-size: 72px; }
+    .kitchen-state .kitchen-detail { font-size: 15px; }
+}
+
+/* ---- 3. Settings desk ---- */
+.settings-grid { max-width: 720px; }
+
+.settings-panel { display: flex; flex-direction: column; gap: var(--sp-sm); }
+
+.settings-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); }
+
+.settings-panel input.is-custom {
+    border-color: var(--tertiary-fixed-dim);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tertiary-fixed) 25%, transparent);
+}
+
+@media (max-width: 640px) {
+    .settings-row { grid-template-columns: 1fr; }
+}
+
+/* ---- 4. PAE reports ---- */
+.report-controls {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-sm);
+    margin-bottom: var(--sp-md);
+}
+
+.report-controls .field { min-width: 150px; }
+
+.report-exports { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
+.report-cols {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md);
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .report-cols { grid-template-columns: 1fr; }
+    .report-exports { margin-left: 0; }
+}
+
+.report-chart { width: 100%; height: auto; display: block; }
+
+.bar-breakfast { fill: var(--tertiary-fixed-dim); }
+.bar-lunch { fill: var(--primary); }
+.bar-missed { fill: var(--error); }
+.chart-axis { stroke: var(--outline-variant); stroke-width: 1; }
+.chart-label { fill: var(--outline); font-size: 10px; font-family: var(--font-mono); }
+
+.chart-legend { display: flex; align-items: center; gap: 8px; margin: var(--sp-xs) 0 0; }
+
+.legend-swatch {
+    display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    background: var(--outline-variant);
+}
+.legend-swatch.bar-breakfast { background: var(--tertiary-fixed-dim); }
+.legend-swatch.bar-lunch { background: var(--primary); }
+.legend-swatch.is-served { background: #1e7a41; }
+.legend-swatch.is-flagged { background: var(--tertiary-fixed-dim); }
+.legend-swatch.is-empty { background: var(--surface-container-highest); }
+
+.sp-l-md { margin-left: var(--sp-md); }
+.sp-t-md { margin-top: var(--sp-md); }
+.sp-t-sm { margin-top: var(--sp-sm); }
+.sp-b-sm { margin-bottom: var(--sp-sm); }
+
+.report-dl { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.report-dl > div {
+    display: flex; justify-content: space-between; gap: var(--sp-md);
+    border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;
+}
+.report-dl dt { color: var(--text-muted); }
+.report-dl dd { margin: 0; font-family: var(--font-mono); font-weight: 600; }
+
+.report-reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.report-reasons li {
+    display: flex; justify-content: space-between; gap: var(--sp-md);
+    border-bottom: 1px dashed var(--outline-variant); padding-bottom: 4px;
+}
+.report-reasons strong { font-family: var(--font-mono); }
+
+.stat-row-compact { grid-template-columns: repeat(3, 1fr); }
+
+.report-student-badges {
+    display: flex; align-items: center; gap: var(--sp-sm); flex-wrap: wrap;
+    margin-bottom: var(--sp-md);
+}
+
+.report-student-pick { display: flex; align-items: flex-end; gap: var(--sp-sm); flex-wrap: wrap; }
+
+/* Per-student participation strip: one column per day, two cells
+   (breakfast/lunch). Green = served; amber = flagged; hollow = no meal. */
+.report-participation {
+    display: flex; gap: 4px; overflow-x: auto; padding-bottom: var(--sp-xs);
+}
+
+.participation-day { display: flex; flex-direction: column; gap: 3px; min-width: 58px; }
+
+.participation-cell {
+    min-height: 34px; border-radius: 4px; padding: 4px 6px;
+    font-family: var(--font-mono); font-size: 11px; text-align: center;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.participation-cell.is-served { background: #1e7a41; color: #ffffff; }
+.participation-cell.is-flagged {
+    background: color-mix(in srgb, var(--tertiary-fixed) 45%, var(--surface-container-lowest));
+    color: var(--on-tertiary-fixed-variant);
+    border: 1px dashed var(--tertiary-fixed-dim);
+}
+.participation-cell.is-empty { background: var(--surface-container-high); color: var(--outline); }
+
+.participation-date {
+    font-family: var(--font-mono); font-size: 10px; text-align: center;
+    color: var(--outline);
+}

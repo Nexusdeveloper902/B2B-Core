@@ -17,7 +17,12 @@ Una aplicación Laravel 13 que ingiere **eventos de tap** de lectores NFC
 unificado de eventos:
 
 1. **Registro de asistencia** — la aplicación fundamental
-2. **PAE (programa de alimentación escolar)** — desayuno/almuerzo obligatorios
+2. **PAE (programa de alimentación escolar)** — un servicio de comidas
+   operativo completo: inscripción por comida (desayuno/almuerzo
+   independientes), ventanas de servicio auto-detectadas, prerrequisito
+   de asistencia, auditoría de duplicados/intentos marcados, un
+   escritorio de cocina en tiempo real, reportes de comidas perdidas y
+   exportación a PDF/CSV (TASK-037)
 3. **Incentivos de reciclaje** — tap → clasificar material → **ganar**
    puntos → **gastarlos** en recompensas (un bucle real de ganar+gastar con
    paso de verificación, a diferencia de displays de puntos sin mecanismo de
@@ -112,6 +117,9 @@ Documentación completa de endpoints: [docs/API.es.md](docs/API.es.md) ·
 | `/login` | — | Inicio de sesión EN/ES |
 | `/teacher` | profesor (o admin) | Asistencia de hoy de la clase: presente / tarde (tras el corte configurable) / ausente |
 | `/admin` | admin | Estadísticas de toda la escuela (asistencia, PAE desayuno/almuerzo, reciclaje artículos+puntos), control de modo de lectores, caja de consulta NL, mostrador de canjes, enlaces a vista de padres |
+| `/kitchen` | cocina (o admin) | **Escritorio de cocina** (TASK-037): el flujo de servicio de comidas — un estado gigante verde/rojo de aceptado/rechazado guiado por los toques en tiempo real (con el motivo del rechazo), la comida detectada y una lista de toques recientes. Los usuarios de cocina quedan restringidos a este escritorio |
+| `/admin/settings` | admin | **Escritorio de configuración** (TASK-037): los mandos seguros de presencia/PAE — ventanas de servicio, corte de llegada tarde, ventana de emparejamiento, convenciones de cuentas — guardados por la API y aplicados al instante |
+| `/admin/reports/pae` | admin | **Reportes PAE** (TASK-037): comidas servidas por día/mes con gráficas, comidas perdidas (lista + tendencia), intentos excluidos por motivo, inscripción por comida, historial por estudiante — con exportación a PDF y CSV |
 | `/admin/pairing` | admin | **Escritorio de emparejamiento** (TASK-011): botón "Armar emparejamiento" de un clic por estudiante, cuenta regresiva de 45 s en vivo, el instante en que la tarjeta queda emparejada e historial reciente — empareja tarjetas nuevas sin curl ni PAT. En vivo por el canal WebSocket en tiempo real (TASK-020): armado / emparejado / rechazo llegan en ~300 ms, con la consulta de estado como respaldo honesto |
 | `/parent/students/{id}` | admin/profesor | Línea de tiempo completa de eventos de un estudiante (sustituto simplificado de vista de padres — un sistema real de autenticación de padres está intencionalmente fuera del alcance) |
 
@@ -166,7 +174,7 @@ cada push.
 ## Arquitectura en un párrafo
 
 `events` es la **columna vertebral de tipos de evento**: un tap = una fila
-(`card_id`, `reader_id`, `type`, `occurred_at`). Los números de asistencia,
+(`card_id`, `reader_id`, `type`, `occurred_at`, `served`, `reason`). Los números de asistencia,
 PAE y reciclaje **siempre se derivan** de esa tabla — nunca se almacenan por
 separado — así las tres aplicaciones nunca pueden divergir. Los lectores se
 autentican con una clave Bearer estática (la clave ES la identidad del

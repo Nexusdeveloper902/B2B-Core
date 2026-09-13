@@ -22,6 +22,9 @@ class AttendanceServiceTest extends TestCase
         parent::setUp();
         $this->service = app(AttendanceService::class);
         $this->seedDemo();
+        // TASK-037 — the fixture owns ALL events (the demo seeder's
+        // past-day PAE scenario rows would leak into the timeline).
+        PresenceEvent::query()->delete();
     }
 
     #[Test]

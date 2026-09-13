@@ -22,7 +22,9 @@ class ReaderModeRequest extends FormRequest
         return [
             // The same physical reader can be relabeled to any known event
             // type — validated against the canonical EventType set.
-            'active_event_type' => ['required', 'string', Rule::enum(EventType::class)],
+            // TASK-037 — PAE_ATTEMPT is engine-written only (flagged rows), never
+            // a valid reader mode: see EventType::validReaderModes().
+            'active_event_type' => ['required', 'string', Rule::in(EventType::validReaderModes()->all())],
         ];
     }
 }

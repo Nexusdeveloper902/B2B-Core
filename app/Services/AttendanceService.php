@@ -21,8 +21,13 @@ use Illuminate\Support\Collection;
  *
  * TASK-027 adds the analytical half (absences, repeat absentees, trends,
  * late counts, name lookup — all scope-aware for the teacher NL
- * interface) and the entry/exit session pairing (every entry registers;
- * time-in-school is derived on the fly, never stored).
+ * interface).
+ *
+ * TASK-037 — the entry/exit session pairing is REMOVED (ENTRY/EXIT left
+ * the platform entirely; supersedes ADR-038) and every PAE derivation
+ * counts only served meal rows: a flagged attempt (served=false) never
+ * reaches paeCount/paeStudents/paeTrend, by the where('served', true)
+ * constraint inside the shared helpers.
  *
  * Scope convention used by the new methods: `$classIds === null` means
  * school-wide (admin); an empty array means a teacher with no classes
@@ -55,7 +60,7 @@ class AttendanceService
      */
     public function attendanceRowsForClass(int $classId, string $date): array
     {
-        $cutoff = (string) config('presence.late_cutoff');
+        $cutoff = settings()->lateCutoff();
 
         $students = Student::where('class_id', $classId)
             ->with('cards')
@@ -168,6 +173,13 @@ class AttendanceService
         return $this->studentCountForEvent($this->paeMealType($meal), $date, $classIds);
     }
 
+    /**
+     * TASK-037 — rejected attempts are auditable but never counted: the
+     * shared helper below keeps a served=true constraint so duplicates,
+     * out-of-window and not-enrolled attempts can never inflate a PAE
+     * metric. This method is the serving-truth behind every PAE count.
+     */
+
     /** Meal name → event type (unknown maps to lunch, same as paeCount always did). */
     private function paeMealType(string $meal): string
     {
@@ -214,6 +226,7 @@ class AttendanceService
 
         $counts = PresenceEvent::query()
             ->where('events.type', $type)
+            ->where('events.served', true)
             ->whereBetween('occurred_at', [
                 Carbon::parse($from)->startOfDay(),
                 Carbon::parse($to)->endOfDay(),
@@ -251,6 +264,11 @@ class AttendanceService
     {
         $query = PresenceEvent::query()
             ->where('events.type', $type)
+            // TASK-037 — the served-truth constraint: flagged attempts
+            // (duplicates, out-of-window, not-enrolled, no-attendance)
+            // stay auditable but never count. Harmless for CLASS_ATTENDANCE
+            // (attendance rows are always served).
+            ->where('events.served', true)
             ->whereDate('occurred_at', $date)
             ->join('cards', 'cards.id', '=', 'events.card_id')
             ->join('students', 'students.id', '=', 'cards.student_id');
@@ -312,6 +330,12 @@ class AttendanceService
                     'reader' => $event->reader?->label,
                     'material' => $event->deposit?->material_class?->value,
                     'points' => $event->deposit?->points_awarded,
+                    // TASK-037 — meal semantics for the parent view: served
+                    // rows are real meals; served=false + reason is a
+                    // recorded attempt that did NOT count (distinct badge).
+                    'served' => $event->served,
+                    'reason' => $event->reason,
+                    'meal' => $event->mealName(),
                 ];
             })
             ->all();
@@ -378,7 +402,7 @@ class AttendanceService
      */
     public function lateCount(string $date, ?array $classIds = null): int
     {
-        $cutoff = (string) config('presence.late_cutoff');
+        $cutoff = settings()->lateCutoff();
 
         return collect($this->firstTapByStudent($date, $classIds))
             ->filter(fn (string $time) => $time > $cutoff)
@@ -394,7 +418,7 @@ class AttendanceService
      */
     public function lateStudents(string $date, ?array $classIds = null): array
     {
-        $cutoff = (string) config('presence.late_cutoff');
+        $cutoff = settings()->lateCutoff();
 
         $lateIds = collect($this->firstTapByStudent($date, $classIds))
             ->filter(fn (string $time) => $time > $cutoff);
@@ -578,64 +602,14 @@ class AttendanceService
     }
 
     /**
-     * Students currently inside school: today's last gate event per
-     * student is an ENTRY with no later EXIT ("¿quién está en el
-     * colegio ahora mismo?"). entry_at is the day's first ENTRY.
+     * TASK-037 — findStudentsByName now carries the per-meal enrollment
+     * flags (breakfast/lunch) instead of the removed single flag.
      *
-     * @param  array<int, int>|null  $classIds
-     * @return array<int, array{id: int, name: string, class_name: ?string, entry_at: string}>
-     */
-    public function studentsInSchool(?array $classIds = null): array
-    {
-        $today = Carbon::today()->toDateString();
-
-        $events = PresenceEvent::query()
-            ->whereIn('events.type', ['ENTRY', 'EXIT'])
-            ->whereDate('occurred_at', $today)
-            ->join('cards', 'cards.id', '=', 'events.card_id')
-            ->join('students', 'students.id', '=', 'cards.student_id')
-            ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
-            ->orderBy('occurred_at')
-            ->get(['students.id as student_id', 'events.type as type', 'occurred_at']);
-
-        $byStudent = [];
-        foreach ($events as $event) {
-            $id = (int) $event->student_id;
-            $byStudent[$id] ??= ['first_entry' => null, 'last' => null];
-            if ($event->type === 'ENTRY' && $byStudent[$id]['first_entry'] === null) {
-                $byStudent[$id]['first_entry'] = Carbon::parse($event->occurred_at)->format('H:i');
-            }
-            $byStudent[$id]['last'] = $event->type;
-        }
-
-        $insideIds = array_keys(array_filter($byStudent, fn ($s) => $s['last'] === 'ENTRY'));
-
-        if ($insideIds === []) {
-            return [];
-        }
-
-        $entryAt = array_map(fn ($s) => $s['first_entry'], $byStudent);
-
-        return $this->scopedStudents($classIds)
-            ->whereIn('students.id', $insideIds)
-            ->join('classes', 'classes.id', '=', 'students.class_id')
-            ->orderBy('students.name')
-            ->get(['students.id', 'students.name', 'classes.name as class_name'])
-            ->map(fn ($row) => [
-                'id' => (int) $row->id,
-                'name' => (string) $row->name,
-                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
-                'entry_at' => $entryAt[(int) $row->id],
-            ])
-            ->all();
-    }
-
-    /**
      * Fuzzy name lookup — the bridge that lets the NL interface resolve
      * "Ana" to a student id before calling the timeline function.
      *
      * @param  array<int, int>|null  $classIds
-     * @return array<int, array{id: int, name: string, class_name: ?string, pae_enrolled: bool}>
+     * @return array<int, array{id: int, name: string, class_name: ?string, pae_breakfast_enrolled: bool, pae_lunch_enrolled: bool}>
      */
     public function findStudentsByName(string $name, ?array $classIds = null): array
     {
@@ -652,85 +626,15 @@ class AttendanceService
             ->join('classes', 'classes.id', '=', 'students.class_id')
             ->orderBy('students.name')
             ->limit(self::NAME_LOOKUP_LIMIT)
-            ->get(['students.id', 'students.name', 'classes.name as class_name', 'students.pae_enrolled'])
+            ->get(['students.id', 'students.name', 'classes.name as class_name', 'students.pae_breakfast_enrolled', 'students.pae_lunch_enrolled'])
             ->map(fn ($row) => [
                 'id' => (int) $row->id,
                 'name' => (string) $row->name,
                 'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
-                'pae_enrolled' => (bool) $row->pae_enrolled,
+                'pae_breakfast_enrolled' => (bool) $row->pae_breakfast_enrolled,
+                'pae_lunch_enrolled' => (bool) $row->pae_lunch_enrolled,
             ])
             ->all();
-    }
-
-    // -----------------------------------------------------------------------
-    // TASK-027 — the entry/exit half (multiple entries all register;
-    // time-in-school derived on the fly from ENTRY/EXIT pairs).
-    // -----------------------------------------------------------------------
-
-    /**
-     * Per-day presence sessions for one student over the last $days days.
-     * Every ENTRY is its own row (multiple entries per day register —
-     * the edge case the spec calls out); each EXIT closes the most recent
-     * open ENTRY of the same day; an unmatched ENTRY stays open (the
-     * student is still inside / forgot to tap out — honest, not invented).
-     *
-     * @return array<int, array{
-     *   date: string, entries: int, exits: int, minutes_in_school: int,
-     *   open_session: bool, sessions: array<int, array{entry: string, exit: ?string, minutes: ?int}>
-     * }>
-     */
-    public function studentSessions(Student $student, int $days = 30): array
-    {
-        $days = max(1, min(365, $days));
-        $from = Carbon::today()->subDays($days - 1)->startOfDay();
-
-        $events = PresenceEvent::whereIn('card_id', $student->cards()->pluck('id'))
-            ->whereIn('type', ['ENTRY', 'EXIT'])
-            ->where('occurred_at', '>=', $from)
-            ->orderBy('occurred_at')
-            ->get(['type', 'occurred_at']);
-
-        $byDay = [];
-        foreach ($events as $event) {
-            $day = $event->occurred_at->toDateString();
-            $byDay[$day] ??= ['sessions' => [], 'open' => null, 'exits' => 0, 'entries' => 0];
-
-            if ($event->type === 'ENTRY') {
-                $byDay[$day]['entries']++;
-                $byDay[$day]['sessions'][] = ['entry' => $event->occurred_at->format('H:i'), 'exit' => null, 'minutes' => null];
-                $byDay[$day]['open'] = count($byDay[$day]['sessions']) - 1;
-            } else {
-                $byDay[$day]['exits']++;
-                $open = $byDay[$day]['open'];
-                if ($open !== null) {
-                    $entry = $byDay[$day]['sessions'][$open];
-                    $minutes = (int) round(abs($event->occurred_at->diffInMinutes(
-                        Carbon::parse($day.' '.$entry['entry'])
-                    )));
-                    $byDay[$day]['sessions'][$open]['exit'] = $event->occurred_at->format('H:i');
-                    $byDay[$day]['sessions'][$open]['minutes'] = $minutes;
-                    $byDay[$day]['open'] = null;
-                }
-                // An EXIT with no open entry of the same day is kept in the
-                // exits count but pairs with nothing (no invented entry).
-            }
-        }
-
-        krsort($byDay);
-
-        $rows = [];
-        foreach ($byDay as $day => $data) {
-            $rows[] = [
-                'date' => (string) $day,
-                'entries' => $data['entries'],
-                'exits' => $data['exits'],
-                'minutes_in_school' => (int) collect($data['sessions'])->sum('minutes'),
-                'open_session' => $data['open'] !== null,
-                'sessions' => $data['sessions'],
-            ];
-        }
-
-        return $rows;
     }
 
     /**
@@ -752,6 +656,7 @@ class AttendanceService
     {
         return PresenceEvent::query()
             ->where('events.type', $type)
+            ->where('events.served', true)
             ->whereDate('occurred_at', $date)
             ->join('cards', 'cards.id', '=', 'events.card_id')
             ->join('students', 'students.id', '=', 'cards.student_id')

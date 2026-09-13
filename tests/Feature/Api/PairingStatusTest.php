@@ -318,7 +318,7 @@ class PairingStatusTest extends TestCase
         return Student::create([
             'name' => "Estudiante Escritorio {$n}",
             'grade' => '5°',
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
     }
 }

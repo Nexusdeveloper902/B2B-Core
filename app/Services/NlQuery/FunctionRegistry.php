@@ -4,6 +4,7 @@ namespace App\Services\NlQuery;
 
 use App\Models\Student;
 use App\Services\AttendanceService;
+use App\Services\PaeReportService;
 use App\Services\PointsService;
 use App\Services\Recycling\LeaderboardService;
 use App\Services\StudentScope;
@@ -25,6 +26,15 @@ use App\Services\StudentScope;
  * data). The school-wide recycling totals stay school-wide on purpose
  * (leaderboard-level exposure, spec §22).
  *
+ * TASK-037 — PAE parity: the complete school-feeding data model is
+ * queryable here — per-meal counts and lists, meal participation,
+ * trends, missed meals, per-meal enrollment, per-student meal history
+ * and flagged (excluded) meal attempts — all resolved through the same
+ * AttendanceService/PaeReportService methods the dashboards and the
+ * /admin/reports/pae pages use, so the LLM can never disagree with a
+ * report. The entry/exit functions are REMOVED with the feature
+ * (supersedes ADR-038).
+ *
  * Wire format: provider-neutral declarations (name/description/parameters)
  * with LOWERCASE JSON-Schema types ("object"/"string"/"integer") — exactly
  * what the DeepSeek tools format expects; the client wraps them into
@@ -35,6 +45,7 @@ class FunctionRegistry
 {
     public function __construct(
         private readonly AttendanceService $attendance,
+        private readonly PaeReportService $pae,
         private readonly PointsService $points,
         private readonly LeaderboardService $leaderboard,
     ) {}
@@ -86,7 +97,7 @@ class FunctionRegistry
             ],
             [
                 'name' => 'get_student_timeline',
-                'description' => 'Chronological list of all presence events (attendance, feeding program, recycling deposits, entry/exit) for one student.',
+                'description' => 'Chronological list of all presence events (class attendance, PAE meals and flagged meal attempts, recycling deposits) for one student.',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
@@ -168,20 +179,8 @@ class FunctionRegistry
                 ],
             ],
             [
-                'name' => 'get_student_time_in_school',
-                'description' => 'Per-day entry/exit sessions and total time spent in school for one student (derived from ENTRY/EXIT taps; an unmatched entry counts as an open session).',
-                'parameters' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'student_id' => ['type' => 'integer', 'description' => 'The student ID (resolve it with find_student first).'],
-                        'days' => ['type' => 'integer', 'description' => 'How many days back (1-365, default 30).'],
-                    ],
-                    'required' => ['student_id'],
-                ],
-            ],
-            [
                 'name' => 'find_student',
-                'description' => 'Look up students by (partial) name to resolve a student_id before calling timeline or time-in-school functions. Returns up to five matches.',
+                'description' => 'Look up students by (partial) name to resolve a student_id before calling timeline or PAE-history functions. Returns up to five matches with their per-meal PAE enrollment.',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
@@ -262,17 +261,6 @@ class FunctionRegistry
                 ],
             ],
             [
-                'name' => 'get_students_in_school',
-                'description' => 'Students currently inside school (entered today with no later exit), with entry times. Use for "who is in school right now / quién está en el colegio". Optionally scoped to one class.',
-                'parameters' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
-                    ],
-                    'required' => [],
-                ],
-            ],
-            [
                 'name' => 'get_recycling_leaderboard',
                 'description' => 'Top students by recycling points (competition rank). Use for "who is winning recycling / quién va ganando". School-wide by design (public competition board).',
                 'parameters' => [
@@ -302,6 +290,92 @@ class FunctionRegistry
                     'properties' => [
                         'days' => ['type' => 'integer', 'description' => 'How many days back to consider (1-90, default 30).'],
                         'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'get_missed_meals',
+                'description' => 'List of students who MISSED a PAE meal on a school day: present (class attendance), enrolled for that meal, but no served meal recorded. Use for "who missed lunch / quiénes no almorzaron". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format (default today).'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => ['meal'],
+                ],
+            ],
+            [
+                'name' => 'get_missed_meal_count',
+                'description' => 'Count of students who missed a PAE meal on a school day (present + enrolled + not served). Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format (default today).'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the count.'],
+                    ],
+                    'required' => ['meal'],
+                ],
+            ],
+            [
+                'name' => 'get_missed_meal_trend',
+                'description' => 'Daily count of missed meals for one meal over the last N school days. Use for "is the missed-lunch problem growing".',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'days' => ['type' => 'integer', 'description' => 'How many days back (1-90, default 7).'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the trend.'],
+                    ],
+                    'required' => ['meal'],
+                ],
+            ],
+            [
+                'name' => 'get_pae_enrollment',
+                'description' => 'PAE enrollment summary: how many students are enrolled for breakfast, for lunch, for both, for one only, and for neither. Use for "how many are in the feeding program / cuántos están en el PAE". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the summary.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'get_student_pae_history',
+                'description' => 'One student\'s PAE history: per-day breakfast/lunch status (served or flagged) plus totals, over the last N days. Use for "has Maria been eating / María ha estado almorzando". Resolve the id with find_student first.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'student_id' => ['type' => 'integer', 'description' => 'The student ID (resolve it with find_student first).'],
+                        'days' => ['type' => 'integer', 'description' => 'How many days back (1-365, default 30).'],
+                    ],
+                    'required' => ['student_id'],
+                ],
+            ],
+            [
+                'name' => 'get_student_meals_on',
+                'description' => 'Whether one specific student received breakfast and/or lunch on a specific date (served meals only). Use for "did Maria have lunch today / María almorzó hoy". Resolve the id with find_student first.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'student_id' => ['type' => 'integer', 'description' => 'The student ID (resolve it with find_student first).'],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format (default today).'],
+                    ],
+                    'required' => ['student_id'],
+                ],
+            ],
+            [
+                'name' => 'get_flagged_meal_attempts',
+                'description' => 'Flagged (recorded but excluded) meal attempts: duplicate taps, out-of-window taps, students not enrolled, no prior attendance. Returns the count, the per-reason breakdown and the most recent rows. Use for "how many rejected meal taps / cuántos toques rechazados".',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'date_from' => ['type' => 'string', 'description' => 'Start date in YYYY-MM-DD format (inclusive, default today).'],
+                        'date_to' => ['type' => 'string', 'description' => 'End date in YYYY-MM-DD format (inclusive, default date_from).'],
                     ],
                     'required' => [],
                 ],
@@ -338,7 +412,6 @@ class FunctionRegistry
                 ),
             ],
             'get_repeatedly_absent_students' => $this->repeatedlyAbsentResult($args, $scope),
-            'get_student_time_in_school' => $this->timeInSchoolResult($args, $scope),
             'find_student' => [
                 'name' => (string) $args['name'],
                 'matches' => $this->attendance->findStudentsByName(
@@ -366,12 +439,18 @@ class FunctionRegistry
                     $this->scopeClassIds($scope),
                 ),
             ],
-            'get_students_in_school' => $this->inSchoolResult($args, $scope),
             'get_recycling_leaderboard' => [
                 'leaders' => $this->leaderboard->top(max(1, min(50, (int) ($args['limit'] ?? 10)))),
             ],
             'get_student_points' => $this->studentPointsResult($args, $scope),
             'get_perfect_attendance' => $this->perfectAttendanceResult($args, $scope),
+            'get_missed_meals' => $this->missedMealsResult($args, $scope, false),
+            'get_missed_meal_count' => $this->missedMealsResult($args, $scope, true),
+            'get_missed_meal_trend' => $this->missedMealTrendResult($args, $scope),
+            'get_pae_enrollment' => $this->paeEnrollmentResult($args, $scope),
+            'get_student_pae_history' => $this->studentPaeHistoryResult($args, $scope),
+            'get_student_meals_on' => $this->studentMealsOnResult($args, $scope),
+            'get_flagged_meal_attempts' => $this->flaggedAttemptsResult($args),
             default => ['error' => "Unknown function [{$name}]"],
         };
     }
@@ -589,10 +668,13 @@ class FunctionRegistry
     }
 
     /**
+     * TASK-037 — missed-meal list + count (one implementation, two
+     * functions — the same PaeReportService the report pages use).
+     *
      * @param  array<string, mixed>  $args
      * @return array<string, mixed>
      */
-    private function inSchoolResult(array $args, ?StudentScope $scope): array
+    private function missedMealsResult(array $args, ?StudentScope $scope, bool $countOnly): array
     {
         [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
 
@@ -600,9 +682,125 @@ class FunctionRegistry
             return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
         }
 
-        $inside = $this->attendance->studentsInSchool($classIds);
+        $meal = (string) ($args['meal'] ?? 'lunch');
+        $date = (string) ($args['date'] ?? now()->toDateString());
+        $missed = $this->pae->missedMeals($meal, $date, $classIds);
 
-        return ['inside_count' => count($inside), 'inside' => $inside];
+        return [
+            'meal' => $meal,
+            'date' => $date,
+            'missed_count' => count($missed),
+            'missed_students' => $countOnly ? null : $missed,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function missedMealTrendResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        $meal = (string) ($args['meal'] ?? 'lunch');
+        $days = $this->boundedDays((int) ($args['days'] ?? 7), 90);
+
+        return [
+            'meal' => $meal,
+            'days' => $days,
+            'trend' => $this->pae->missedMealTrend($meal, $days, $classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function paeEnrollmentResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return $this->pae->enrollmentSummary($classIds);
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function studentPaeHistoryResult(array $args, ?StudentScope $scope): array
+    {
+        $student = Student::find((int) $args['student_id']);
+
+        if ($student === null) {
+            return ['error' => 'Student ['.(int) $args['student_id'].'] not found'];
+        }
+
+        if ($scope !== null && ! $scope->allowsStudent($student)) {
+            return ['error' => 'Student is outside the caller\'s scope'];
+        }
+
+        return $this->pae->studentHistory(
+            $student,
+            $this->boundedDays((int) ($args['days'] ?? 30), 365),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function studentMealsOnResult(array $args, ?StudentScope $scope): array
+    {
+        $student = Student::find((int) $args['student_id']);
+
+        if ($student === null) {
+            return ['error' => 'Student ['.(int) $args['student_id'].'] not found'];
+        }
+
+        if ($scope !== null && ! $scope->allowsStudent($student)) {
+            return ['error' => 'Student is outside the caller\'s scope'];
+        }
+
+        $date = (string) ($args['date'] ?? now()->toDateString());
+
+        return [
+            'student_id' => $student->id,
+            'student_name' => $student->name,
+            'date' => $date,
+            'breakfast_enrolled' => $student->pae_breakfast_enrolled,
+            'lunch_enrolled' => $student->pae_lunch_enrolled,
+        ] + $this->pae->studentMealsToday($student, $date);
+    }
+
+    /**
+     * Flagged attempts are admin-report data (whole school, no class
+     * scoping — mirrors the /admin/reports/pae flagged surface).
+     *
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function flaggedAttemptsResult(array $args): array
+    {
+        $dateFrom = (string) ($args['date_from'] ?? now()->toDateString());
+        $dateTo = (string) ($args['date_to'] ?? $dateFrom);
+
+        $result = $this->pae->flaggedAttempts($dateFrom, $dateTo);
+
+        return [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'flagged_count' => $result['total'],
+            'by_reason' => $result['by_reason'],
+            'recent' => array_slice($result['rows'], 0, 20),
+        ];
     }
 
     /**
@@ -684,33 +882,6 @@ class FunctionRegistry
             'days' => $days,
             'min_absences' => $minAbsences,
             'students' => $this->attendance->repeatedlyAbsentStudents($days, $minAbsences, $classIds),
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $args
-     * @return array<string, mixed>
-     */
-    private function timeInSchoolResult(array $args, ?StudentScope $scope): array
-    {
-        $student = Student::find((int) $args['student_id']);
-
-        if ($student === null) {
-            return ['error' => 'Student ['.(int) $args['student_id'].'] not found'];
-        }
-
-        if ($scope !== null && ! $scope->allowsStudent($student)) {
-            return ['error' => 'Student is outside the caller\'s scope'];
-        }
-
-        return [
-            'student_id' => $student->id,
-            'student_name' => $student->name,
-            'days' => $this->boundedDays((int) ($args['days'] ?? 30), 365),
-            'sessions_by_day' => $this->attendance->studentSessions(
-                $student,
-                $this->boundedDays((int) ($args['days'] ?? 30), 365),
-            ),
         ];
     }
 

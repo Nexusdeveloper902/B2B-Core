@@ -110,7 +110,7 @@
                 @foreach($students as $student)
                     <li>
                         <a href="{{ route('parent.timeline', $student) }}">{{ $student->name }}</a>
-                        <span class="meta">{{ $student->schoolClass?->name }} · {{ $student->pae_enrolled ? __('app.pae_enrolled_yes') : __('app.pae_enrolled_no') }}</span>
+                        <span class="meta">{{ $student->schoolClass?->name }} · {{ __('app.pae_breakfast') }} {{ $student->pae_breakfast_enrolled ? '✓' : '—' }} · {{ __('app.pae_lunch') }} {{ $student->pae_lunch_enrolled ? '✓' : '—' }}</span>
                     </li>
                 @endforeach
             </ul>
@@ -252,8 +252,7 @@
             'PAE_BREAKFAST' => __('app.event_type_PAE_BREAKFAST'),
             'PAE_LUNCH' => __('app.event_type_PAE_LUNCH'),
             'RECYCLING_DEPOSIT' => __('app.event_type_RECYCLING_DEPOSIT'),
-            'ENTRY' => __('app.event_type_ENTRY'),
-            'EXIT' => __('app.event_type_EXIT'),
+            'PAE_ATTEMPT' => __('app.event_type_PAE_ATTEMPT'),
         ]) !!};
         var POINTS_UNIT = {!! Js::from(__('app.points_unit')) !!};
         var lastTapToast = {};
@@ -272,6 +271,11 @@
             if (ev.student_id === undefined) { return; }
             toastTap(ev);
             var id = String(ev.student_id);
+
+            // TASK-037 — flagged attempts (served === false) never bump a
+            // PAE stat: only served meals count, same rule as every
+            // server-side derivation.
+            if (ev.served === false) { return; }
 
             if (ev.type === 'CLASS_ATTENDANCE' && !seen.attendance[id]) {
                 seen.attendance[id] = true;

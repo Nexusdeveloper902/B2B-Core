@@ -130,7 +130,6 @@
             'classroom' => __('app.reader_type_classroom'),
             'pae' => __('app.reader_type_pae'),
             'recycling' => __('app.reader_type_recycling'),
-            'entry' => __('app.reader_type_entry'),
         ]) !!};
         var MORE_LABEL = {!! Js::from(__('app.reader_more_actions')) !!};
         var SAVE_LABEL = {!! Js::from(__('app.save_reader')) !!};

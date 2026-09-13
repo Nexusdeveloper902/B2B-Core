@@ -3,8 +3,12 @@
 use App\Http\Controllers\Web\AdminDashboardController;
 use App\Http\Controllers\Web\AdminPairingController;
 use App\Http\Controllers\Web\AdminReadersController;
+use App\Http\Controllers\Web\AdminSettingsController;
 use App\Http\Controllers\Web\AdminStudentsController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\KitchenController;
+use App\Http\Controllers\Web\PaeExportController;
+use App\Http\Controllers\Web\PaeReportController;
 use App\Http\Controllers\Web\ParentViewController;
 use App\Http\Controllers\Web\PasswordController;
 use App\Http\Controllers\Web\RealtimeTokenController;
@@ -21,10 +25,14 @@ Route::get('/', function () {
         return redirect()->route('login');
     }
 
-    // TASK-025 item 5 — students have no staff dashboard; send them home.
-    return redirect()->route(
-        auth()->user()->isStudent() ? 'student.dashboard' : 'dashboard'
-    );
+    $user = auth()->user();
+
+    // TASK-037 — kitchen staff land on the kitchen desk (their only one).
+    return redirect()->route(match (true) {
+        $user->isStudent() => 'student.dashboard',
+        $user->isKitchen() => 'kitchen',
+        default => 'dashboard',
+    });
 })->name('home');
 
 // Language switcher (EN / ES).
@@ -96,6 +104,48 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:admin')
         ->name('admin.readers');
 
+    // TASK-037 — the settings desk: every safe presence/PAE knob
+    // (meal windows, late cutoff, pairing window, account conventions).
+    Route::get('/admin/settings', [AdminSettingsController::class, 'page'])
+        ->middleware('role:admin')
+        ->name('admin.settings');
+
+    // TASK-037 — the PAE reporting desk: daily/monthly reports with
+    // graphics, missed meals, flagged attempts, per-student history.
+    // Exports (PDF + CSV) ride the same admin wall.
+    Route::get('/admin/reports/pae', [PaeReportController::class, 'index'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae');
+
+    Route::get('/admin/reports/pae/student/{student}', [PaeReportController::class, 'student'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae.student');
+
+    Route::get('/admin/reports/pae/export/csv', [PaeExportController::class, 'csv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae.export.csv');
+
+    Route::get('/admin/reports/pae/export/pdf', [PaeExportController::class, 'pdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae.export.pdf');
+
+    Route::get('/admin/reports/pae/student/{student}/export/csv', [PaeExportController::class, 'studentCsv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae.student.export.csv');
+
+    Route::get('/admin/reports/pae/student/{student}/export/pdf', [PaeExportController::class, 'studentPdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.pae.student.export.pdf');
+
+    // TASK-037 — the kitchen meal-service desk (ADR-054): glanceable,
+    // realtime accept/reject states for meal-service staff. Kitchen
+    // users are RESTRICTED to this workflow (their login lands here
+    // and every other desk's role wall 403s them); admins may open it
+    // too for verification.
+    Route::get('/kitchen', [KitchenController::class, 'page'])
+        ->middleware('role:kitchen,admin')
+        ->name('kitchen');
+
     // TASK-025 item 5 — student self-service (spec §11/§12/§30): own
     // points, history, rewards. The student row always resolves from
     // the authenticated account — never a URL parameter.
@@ -127,8 +177,11 @@ Route::middleware(['auth'])->group(function () {
     // (session-authed; the socket process verifies the HMAC, not the
     // session). TASK-025: students too — recycling frames carry the
     // same student names the tap frames already do (no card UIDs).
+    // TASK-037: kitchen too — the /kitchen page boots realtime.js the
+    // same way and its frames stay name-level (no UIDs, no admin
+    // channels — see RealtimeServeCommand::resolveScope).
     Route::get('/realtime/token', [RealtimeTokenController::class, 'issue'])
-        ->middleware('role:admin,teacher,student')
+        ->middleware('role:admin,teacher,student,kitchen')
         ->name('realtime.token');
 });
 

@@ -53,7 +53,7 @@ class StudentAccountProvisioningTest extends TestCase
                 'name' => 'Nueva Estudiante',
                 'grade' => '5°',
                 'class_id' => $class->id,
-                'pae_enrolled' => true,
+                'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true,
             ]);
 
         $response->assertOk()
@@ -212,7 +212,7 @@ class StudentAccountProvisioningTest extends TestCase
             'name' => 'Maria González',
             'grade' => '5°',
             'class_id' => $class->id,
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
     }
 
@@ -288,7 +288,7 @@ class StudentAccountProvisioningTest extends TestCase
             'name' => 'Legado Antiguo',
             'grade' => '5°',
             'class_id' => SchoolClass::firstOrFail()->id,
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
 
         $response = $this->actingAs($this->admin())
@@ -352,7 +352,7 @@ class StudentAccountProvisioningTest extends TestCase
             'name' => 'Acceso Fresco',
             'grade' => '5°',
             'class_id' => SchoolClass::firstOrFail()->id,
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
         app(StudentAccountService::class)->provisionFor($student);
 

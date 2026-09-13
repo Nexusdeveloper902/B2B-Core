@@ -89,3 +89,28 @@ huso horario en hora de pared (`America/Bogota`); las columnas DATETIME
 de MariaDB guardan las mismas marcas locales ingenuas que guardaba
 SQLite. Las cadenas ISO `-05:00` de la API vienen de la capa de la
 aplicación, no del motor.
+
+## 6. Adiciones de esquema — TASK-037 (programa PAE completo)
+
+- **`students`**: la bandera única `pae_enrolled` se convirtió en dos
+  columnas independientes — `pae_breakfast_enrolled` y
+  `pae_lunch_enrolled` (ambas booleanas, por defecto falso). Un
+  estudiante puede inscribirse solo en desayuno, solo en almuerzo, en
+  ambos o en ninguno. La migración copia la bandera antigua en ambas
+  (un superconjunto — ningún estudiante inscrito pierde una comida)
+  antes de eliminar la columna; una resiembra fresca es igualmente
+  válida según la especificación.
+- **`events`**: dos columnas que hacen explícita la distinción
+  servida-vs-marcada sobre la columna de tipos (ADR-053): `served`
+  (booleana, por defecto verdadero — solo las filas servidas cuentan
+  para las estadísticas PAE) y `reason` (cadena nulleable — el motivo
+  de rechazo estable para filas marcadas: `weekend` / `out_of_window` /
+  `window_overlap` / `no_student` / `not_enrolled` / `no_attendance` /
+  `duplicate`).
+- **`settings`** (tabla nueva, ADR-55): `key` (única) + `value` (json) +
+  timestamps — las anulaciones en tiempo de ejecución respaldadas por BD
+  que lee `SettingsService` (ventanas de comidas, corte de llegada
+  tarde, ventana de emparejamiento, convenciones de cuentas). Las
+  lecturas resuelven fila → valor por defecto de config; los valores
+  por defecto siguen siendo configurables por entorno
+  (`PAE_BREAKFAST_START` etc. en `.env.example`).

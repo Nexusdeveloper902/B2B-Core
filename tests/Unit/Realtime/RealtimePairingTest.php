@@ -69,7 +69,7 @@ class RealtimePairingTest extends TestCase
         $channel = $this->channel();
         $pairings = $this->pairings();
         $target = Student::whereDoesntHave('cards')->first()
-            ?? Student::create(['name' => 'Fresh Target', 'grade' => '5°', 'pae_enrolled' => false]);
+            ?? Student::create(['name' => 'Fresh Target', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
 
         // A rejection stamp mutates the ARMED row — it must broadcast.
         $pairings->arm($target);
@@ -88,7 +88,7 @@ class RealtimePairingTest extends TestCase
     {
         $pairings = $this->pairings();
         $target = Student::whereDoesntHave('cards')->first()
-            ?? Student::create(['name' => 'Payload Target', 'grade' => '5°', 'pae_enrolled' => false]);
+            ?? Student::create(['name' => 'Payload Target', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         $pairings->arm($target);
         $pairings->pair($this->reader('classroom'), 'PAYLOADFRESH1');
 

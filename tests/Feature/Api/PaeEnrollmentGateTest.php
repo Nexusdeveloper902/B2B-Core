@@ -7,14 +7,17 @@ use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Services\AttendanceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * TASK-030 (Fix C) — the PAE enrollment gate: a PAE-mode reader rejects
- * a non-enrolled tap with a device-facing localized 422, logs the
- * attempt, and records NOTHING (paeCount stays honest). The enrolled
- * happy path taps straight through on the same reader.
+ * TASK-027 built the original PAE enrollment gate; TASK-037 turned it
+ * into the full meal-serving engine (see MealServingTest for the rule
+ * matrix). This file keeps the gate's ORIGINAL contract, restated for
+ * the per-meal model: a not-enrolled tap is a 422 with a device-facing
+ * localized, MEAL-SPECIFIC message, is persisted as a flagged (auditable)
+ * attempt, and never inflates paeCount.
  */
 class PaeEnrollmentGateTest extends TestCase
 {
@@ -24,23 +27,25 @@ class PaeEnrollmentGateTest extends TestCase
     {
         parent::setUp();
         $this->seedDemo();
+        // The fixture owns ALL events (the demo seeder's past-day PAE
+        // scenario rows would leak into the counts below).
+        PresenceEvent::query()->delete();
+        $this->travelTo(Carbon::parse('2026-09-01 07:10:00')); // Tuesday
+        $this->wideMealWindows();
     }
 
-    private function paeReader(): Reader
+    protected function tearDown(): void
     {
-        return Reader::create([
-            'label' => 'Gate Test — PAE',
-            'type' => 'pae',
-            'active_event_type' => 'PAE_BREAKFAST',
-            'api_key' => 'pae-gate-test-key-00000000000001',
-        ]);
+        $this->travelBack();
+        parent::tearDown();
     }
 
-    private function tap(string $key, string $uid)
+    private function tap(string $key, string $uid, array $headers = [])
     {
         return $this->postJson('/api/v1/events/tap', [
             'credential_uid' => $uid,
-        ], ['Authorization' => "Bearer {$key}"]);
+            'client_timestamp' => '2026-09-01 07:15:00',
+        ], array_merge(['Authorization' => "Bearer {$key}"], $headers));
     }
 
     private function uidOf(string $student): string
@@ -48,46 +53,77 @@ class PaeEnrollmentGateTest extends TestCase
         return Card::whereHas('student', fn ($q) => $q->where('name', $student))->firstOrFail()->credential_uid;
     }
 
-    #[Test]
-    public function a_non_pae_student_is_rejected_and_logged_without_a_trace_in_events(): void
+    private function attend(string $student): void
     {
-        $reader = $this->paeReader();
-        $eventsBefore = PresenceEvent::count();
+        PresenceEvent::create([
+            'card_id' => Card::whereHas('student', fn ($q) => $q->where('name', $student))->firstOrFail()->id,
+            'reader_id' => Reader::where('type', 'classroom')->firstOrFail()->id,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => Carbon::parse('2026-09-01 07:00:00'),
+        ]);
+    }
 
-        $response = $this->tap($reader->api_key, $this->uidOf('Ana Martínez'));
-
-        $response->assertStatus(422)
-            ->assertJson(['status' => 'error', 'reason' => 'student_not_pae']);
-
-        $this->assertSame($eventsBefore, PresenceEvent::count());
+    private function paeReader(): Reader
+    {
+        return Reader::firstOrCreate(
+            ['label' => 'Gate Test — Cafeteria'],
+            [
+                'type' => 'pae',
+                'active_event_type' => 'PAE_BREAKFAST',
+                'api_key' => 'pae-gate-test-key-00000000000001',
+            ],
+        );
     }
 
     #[Test]
-    public function an_enrolled_student_taps_straight_through(): void
+    public function a_not_enrolled_meal_tap_is_a_flagged_422(): void
     {
         $reader = $this->paeReader();
+        $this->attend('Ana Martínez'); // lunch-only: breakfast is not enrolled
+
+        $this->tap($reader->api_key, $this->uidOf('Ana Martínez'))
+            ->assertStatus(422)
+            ->assertJson(['status' => 'error', 'reason' => 'not_enrolled', 'meal' => 'breakfast']);
+
+        // TASK-037 — the attempt IS persisted (auditable, served=false);
+        // it just never counts.
+        $this->assertDatabaseHas('events', [
+            'type' => 'PAE_BREAKFAST',
+            'served' => false,
+            'reason' => 'not_enrolled',
+        ]);
+        $this->assertSame(0, PresenceEvent::where('served', true)->where('type', 'PAE_BREAKFAST')->count());
+    }
+
+    #[Test]
+    public function an_enrolled_present_student_taps_straight_through(): void
+    {
+        $reader = $this->paeReader();
+        $this->attend('Maria González');
 
         $this->tap($reader->api_key, $this->uidOf('Maria González'))
             ->assertOk()
-            ->assertJson(['status' => 'ok', 'event_type' => 'PAE_BREAKFAST']);
+            ->assertJson(['status' => 'ok', 'event_type' => 'PAE_BREAKFAST', 'meal' => 'breakfast']);
 
-        $this->assertSame(1, PresenceEvent::where('type', 'PAE_BREAKFAST')->count());
+        $this->assertSame(1, PresenceEvent::where('type', 'PAE_BREAKFAST')->where('served', true)->count());
     }
 
     #[Test]
-    public function the_rejection_speaks_spanish_on_request(): void
+    public function the_rejection_speaks_spanish_and_names_the_meal_on_request(): void
     {
         $reader = $this->paeReader();
+        $this->attend('Ana Martínez');
 
         $response = $this->postJson('/api/v1/events/tap', [
             'credential_uid' => $this->uidOf('Ana Martínez'),
+            'client_timestamp' => '2026-09-01 07:15:00',
         ], [
             'Authorization' => "Bearer {$reader->api_key}",
             'Accept-Language' => 'es',
         ]);
 
-        $response->assertStatus(422)->assertJson(['reason' => 'student_not_pae']);
-        $this->assertStringContainsString('PAE', (string) $response->json('message'));
+        $response->assertStatus(422)->assertJson(['reason' => 'not_enrolled', 'meal' => 'breakfast']);
+        $this->assertSame('Ana no está inscrito para el Desayuno', $response->json('message'));
     }
 
     #[Test]
@@ -96,6 +132,7 @@ class PaeEnrollmentGateTest extends TestCase
         // Guests (no session at all) reach the device surface — the gate
         // is reader-key auth, and the rejection is identical.
         $reader = $this->paeReader();
+        $this->attend('Ana Martínez');
 
         $this->tap($reader->api_key, $this->uidOf('Ana Martínez'))->assertStatus(422);
     }
@@ -104,13 +141,16 @@ class PaeEnrollmentGateTest extends TestCase
     public function rejected_attempts_never_inflate_meal_counts(): void
     {
         $reader = $this->paeReader();
+        $this->attend('Ana Martínez');
+        $this->attend('Maria González');
 
         $this->tap($reader->api_key, $this->uidOf('Ana Martínez'))->assertStatus(422);
         $this->tap($reader->api_key, $this->uidOf('Maria González'))->assertOk();
 
         $service = new AttendanceService;
 
-        $this->assertSame(1, $service->paeCount('breakfast', now()->toDateString()));
-        $this->assertSame(1, PresenceEvent::where('type', 'PAE_BREAKFAST')->count());
+        $this->assertSame(1, $service->paeCount('breakfast', '2026-09-01'));
+        $this->assertSame(1, PresenceEvent::where('type', 'PAE_BREAKFAST')->where('served', true)->count());
+        $this->assertSame(1, PresenceEvent::where('type', 'PAE_BREAKFAST')->where('served', false)->count());
     }
 }

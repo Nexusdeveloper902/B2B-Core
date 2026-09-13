@@ -39,7 +39,7 @@ class StudentAccountServiceTest extends TestCase
             'name' => $name,
             'grade' => '5°',
             'class_id' => $this->class->id,
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
     }
 

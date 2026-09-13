@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +12,13 @@ class Student extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'grade', 'pae_enrolled', 'class_id'];
+    protected $fillable = ['name', 'grade', 'pae_breakfast_enrolled', 'pae_lunch_enrolled', 'class_id'];
 
     protected function casts(): array
     {
         return [
-            'pae_enrolled' => 'boolean',
+            'pae_breakfast_enrolled' => 'boolean',
+            'pae_lunch_enrolled' => 'boolean',
         ];
     }
 
@@ -55,9 +55,13 @@ class Student extends Model
         return (int) $this->pointsLedger()->sum('delta');
     }
 
-    public function scopePaeEnrolled(Builder $query): Builder
+    /**
+     * TASK-037 — per-meal PAE enrollment. Breakfast and lunch are fully
+     * independent: either flag may be set without the other.
+     */
+    public function enrolledForMeal(string $meal): bool
     {
-        return $query->where('pae_enrolled', true);
+        return $meal === 'breakfast' ? $this->pae_breakfast_enrolled : $this->pae_lunch_enrolled;
     }
 
     /** First word of the name — used for device feedback displays. */

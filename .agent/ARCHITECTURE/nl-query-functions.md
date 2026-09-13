@@ -44,3 +44,30 @@ multi-turn contract, ADR-030). Empty final text =
 - ADR-037 (teacher data wall), ADR-030 (DeepSeek provider),
   ADR-046 (model lineup), ADR-051 (this surface's expansion),
   ADR-041 (safe-markdown answers).
+
+---
+
+## TASK-037 appendendum — the PAE parity surface (27 functions)
+
+Removed with ENTRY/EXIT (ADR-054): `get_student_time_in_school`,
+`get_students_in_school`.
+
+Added for PAE parity (ADR-057; all resolved through the same
+PaeReportService/AttendanceService methods the /admin/reports/pae pages
+use, fenced by StudentScope like every other function):
+
+- `get_missed_meals(meal, date?, class_id?)` — present + enrolled + not
+  served ("quiénes no almorzaron").
+- `get_missed_meal_count(meal, date?, class_id?)`.
+- `get_missed_meal_trend(meal, days?, class_id?)`.
+- `get_pae_enrollment(class_id?)` — breakfast/lunch/both/only-one/
+  neither buckets.
+- `get_student_pae_history(student_id, days?)` — per-day breakfast/
+  lunch slots (served/flagged) + totals.
+- `get_student_meals_on(student_id, date?)` — did-they-eat.
+- `get_flagged_meal_attempts(date_from?, date_to?)` — excluded
+  attempts: count + per-reason breakdown + recent rows (school-wide,
+  mirroring the admin report).
+
+The system prompt pins the missed-meal polarity and the served-only
+counting rule (rejected/duplicate taps never count).

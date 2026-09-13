@@ -79,6 +79,14 @@ export DEEPSEEK_API_KEY=""
 # the "classify awards points" check depend on live credentials. The e2e
 # is a contract suite — the stub driver is its deterministic classifier.
 export RECYCLING_CLASSIFIER_DRIVER="stub"
+# TASK-037 — full-day meal windows (breakfast 00:00–12:00, lunch 12:00–23:59;
+# touching, never overlapping) so the meal phases are deterministic at any
+# wall-clock time. Exported BEFORE the seed so the demo seeder writes them
+# as the settings rows the engine reads.
+export PAE_BREAKFAST_START="00:00"
+export PAE_BREAKFAST_END="12:00"
+export PAE_LUNCH_START="12:00"
+export PAE_LUNCH_END="23:59"
 "$PHP_BIN" artisan migrate --seed --force >/dev/null
 
 # Extract demo credentials from the throwaway DB (seed printed them too).
@@ -93,10 +101,13 @@ $recycling = $pdo->query("SELECT api_key FROM readers WHERE type = \"recycling\"
 // the relabel-phase tap correctly hit the TASK-027 PAE gate). One
 // ordered, PAE-filtered query also keeps CARD_UID and STUDENT_ID
 // coherent for the redemption phase.
-$card = $pdo->query("SELECT c.credential_uid, c.student_id FROM cards c JOIN students s ON s.id = c.student_id WHERE s.pae_enrolled = 1 ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDENT_ID=%s\n",
+$card = $pdo->query("SELECT c.credential_uid, c.student_id FROM cards c JOIN students s ON s.id = c.student_id WHERE s.pae_lunch_enrolled = 1 AND s.pae_breakfast_enrolled = 1 ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+// TASK-037 — the Ana card: the meal-specific not-enrolled message check
+// (Ana is lunch-only, so a breakfast-window tap gets the breakfast message).
+$ana = $pdo->query("SELECT c.credential_uid FROM cards c JOIN students s ON s.id = c.student_id WHERE s.name LIKE \"Ana%\" ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDENT_ID=%s\nANA_UID=%s\n",
     escapeshellarg($classroom["api_key"]), $classroom["id"], $recycling["api_key"],
-    $card["credential_uid"], $card["student_id"]);
+    $card["credential_uid"], $card["student_id"], $ana["credential_uid"]);
 ')"
 
 # A test image (valid PNG) — created project-relative so BOTH Linux curl and
@@ -167,6 +178,30 @@ check "Idempotent: no double award / Idempotente: sin doble otorgo" "$R2" '"alre
 say "== Fase B — cambiar modo del lector (admin) / reader relabeling =="
 PAT=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $u=App\Models\User::where("email","admin@presence.test")->first(); echo $u->createToken("e2e")->plainTextToken;')
 
+# TASK-037 — the meal-serving engine over real HTTP. A relabeled PAE-mode
+# reader routes its taps through the engine: the meal is AUTO-DETECTED from
+# the windows (the label is not the meal authority), and the eligibility
+# rules apply (attendance prerequisite, per-meal enrollment, duplicates).
+# Deterministic at any wall-clock time: attendance is tapped with a
+# day-safe client_timestamp 10 minutes before the meal tap — BEFORE the
+# relabel, while the classroom reader still records CLASS_ATTENDANCE.
+eval "$("$PHP_BIN" -r '
+$now = new DateTime("now", new DateTimeZone("America/Bogota"));
+$att = (clone $now)->modify("-10 minutes");
+if ($att->format("Y-m-d") !== $now->format("Y-m-d")) { $att = (clone $now)->setTime(0, 1, 0); }
+$meal = (clone $att)->modify("+5 minutes");
+printf("ATT_TS=%s\nMEAL_TS=%s\nDOW=%s\nEXPECTED_MEAL=%s\n",
+    escapeshellarg($att->format("Y-m-d H:i:s")), escapeshellarg($meal->format("Y-m-d H:i:s")),
+    $now->format("N"), ((int) $meal->format("H")) < 12 ? "breakfast" : "lunch");
+')"
+
+if [ "$DOW" -le 5 ]; then
+    R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+        -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$ATT_TS\"}")
+    check "Attendance tap for the meal prerequisite / Tap de asistencia previo" "$R" '"event_type":"CLASS_ATTENDANCE"'
+fi
+
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/readers/$CLASSROOM_ID/mode" \
     -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
     -H "Content-Type: application/json" -d '{"active_event_type":"PAE_LUNCH"}')
@@ -174,12 +209,32 @@ check "Admin relabels the reader / Admin reetiqueta el lector" "$R" '"active_eve
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
     -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\"}")
-check "Taps now register as PAE_LUNCH / Los taps ahora son PAE_LUNCH" "$R" '"event_type":"PAE_LUNCH"'
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
+if [ "$DOW" -le 5 ]; then
+    check "Meal auto-detected from the windows / Comida auto-detectada ($EXPECTED_MEAL)" "$R" "\"meal\":\"$EXPECTED_MEAL\""
+    check "Served meal returns the meal type / La comida servida devuelve el tipo" "$R" "\"event_type\":\"PAE_"$(echo "$EXPECTED_MEAL" | tr "[:lower:]" "[:upper:]")"\""
+
+    R2=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+        -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
+    check "Duplicate meal is flagged 422 / Comida duplicada queda marcada 422" "$R2" '"reason":"duplicate"'
+else
+    check "Weekend taps are flagged / Toques de fin de semana marcados" "$R" '"reason":"weekend"'
+fi
+
+# The engine's rejection speaks Spanish and NAMES THE MEAL (TASK-037):
+# Ana is lunch-only, so an in-window breakfast tap gets the breakfast message.
+R=$(curl -s -X POST "$BASE_URL/api/v1/events/tap" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Accept-Language: es" -H "Content-Type: application/json" \
+    -d "{\"credential_uid\": \"$ANA_UID\", \"client_timestamp\": \"$ATT_TS\"}")
+if [ "$DOW" -le 5 ] && [ "$EXPECTED_MEAL" = "breakfast" ]; then
+    check "Not-enrolled rejection names the meal (ES) / Rechazo nombra la comida" "$R" 'no está inscrito para el Desayuno'
+fi
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/readers/$CLASSROOM_ID/mode" \
     -H "Authorization: Bearer nope" -H "Accept: application/json" \
-    -H "Content-Type: application/json" -d '{"active_event_type":"ENTRY"}')
+    -H "Content-Type: application/json" -d '{"active_event_type":"PAE_ATTEMPT"}')
 check "Guest cannot relabel (401) / Invitado no puede reetiquetar" "$R" '401'
 
 # ---------------------------------------------------------------------------

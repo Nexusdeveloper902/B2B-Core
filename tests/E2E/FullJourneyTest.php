@@ -10,19 +10,23 @@ use App\Models\Student;
 use App\Services\NlQuery\DeepSeekClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
  * E2E — the complete platform story, exactly as a demo day would run it:
- * simulate a school morning with card taps, a recycling deposit with
- * classification, a reward redemption, reader relabeling, dashboards,
- * the parent timeline, and the NL-query blocked-state check.
+ * simulate a school morning with card taps, a PAE breakfast service through
+ * the serving engine (auto meal detection, the enrollment gate), a
+ * recycling deposit with classification, a reward redemption, reader
+ * relabeling, dashboards, the parent timeline, and the NL-query blocked
+ * state check.
  *
  * Everything goes through real HTTP endpoints (kernel-level), with the
  * demo seeder data and the same drivers a production instance would use
  * (only the classifier is faked deterministically to keep assertions
- * exact without model dependencies).
+ * exact without model dependencies). TASK-037: time is frozen on a known
+ * school day with wide windows so the meal flow is deterministic.
  */
 class FullJourneyTest extends TestCase
 {
@@ -37,6 +41,13 @@ class FullJourneyTest extends TestCase
         $teacher = $fixtures['teacher'];
         $classroomKey = $this->readerToken('classroom');
         $recyclingKey = $this->readerToken('recycling');
+
+        // TASK-037 — a deterministic school morning: frozen Tuesday,
+        // full-day meal windows, and the seeder's past-day PAE scenario
+        // rows wiped (the journey owns today's events).
+        $this->travelTo(Carbon::parse('2026-09-01 07:05:00'));
+        $this->wideMealWindows();
+        PresenceEvent::query()->delete();
 
         // ---- Morning: attendance taps (devices authenticate with Bearer) ----
         $mariaTap = $this->postJson('/api/v1/events/tap', [
@@ -56,27 +67,21 @@ class FullJourneyTest extends TestCase
         ])->assertNotFound();
         $this->assertSame(2, PresenceEvent::count());
 
-        // ---- The reader gets relabeled to PAE breakfast (admin action) ----
-        $readerId = $this->reader('classroom')->id;
-        $this->actingAs($admin)
-            ->postJson("/api/v1/admin/readers/{$readerId}/mode", ['active_event_type' => 'PAE_BREAKFAST'])
-            ->assertOk()
-            ->assertJsonPath('reader.active_event_type', 'PAE_BREAKFAST');
-
         // ---- Pairing desk: arm-then-pair for a NEW student (TASK-010/020) ----
         // The operator's real bench sequence, including the double-arm
         // that used to leave a zombie window: arm twice (impatient
         // double-click), tap ONE fresh card — the pairing succeeds AND
         // the desk's status feed reports the success, not a phantom
         // armed window counting down (TASK-020's single-window invariant).
+        // TASK-037: the pairing leg runs while the classroom reader is
+        // still in CLASS_ATTENDANCE mode, so the freshly paired card's
+        // proof tap records attendance (the PAE relabel comes after).
         $newStudent = Student::create([
             'name' => 'Estudiante Nueva',
             'grade' => '5°',
-            // TASK-027 — the reader is already in PAE_BREAKFAST mode at
-            // this point of the journey, and the PAE enrollment gate now
-            // rejects non-enrolled students at feeding-program readers:
-            // this student is enrolled, so the freshly paired card works.
-            'pae_enrolled' => true,
+            // Enrolled for both meals: the journey's breakfast service
+            // can serve this student once they have attendance.
+            'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true,
         ]);
 
         $this->actingAs($admin)
@@ -112,14 +117,48 @@ class FullJourneyTest extends TestCase
             'credential_uid' => 'E2EFRESHCARD1',
         ], ['Authorization' => "Bearer {$classroomKey}"])->assertOk();
 
+        // ---- The reader gets relabeled to PAE breakfast (admin action) ----
+        // TASK-037 — the legacy manual entry point into the serving
+        // engine: a relabeled PAE-mode reader auto-detects the meal from
+        // the clock (here: breakfast) and enforces the eligibility rules.
+        $readerId = $this->reader('classroom')->id;
+        $this->actingAs($admin)
+            ->postJson("/api/v1/admin/readers/{$readerId}/mode", ['active_event_type' => 'PAE_BREAKFAST'])
+            ->assertOk()
+            ->assertJsonPath('reader.active_event_type', 'PAE_BREAKFAST');
+
         // ---- Breakfast service: the same reader, now in PAE mode ----
-        foreach (['Maria González', 'Carlos Pérez', 'Diego López'] as $name) {
+        foreach (['Maria González', 'Carlos Pérez'] as $name) {
             $this->postJson('/api/v1/events/tap', [
                 'credential_uid' => $this->cardUidFor($name),
+                'client_timestamp' => '2026-09-01 07:15:00',
             ], ['Authorization' => "Bearer {$classroomKey}"])
                 ->assertOk()
-                ->assertJsonPath('event_type', 'PAE_BREAKFAST');
+                ->assertJsonPath('event_type', 'PAE_BREAKFAST')
+                ->assertJsonPath('meal', 'breakfast');
         }
+
+        // TASK-037 — Diego (neither meal enrolled) is the honest gate:
+        // 422, flagged row, never a served meal.
+        $this->postJson('/api/v1/events/tap', [
+            'credential_uid' => $this->cardUidFor('Diego López'),
+            'client_timestamp' => '2026-09-01 07:15:00',
+        ], ['Authorization' => "Bearer {$classroomKey}"])
+            ->assertStatus(422)
+            ->assertJson(['status' => 'error', 'reason' => 'not_enrolled', 'meal' => 'breakfast']);
+        $this->assertDatabaseHas('events', [
+            'type' => 'PAE_BREAKFAST',
+            'served' => false,
+            'reason' => 'not_enrolled',
+        ]);
+
+        // A duplicate breakfast re-tap is flagged, never counted twice.
+        $this->postJson('/api/v1/events/tap', [
+            'credential_uid' => $this->cardUidFor('Maria González'),
+            'client_timestamp' => '2026-09-01 07:25:00',
+        ], ['Authorization' => "Bearer {$classroomKey}"])
+            ->assertStatus(422)
+            ->assertJson(['reason' => 'duplicate']);
 
         // ---- Recycling: tap -> classify -> earn (with a fixed classifier) ----
         // One mutable fake, bound BEFORE the first request (the controller
@@ -199,6 +238,11 @@ class FullJourneyTest extends TestCase
         $this->actingAs($teacher)->get('/teacher')->assertOk()->assertSee('Maria González');
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Demo Reader — Recycling');
 
+        // TASK-037 — the kitchen desk renders the same day's meal taps;
+        // the reports desk renders the served counts.
+        $this->actingAs($admin)->get('/kitchen')->assertOk()->assertSee('Maria González');
+        $this->actingAs($admin)->get('/admin/reports/pae')->assertOk()->assertSee('Maria González');
+
         // ---- Parent view: the whole story on one timeline ----
         $timeline = $this->actingAs($admin)->get("/parent/students/{$studentId}");
         $timeline->assertOk()
@@ -225,5 +269,7 @@ class FullJourneyTest extends TestCase
             'Ledger must show earn + earn + spend in order.'
         );
         $this->assertSame(5, (int) $ledger->where('student_id', $studentId)->sum('delta'));
+
+        $this->travelBack();
     }
 }

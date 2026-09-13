@@ -18,28 +18,33 @@ use Illuminate\Support\Facades\DB;
  * TASK-027 — student management through the GUI: create students and
  * bulk-import a CSV, no more hand-written SQL.
  *
- * POST /api/v1/admin/students        { name, grade, class_id, pae_enrolled }
+ * POST /api/v1/admin/students        { name, grade, class_id, pae_breakfast_enrolled, pae_lunch_enrolled }
  * POST /api/v1/admin/students/import  multipart: file (CSV) — admin-only.
-+*
-+* TASK-030-A (ADR-044) — every created student leaves with a login: the
-+* 1:1 account is provisioned in the SAME transaction (convention email
-+* + shared initial password + forced first-login rotation). The
-+* creation/import responses carry the credentials EXACTLY ONCE
-+* (display-once, the reader-API-key rule); roster frames carry only the
-+* email. POST /api/v1/admin/students/{student}/account backfills
-+* pre-feature rows (idempotent).
+ *
+ * TASK-030-A (ADR-044) — every created student leaves with a login: the
+ * 1:1 account is provisioned in the SAME transaction (convention email
+ * + shared initial password + forced first-login rotation). The
+ * creation/import responses carry the credentials EXACTLY ONCE
+ * (display-once, the reader-API-key rule); roster frames carry only the
+ * email. POST /api/v1/admin/students/{student}/account backfills
+ * pre-feature rows (idempotent).
+ *
+ * TASK-037 — PAE enrollment is PER MEAL: breakfast and lunch are
+ * independent flags (either, both, or neither).
  *
  * CSV contract (header row REQUIRED, columns case-insensitive, order
  * free, extra columns ignored):
  *
- *   name,grade,class,pae_enrolled
- *   María Pérez,5° B,5° B,yes
+ *   name,grade,class,pae_breakfast,pae_lunch
+ *   María Pérez,5° B,5° B,yes,no
  *
- * `class` resolves by class NAME (the human workflow); `pae_enrolled`
- * accepts yes/no/true/false/1/0/sí/no. Row-level failures are reported
- * per row (row number + bilingual message) — a bad row never blocks
- * the good ones; duplicates (same name in the same class) are row
- * errors, never silent skips.
+ * `class` resolves by class NAME (the human workflow). Enrollment
+ * columns accept yes/no/true/false/1/0/sí/no and understand the aliases
+ * `breakfast`/`lunch`; the legacy single `pae` (or `pae_enrolled`)
+ * column still works and enrolls the student for BOTH meals. Row-level
+ * failures are reported per row (row number + bilingual message) — a
+ * bad row never blocks the good ones; duplicates (same name in the
+ * same class) are row errors, never silent skips.
  */
 class StudentController extends Controller
 {
@@ -71,7 +76,8 @@ class StudentController extends Controller
                     'name' => $validated['name'],
                     'grade' => $validated['grade'],
                     'class_id' => (int) $validated['class_id'],
-                    'pae_enrolled' => (bool) ($validated['pae_enrolled'] ?? false),
+                    'pae_breakfast_enrolled' => (bool) ($validated['pae_breakfast_enrolled'] ?? false),
+                    'pae_lunch_enrolled' => (bool) ($validated['pae_lunch_enrolled'] ?? false),
                 ]);
 
                 // TASK-030-A — the login ships with the enrollment, same
@@ -89,7 +95,8 @@ class StudentController extends Controller
                     'grade' => $student->grade,
                     'class_id' => $student->class_id,
                     'class_name' => $student->schoolClass?->name,
-                    'pae_enrolled' => $student->pae_enrolled,
+                    'pae_breakfast_enrolled' => $student->pae_breakfast_enrolled,
+                    'pae_lunch_enrolled' => $student->pae_lunch_enrolled,
                     // Admin-only channel: the desk's account column renders
                     // the email on live arrivals too (never the password —
                     // display-once lives only in this HTTP response).
@@ -132,7 +139,8 @@ class StudentController extends Controller
                 'name' => $student->name,
                 'grade' => $student->grade,
                 'class_name' => $student->schoolClass?->name,
-                'pae_enrolled' => $student->pae_enrolled,
+                'pae_breakfast_enrolled' => $student->pae_breakfast_enrolled,
+                'pae_lunch_enrolled' => $student->pae_lunch_enrolled,
                 // The desk's live row renders the account column from
                 // the same object (frames carry it as account_email too).
                 'account_email' => $account->email,
@@ -141,13 +149,13 @@ class StudentController extends Controller
             // response is the ONLY place the temporary password appears.
             'account' => [
                 'email' => $account->email,
-                'temporary_password' => (string) config('presence.student_initial_password', 'password'),
+                'temporary_password' => (string) settings()->studentInitialPassword(),
                 'must_change_password' => true,
             ],
             'message' => __('api.student_created', ['name' => $student->name]),
             'account_notice' => __('api.student_account_notice', [
                 'email' => $account->email,
-                'password' => (string) config('presence.student_initial_password', 'password'),
+                'password' => (string) settings()->studentInitialPassword(),
             ]),
         ]);
     }
@@ -271,7 +279,8 @@ class StudentController extends Controller
                             'grade' => $s->grade,
                             'class_id' => $s->class_id,
                             'class_name' => $s->schoolClass?->name,
-                            'pae_enrolled' => $s->pae_enrolled,
+                            'pae_breakfast_enrolled' => $s->pae_breakfast_enrolled,
+                            'pae_lunch_enrolled' => $s->pae_lunch_enrolled,
                             // Admin-only channel (see store()).
                             'account_email' => $accountEmails[$s->id] ?? null,
                         ], $students),
@@ -344,14 +353,14 @@ class StudentController extends Controller
                 'email' => $user->email,
                 // Display-once: only a freshly minted account carries
                 // the temporary password (see store()).
-                'temporary_password' => $already ? null : (string) config('presence.student_initial_password', 'password'),
+                'temporary_password' => $already ? null : (string) settings()->studentInitialPassword(),
                 'must_change_password' => (bool) $user->must_change_password,
             ], fn ($value) => $value !== null),
             'message' => $already
                 ? __('api.student_account_exists', ['email' => $user->email])
                 : __('api.student_account_notice', [
                     'email' => $user->email,
-                    'password' => (string) config('presence.student_initial_password', 'password'),
+                    'password' => (string) settings()->studentInitialPassword(),
                 ]),
         ]);
     }
@@ -367,8 +376,18 @@ class StudentController extends Controller
         $map = [];
         foreach ($header as $index => $name) {
             $key = strtolower(trim((string) $name));
-            if (in_array($key, ['name', 'grade', 'class', 'pae_enrolled', 'pae'], true)) {
-                $map[$key === 'pae' ? 'pae_enrolled' : $key] = (int) $index;
+            // TASK-037 — per-meal enrollment columns (pae_breakfast /
+            // breakfast, pae_lunch / lunch) plus the legacy single-flag
+            // aliases (pae / pae_enrolled), which enroll for BOTH meals.
+            $key = match ($key) {
+                'breakfast' => 'pae_breakfast',
+                'lunch' => 'pae_lunch',
+                'pae' => 'pae_both',
+                'pae_enrolled' => 'pae_both',
+                default => $key,
+            };
+            if (in_array($key, ['name', 'grade', 'class', 'pae_breakfast', 'pae_lunch', 'pae_both'], true)) {
+                $map[$key] = (int) $index;
             }
         }
 
@@ -395,9 +414,27 @@ class StudentController extends Controller
         $name = trim((string) ($row[$columns['name']] ?? ''));
         $grade = trim((string) ($row[$columns['grade']] ?? ''));
         $className = trim((string) ($row[$columns['class']] ?? ''));
-        $paeRaw = isset($columns['pae_enrolled'])
-            ? strtolower(trim((string) ($row[$columns['pae_enrolled']] ?? '')))
-            : '';
+
+        // TASK-037 — independent per-meal truthiness; the legacy single
+        // column (when a per-meal column is absent) sets BOTH flags.
+        $breakfastRaw = isset($columns['pae_breakfast'])
+            ? strtolower(trim((string) ($row[$columns['pae_breakfast']] ?? '')))
+            : null;
+        $lunchRaw = isset($columns['pae_lunch'])
+            ? strtolower(trim((string) ($row[$columns['pae_lunch']] ?? '')))
+            : null;
+        $bothRaw = isset($columns['pae_both'])
+            ? strtolower(trim((string) ($row[$columns['pae_both']] ?? '')))
+            : null;
+
+        $truthy = ['yes', 'true', '1', 'si', 'sí', 'y', 'v'];
+
+        $breakfast = $breakfastRaw !== null
+            ? in_array($breakfastRaw, $truthy, true)
+            : ($bothRaw !== null && in_array($bothRaw, $truthy, true));
+        $lunch = $lunchRaw !== null
+            ? in_array($lunchRaw, $truthy, true)
+            : ($bothRaw !== null && in_array($bothRaw, $truthy, true));
 
         if ($name === '' || $grade === '') {
             return ['attributes' => [], 'error' => __('api.students_import_row_incomplete')];
@@ -410,8 +447,6 @@ class StudentController extends Controller
         if ($classId === null) {
             return ['attributes' => [], 'error' => __('api.students_import_unknown_class', ['class' => $className])];
         }
-
-        $paeEnrolled = in_array($paeRaw, ['yes', 'true', '1', 'si', 'sí', 'y', 'v'], true);
 
         $duplicate = Student::query()
             ->where('name', $name)
@@ -430,7 +465,8 @@ class StudentController extends Controller
                 'name' => $name,
                 'grade' => $grade,
                 'class_id' => $classId,
-                'pae_enrolled' => $paeEnrolled,
+                'pae_breakfast_enrolled' => $breakfast,
+                'pae_lunch_enrolled' => $lunch,
             ],
             'error' => null,
         ];

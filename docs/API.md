@@ -90,23 +90,47 @@ awarded at tap time.**
 `404 Not Found` — unknown card (`Card not recognized`) or non-active card
 (`Card is not active`).
 
-`422 Unprocessable Entity` — **PAE enrollment gate** (TASK-027): a valid,
-active card whose student is **not enrolled in PAE** tapped a reader in
-`PAE_BREAKFAST`/`PAE_LUNCH` mode. The meal is NOT recorded (keeps
-`paeCount()` honest: attendance comes only from enrolled students' taps)
-and the attempt is written to `storage/logs/laravel.log` for the
-feeding-program audit trail:
+`422 Unprocessable Entity` — **meal-serving engine** (TASK-037): a valid,
+active card tapped a meal reader (`type: "pae"`, or any reader relabeled
+into `PAE_BREAKFAST`/`PAE_LUNCH` mode) and one of the eligibility rules
+failed. The attempt is NOT served, but IS persisted as a flagged events
+row (`served=false` + `reason`) — auditable in feeds, the kitchen desk,
+the reports and `storage/logs/laravel.log`, never counted as a meal:
 
 ```json
-{"status":"error","reason":"student_not_pae","event_type":"PAE_BREAKFAST","message":"Ana is not enrolled in the feeding program"}
+{"status":"error","reason":"not_enrolled","meal":"breakfast","event_id":42,"event_type":"PAE_BREAKFAST","message":"Ana is not enrolled for Breakfast"}
 ```
 
-**Entry/exit pairs (TASK-027):** a reader in `ENTRY` mode logs every tap
-as an `ENTRY` event — and the same reader in `EXIT` mode logs `EXIT`.
-Multiple rows per student per day are the point (every entry is
-registered); `AttendanceService::studentSessions()` pairs them on the
-fly to derive time-in-school (an unmatched entry counts as an open
-session). No schema change: both values ride the same `events.type` spine.
+Machine-stable reasons and what they mean:
+
+| `reason` | Rule that failed | Message flavor |
+|---|---|---|
+| `weekend` | Mon–Fri service (America/Bogota) | No meal service today |
+| `out_of_window` | No active serving window | Names both windows as a hint |
+| `window_overlap` | Both windows active (misconfig) | Check the settings desk |
+| `no_student` | Card not linked to a student | Card has no student |
+| `not_enrolled` | Student lacks THIS meal's enrollment | Names the meal |
+| `no_attendance` | No earlier same-day `CLASS_ATTENDANCE` | Must check in at class first |
+| `duplicate` | Meal already served today | Already received (:meal) |
+
+**Meal-serving rules (TASK-037):** a meal counts only when (1) the date
+is a school day (Mon–Fri), (2) exactly one serving window is active
+(auto-detected from the admin-configurable windows — the reader's mode
+label is NOT the meal authority), (3) the student is enrolled for that
+specific meal (`pae_breakfast_enrolled` / `pae_lunch_enrolled`,
+independent flags), (4) a strictly earlier `CLASS_ATTENDANCE` event
+exists on the same school-local day, and (5) the student has not
+already received that meal today. Accepted taps return `meal` +
+a localized message:
+
+```json
+{"status":"ok","event_id":43,"event_type":"PAE_LUNCH","student_first_name":"Maria","meal":"lunch","message":"Maria received Lunch","next_step":null}
+```
+
+**ENTRY/EXIT is removed** (TASK-037, supersedes the TASK-027 sessions):
+gate readers, `ENTRY`/`EXIT` events and the time-in-school derivations
+are gone from the platform — the PAE attendance prerequisite rides
+`CLASS_ATTENDANCE` exclusively.
 
 ---
 
@@ -123,7 +147,11 @@ accepted.
 ```
 
 Valid values: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
-`RECYCLING_DEPOSIT`, `ENTRY`, `EXIT` (anything else → 422).
+`RECYCLING_DEPOSIT` (anything else → 422). `PAE_ATTEMPT` is NOT a valid
+mode: it is the engine-written type for out-of-window/weekend attempts
+(`served=false`), never an assignable reader label. TASK-037: a reader
+relabeled into a PAE mode routes its taps through the serving engine —
+the meal is auto-detected from the clock, not the label.
 
 **Response `200`**:
 
@@ -383,12 +411,18 @@ attendance lists `get_present_students(date, class_id?)`,
 `get_attendance_trend(days)`,
 `get_repeatedly_absent_students(days, min_absences, class_id?)`
 (TASK-027), `get_perfect_attendance(days, class_id?)`,
-`get_late_count(date, class_id?)`; PAE
-`get_pae_count(meal, date, class_id?)`,
-`get_pae_students(meal, date, class_id?)`,
-`get_pae_trend(meal, days)`; presence
-`get_students_in_school(class_id?)`,
-`get_student_time_in_school(student_id, days)`,
+`get_late_count(date, class_id?)`; PAE `get_pae_count(meal, date,
+class_id?)`, `get_pae_students(meal, date, class_id?)`,
+`get_pae_trend(meal, days)` and the TASK-037 parity surface —
+`get_missed_meals(meal, date?, class_id?)`,
+`get_missed_meal_count(meal, date?, class_id?)`,
+`get_missed_meal_trend(meal, days?, class_id?)`,
+`get_pae_enrollment(class_id?)`,
+`get_student_pae_history(student_id, days?)`,
+`get_student_meals_on(student_id, date?)`,
+`get_flagged_meal_attempts(date_from?, date_to?)` (present + enrolled +
+not served, per-day slots, excluded attempts — the same
+PaeReportService the /admin/reports/pae pages use); presence
 `get_student_timeline(student_id)`; recycling/points
 `get_recycling_totals(date_from, date_to)` and
 `get_recycling_leaderboard(limit)` (both school-wide by design —
@@ -400,7 +434,9 @@ Date/time context: the backend injects the current date and time
 (America/Bogota) into every request — "today", "right now" and
 "¿quién vino?" resolve server-side and the model never asks the user
 for a date. "Who came / quién vino" reads the PRESENT list, "who
-was absent / quién faltó" the ABSENT one.
+was absent / quién faltó" the ABSENT one. "Missed a meal / no almorzó"
+means present + enrolled + not served (`get_missed_meals`); meal counts
+include only SERVED meals — rejected and duplicate taps never count.
 
 **Responses**
 
@@ -440,6 +476,72 @@ verdict with bilingual fix guidance.
 
 ---
 
+## GET/PUT /api/v1/admin/settings — runtime settings (TASK-037, admin-only)
+
+The admin-configurable presence/PAE environment (ADR-055): reads return
+the EFFECTIVE settings (settings-table override → config default);
+writes validate and persist partial batches that are live for the very
+next request (the meal engine, the late cutoff, the pairing window and
+the student account conventions all resolve through the same service).
+Secrets are never part of this surface.
+
+**GET `/api/v1/admin/settings`**:
+
+```json
+{
+  "status": "ok",
+  "settings": {
+    "pae.breakfast_start": "06:30", "pae.breakfast_end": "08:30",
+    "pae.lunch_start": "11:30", "pae.lunch_end": "13:30",
+    "attendance.late_cutoff": "08:15",
+    "pairing.window_seconds": 45,
+    "accounts.student_email_domain": "presence.test",
+    "accounts.student_initial_password": "password"
+  },
+  "customized": ["pae.breakfast_start", "pae_lunch_end"],
+  "meal_windows": {
+    "breakfast": {"start": "06:30", "end": "08:30"},
+    "lunch": {"start": "11:30", "end": "13:30"}
+  }
+}
+```
+
+**PUT `/api/v1/admin/settings`** (POST accepted) — partial batches; the
+merged view is validated, so one bad field can never corrupt the rest:
+
+```json
+{ "settings": { "pae.breakfast_start": "07:00", "pae.breakfast_end": "09:00" } }
+```
+
+`200` returns the full effective settings. `422` validation errors
+(`HH:MM` format, end strictly after start, breakfast/lunch windows must
+not overlap, pairing window 10–600 s, unknown keys rejected) carry
+per-field messages under `errors`.
+
+Web surfaces riding this API: `/admin/settings` (the desk, bilingual)
+and the web-only reports/exports below.
+
+---
+
+## Web-only TASK-037 surfaces (session auth, no API equivalents)
+
+- `/kitchen` — the kitchen meal-service desk (ADR-054): a fullscreen
+  glanceable accept/reject state driven by realtime tap frames (green
+  served / red rejected + reason), a recent-meal list, no dense
+  dashboards. Kitchen users (`role: kitchen`) authenticate through the
+  normal login flow and are restricted to this page; admins may open it.
+- `/admin/reports/pae` — the PAE reporting desk (ADR-056): daily/monthly
+  served meals with SVG trend charts, missed meals (list + trend),
+  excluded attempts with the reason breakdown, per-meal enrollment
+  summary, per-student meal history. Exports:
+  `/admin/reports/pae/export/pdf?type=daily|monthly|missed|flagged` and
+  `/admin/reports/pae/export/csv?type=...` (polished PDF via dompdf —
+  branded header, summary tiles, bar charts, tables; CSV = raw
+  structured rows), plus per-student variants
+  `/admin/reports/pae/student/{id}/export/{pdf|csv}`.
+
+---
+
 ## PUT /api/v1/admin/readers/{id} — reader settings: name + mode (TASK-027, admin-only)
 
 The backing endpoint of the `/admin/readers` management desk (the page
@@ -451,7 +553,7 @@ is pinned by tests.
 **Request**:
 
 ```json
-{ "label": "Aula 12 — Entrada", "active_event_type": "ENTRY" }
+{ "label": "Aula 12 — Entrada", "active_event_type": "PAE_LUNCH" }
 ```
 
 `label`: required, 3–255 chars. `active_event_type`: required, same
@@ -462,7 +564,7 @@ valid values as the mode endpoint.
 ```json
 {
   "status": "ok",
-  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "ENTRY" }
+  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "PAE_LUNCH" }
 }
 ```
 
@@ -483,11 +585,11 @@ Creation announces a `reader_created` roster frame (same transaction).
 **Request**:
 
 ```json
-{ "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" }
+{ "label": "Aula 12 — Entrada", "type": "pae", "active_event_type": "PAE_LUNCH" }
 ```
 
 `label`: required, 3–255 chars. `type`: required, one of `classroom`
-`pae` `recycling` `entry`. `active_event_type`: required, any event
+`pae` `recycling`. `active_event_type`: required, any event
 type (same set as the settings endpoint).
 
 **Response `200`**:
@@ -495,7 +597,7 @@ type (same set as the settings endpoint).
 ```json
 {
   "status": "ok",
-  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" },
+  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "pae", "active_event_type": "PAE_LUNCH" },
   "api_key": "…32 chars, shown here and never again…",
   "message": "Reader Aula 12 — Entrada created.",
   "api_key_notice": "API key (copy it now — it is never shown again)"
@@ -573,7 +675,7 @@ rule); roster frames carry only the email, never the password.
 **Request**:
 
 ```json
-{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_enrolled": true }
+{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_breakfast_enrolled": true, "pae_lunch_enrolled": true }
 ```
 
 **Response `200`**:
@@ -581,7 +683,7 @@ rule); roster frames carry only the email, never the password.
 ```json
 {
   "status": "ok",
-  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true, "account_email": "nueva@presence.test" },
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_breakfast_enrolled": true, "pae_lunch_enrolled": true, "account_email": "nueva@presence.test" },
   "account": { "email": "nueva@presence.test", "temporary_password": "password", "must_change_password": true },
   "message": "Student Nueva Estudiante created.",
   "account_notice": "Login ready: nueva@presence.test / initial password password — it must be changed on first login"
@@ -601,11 +703,15 @@ no account is minted for rejected rows).
 free, extra columns ignored:
 
 ```csv
-name,grade,class,pae_enrolled
+name,grade,class,pae_breakfast,pae_lunch
 María Pérez,5°,5° B,yes
 ```
 
-`class` resolves by class NAME (the human workflow); `pae_enrolled`
+`class` resolves by class NAME (the human workflow); TASK-037 —
+`pae_breakfast` / `pae_lunch` (aliases `breakfast` / `lunch`) enroll the
+student for EACH meal independently; the legacy single `pae` (or
+`pae_enrolled`) column still works and enrolls for BOTH meals;
+`pae_enrolled`
 accepts `yes`/`no`/`true`/`false`/`1`/`0`/`si`/`sí`. Row-level failures
 are reported per row (row number + bilingual message) — a bad row never
 blocks the good ones; duplicates are row errors.
@@ -882,7 +988,7 @@ frames):
 
 ```json
 {"type": "roster", "update": {"id": 3, "type": "student_created",
- "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_enrolled": false},
+ "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_breakfast_enrolled": false, "pae_lunch_enrolled": false},
  "at": "2026-09-09 08:00:00"}}
 ```
 

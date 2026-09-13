@@ -50,7 +50,11 @@
             <div class="profile-meta">
                 <span>{{ __('app.class') }}: <strong>{{ $student->schoolClass?->name ?? '—' }}</strong></span>
                 <span class="sep">/</span>
-                <span>{{ __('app.pae_enrolled') }}: <strong>{{ $student->pae_enrolled ? '✓' : '—' }}</strong></span>
+                {{-- TASK-037 — per-meal enrollment: breakfast and lunch
+                     badges, independent of each other. --}}
+                <span>{{ __('app.pae_breakfast') }}: <strong>{{ $student->pae_breakfast_enrolled ? '✓' : '—' }}</strong></span>
+                <span class="sep">/</span>
+                <span>{{ __('app.pae_lunch') }}: <strong>{{ $student->pae_lunch_enrolled ? '✓' : '—' }}</strong></span>
             </div>
         </div>
     </div>
@@ -84,14 +88,16 @@
             <span class="material-symbols-outlined is-20" aria-hidden="true">restaurant</span>
         </div>
         <div>
-            @if($student->pae_enrolled)
-                <span class="metric-value metric-value--inline">
-                    <span class="material-symbols-outlined is-20" aria-hidden="true">check_circle</span>
-                    {{ __('app.pae_enrolled_yes') }}
-                </span>
-            @else
-                <span class="metric-value">{{ __('app.pae_enrolled_no') }}</span>
-            @endif
+            {{-- TASK-037 — the two meal badges; parents never see raw
+                 event types, only meal names. --}}
+            <span class="metric-value metric-value--inline">
+                <span class="material-symbols-outlined is-20" aria-hidden="true">{{ $student->pae_breakfast_enrolled ? 'check_circle' : 'cancel' }}</span>
+                {{ __('app.pae_breakfast') }}
+            </span>
+            <span class="metric-value metric-value--inline sp-t-xs">
+                <span class="material-symbols-outlined is-20" aria-hidden="true">{{ $student->pae_lunch_enrolled ? 'check_circle' : 'cancel' }}</span>
+                {{ __('app.pae_lunch') }}
+            </span>
         </div>
         <div class="metric-foot"><span class="dot" aria-hidden="true"></span>{{ __('app.parent_metric_pae_foot') }}</div>
     </div>
@@ -149,10 +155,19 @@
                     </thead>
                     <tbody>
                     @foreach($timeline as $event)
-                        <tr data-category="{{ str_starts_with($event['type'], 'CLASS_') || $event['type'] === 'ENTRY' ? 'attendance' : (str_starts_with($event['type'], 'PAE_') ? 'pae' : (str_starts_with($event['type'], 'RECYCLING_') ? 'recycling' : 'other')) }}"
+                        <tr data-category="{{ str_starts_with($event['type'], 'CLASS_') ? 'attendance' : (str_starts_with($event['type'], 'PAE_') ? 'pae' : (str_starts_with($event['type'], 'RECYCLING_') ? 'recycling' : 'other')) }}"
                             data-search="{{ mb_strtolower($event['type'] . ' ' . ($event['reader'] ?? '') . ' ' . ($event['material'] ?? '')) }}">
                             <td data-label="{{ __('app.event_type') }}">
-                                <span class="live-chip" data-event-type="{{ $event['type'] }}">{{ __('app.event_type_'.$event['type']) }}</span>
+                                {{-- TASK-037 — meal badges: served meals keep
+                                     the meal chip; flagged attempts render
+                                     the dashed style + the human reason, so
+                                     parents can tell a real meal from an
+                                     excluded attempt without knowing event
+                                     types. --}}
+                                <span class="live-chip @if(! $event['served']) is-flagged @endif" data-event-type="{{ $event['type'] }}">{{ __('app.event_type_'.$event['type']) }}</span>
+                                @if(! $event['served'] && $event['reason'])
+                                    <span class="muted small">{{ __('api.pae_reason_'.$event['reason']) }}</span>
+                                @endif
                             </td>
                             <td class="num" data-label="{{ __('app.tapped_at') }}">
                                 {{ \Illuminate\Support\Carbon::parse($event['occurred_at'])->format('Y-m-d') }}
@@ -271,7 +286,7 @@
                 if (!table) { return; } // empty-state page: reload renders it
 
                 var type = String(ev.type || '');
-                var category = type.indexOf('CLASS_') === 0 || type === 'ENTRY' ? 'attendance'
+                var category = type.indexOf('CLASS_') === 0 ? 'attendance'
                     : (type.indexOf('PAE_') === 0 ? 'pae'
                     : (type.indexOf('RECYCLING_') === 0 ? 'recycling' : 'other'));
 

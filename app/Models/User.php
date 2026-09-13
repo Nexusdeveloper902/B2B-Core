@@ -40,6 +40,12 @@ class User extends Authenticatable
         return $this->role === UserRole::Student->value;
     }
 
+    /** TASK-037 — kitchen (meal-service) staff role, restricted to /kitchen. */
+    public function isKitchen(): bool
+    {
+        return $this->role === UserRole::Kitchen->value;
+    }
+
     /**
      * The students row this account references (1:1; null for
      * admin/teacher accounts). NEVER a second identity — the student

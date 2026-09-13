@@ -26,7 +26,7 @@ class ReaderSettingsRequest extends FormRequest
     {
         return [
             'label' => ['required', 'string', 'min:3', 'max:255'],
-            'active_event_type' => ['required', 'string', Rule::enum(EventType::class)],
+            'active_event_type' => ['required', 'string', Rule::in(EventType::validReaderModes()->all())],
         ];
     }
 }

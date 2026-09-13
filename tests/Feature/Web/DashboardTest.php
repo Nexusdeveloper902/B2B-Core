@@ -21,6 +21,9 @@ class DashboardTest extends TestCase
     {
         parent::setUp();
         $this->seedDemo();
+        // TASK-037 — the fixture owns ALL events (the demo seeder's
+        // past-day PAE scenario rows would leak into the feed/KPI fixtures).
+        PresenceEvent::query()->delete();
     }
 
     #[Test]
@@ -369,7 +372,7 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString('sum-chip-absent', $html);
         $this->assertMatchesRegularExpression('/sum-chip-present[^<]*Present 0/', $html);
         $this->assertMatchesRegularExpression('/sum-chip-late[^<]*Late 0/', $html);
-        $this->assertMatchesRegularExpression('/sum-chip-absent[^<]*Absent 4/', $html);
+        $this->assertMatchesRegularExpression('/sum-chip-absent[^<]*Absent 5/', $html);
     }
 
     #[Test]

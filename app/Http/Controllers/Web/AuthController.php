@@ -45,7 +45,13 @@ class AuthController extends Controller
 
     private function postLoginTarget(User $user, ?string $intended): string
     {
-        $fallback = $user->isStudent() ? route('student.dashboard') : route('dashboard');
+        // TASK-037 — kitchen staff land on their (only) desk; students
+        // on theirs; staff on the staff dashboard.
+        $fallback = match (true) {
+            $user->isStudent() => route('student.dashboard'),
+            $user->isKitchen() => route('kitchen'),
+            default => route('dashboard'),
+        };
 
         if ($intended === null) {
             return $fallback;
@@ -65,6 +71,12 @@ class AuthController extends Controller
             return $fallback;
         }
 
+        // TASK-037 — kitchen users may only open the kitchen workflow;
+        // anything else falls back to their desk.
+        if ($user->isKitchen() && $path !== '/kitchen') {
+            return $fallback;
+        }
+
         return $intended;
     }
 
@@ -73,7 +85,8 @@ class AuthController extends Controller
         return str_starts_with($path, '/admin')
             || str_starts_with($path, '/teacher')
             || str_starts_with($path, '/dashboard')
-            || str_starts_with($path, '/parent');
+            || str_starts_with($path, '/parent')
+            || str_starts_with($path, '/kitchen');
     }
 
     public function logout(): RedirectResponse

@@ -117,7 +117,8 @@
                             <th scope="col">{{ __('app.student') }}</th>
                             <th scope="col">{{ __('app.status') }}</th>
                             <th scope="col">{{ __('app.tapped_at') }}</th>
-                            <th scope="col">{{ __('app.pae_enrolled') }}</th>
+                            <th scope="col">{{ __('app.pae_breakfast') }}</th>
+                            <th scope="col">{{ __('app.pae_lunch') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -136,10 +137,11 @@
                                     <x-stamp :status="$row['status']">{{ __('app.'.$row['status']) }}</x-stamp>
                                 </td>
                                 <td class="num js-tap-time" data-label="{{ __('app.tapped_at') }}">{{ $row['tappedAt'] ?? '—' }}</td>
-                                <td class="num" data-label="{{ __('app.pae_enrolled') }}">{{ $row['student']->pae_enrolled ? __('app.pae_enrolled_yes') : __('app.pae_enrolled_no') }}</td>
+                                <td class="num" data-label="{{ __('app.pae_breakfast') }}">{{ $row['student']->pae_breakfast_enrolled ? '✓' : '—' }}</td>
+                                <td class="num" data-label="{{ __('app.pae_lunch') }}">{{ $row['student']->pae_lunch_enrolled ? '✓' : '—' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="4" class="muted">{{ __('app.no_students') }}</td></tr>
+                            <tr><td colspan="5" class="muted">{{ __('app.no_students') }}</td></tr>
                         @endforelse
                         </tbody>
                     </table>

@@ -49,26 +49,31 @@ class AnalyticalFunctionsTest extends TestCase
 
     private function generateDay(): void
     {
+        // TASK-037 — the fixture owns ALL events: the demo seeder's
+        // past-day PAE scenario rows are wiped so counts stay exact.
+        PresenceEvent::query()->delete();
+
         $classroom = Reader::where('type', 'classroom')->firstOrFail();
         $maria = Card::whereHas('student', fn ($q) => $q->where('name', 'Maria González'))->firstOrFail();
         $carlos = Card::whereHas('student', fn ($q) => $q->where('name', 'Carlos Pérez'))->firstOrFail();
+        $ana = Card::whereHas('student', fn ($q) => $q->where('name', 'Ana Martínez'))->firstOrFail();
 
-        // Maria 08:40 (late), Carlos 09:00 (late); Ana + Diego absent.
+        // Maria 08:40 (late), Carlos 09:00 (late), Ana 07:30 (present);
+        // Diego + Lucía absent.
         PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $classroom->id, 'type' => 'CLASS_ATTENDANCE', 'occurred_at' => now()->subMinutes(200)]);
         PresenceEvent::create(['card_id' => $carlos->id, 'reader_id' => $classroom->id, 'type' => 'CLASS_ATTENDANCE', 'occurred_at' => now()->subMinutes(180)]);
+        PresenceEvent::create(['card_id' => $ana->id, 'reader_id' => $classroom->id, 'type' => 'CLASS_ATTENDANCE', 'occurred_at' => Carbon::parse('2026-09-01 07:30:00')]);
 
-        // Maria's gate session: in 07:00, out 12:00 → 300 minutes.
-        $entry = Reader::where('type', 'entry')->first();
-        if ($entry === null) {
-            $entry = Reader::create([
-                'label' => 'Gate',
-                'type' => 'entry',
-                'active_event_type' => 'ENTRY',
-                'api_key' => 'analytical-test-gate-key-00000001',
-            ]);
-        }
-        PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $entry->id, 'type' => 'ENTRY', 'occurred_at' => Carbon::parse('2026-09-01 07:00:00')]);
-        PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $entry->id, 'type' => 'EXIT', 'occurred_at' => Carbon::parse('2026-09-01 12:00:00')]);
+        // TASK-037 — Maria (both meals enrolled + present) gets breakfast
+        // and lunch served, then a flagged duplicate; Carlos (breakfast
+        // only) gets breakfast; Ana is lunch-only + present but does NOT
+        // get lunch → the missed-meal signal; Diego/Lucía absent.
+        $cafeteria = Reader::where('type', 'pae')->firstOrFail();
+        PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $cafeteria->id, 'type' => 'PAE_BREAKFAST', 'occurred_at' => Carbon::parse('2026-09-01 07:20:00'), 'served' => true]);
+        PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $cafeteria->id, 'type' => 'PAE_LUNCH', 'occurred_at' => Carbon::parse('2026-09-01 12:10:00'), 'served' => true]);
+        PresenceEvent::create(['card_id' => $maria->id, 'reader_id' => $cafeteria->id, 'type' => 'PAE_LUNCH', 'occurred_at' => Carbon::parse('2026-09-01 12:40:00'), 'served' => false, 'reason' => 'duplicate']);
+        PresenceEvent::create(['card_id' => $carlos->id, 'reader_id' => $cafeteria->id, 'type' => 'PAE_BREAKFAST', 'occurred_at' => Carbon::parse('2026-09-01 07:30:00'), 'served' => true]);
+        PresenceEvent::create(['card_id' => $carlos->id, 'reader_id' => $cafeteria->id, 'type' => 'PAE_LUNCH', 'occurred_at' => Carbon::parse('2026-09-01 12:15:00'), 'served' => false, 'reason' => 'not_enrolled']);
     }
 
     #[Test]
@@ -77,6 +82,7 @@ class AnalyticalFunctionsTest extends TestCase
         $result = $this->registry->execute('get_absence_count', ['date' => '2026-09-01']);
 
         $this->assertSame('2026-09-01', $result['date']);
+        // Ana is present now (the missed-meal fixture); Diego + Lucía absent.
         $this->assertSame(2, $result['absence_count']);
     }
 
@@ -86,25 +92,27 @@ class AnalyticalFunctionsTest extends TestCase
         $result = $this->registry->execute('get_absent_students', ['date' => '2026-09-01']);
         $names = array_column($result['absent_students'], 'name');
 
-        $this->assertContains('Ana Martínez', $names);
         $this->assertContains('Diego López', $names);
+        $this->assertContains('Lucía Fernández', $names);
         $this->assertNotContains('Maria González', $names);
         $this->assertNotContains('Carlos Pérez', $names);
+        $this->assertNotContains('Ana Martínez', $names);
     }
 
     #[Test]
     public function present_students_names_the_present(): void
     {
-        // Mirror of absent_students_names_the_missing: Maria + Carlos
-        // tapped in, Ana + Diego did not — "quién ha venido" must name
-        // the tappers, never the absentees (polarity-flip regression).
+        // Mirror of absent_students: Maria + Carlos + Ana tapped in;
+        // Diego + Lucía did not — "quién ha venido" must name the
+        // tappers, never the absentees (polarity-flip regression).
         $result = $this->registry->execute('get_present_students', ['date' => '2026-09-01']);
         $names = array_column($result['present_students'], 'name');
 
         $this->assertContains('Maria González', $names);
         $this->assertContains('Carlos Pérez', $names);
-        $this->assertNotContains('Ana Martínez', $names);
+        $this->assertContains('Ana Martínez', $names);
         $this->assertNotContains('Diego López', $names);
+        $this->assertNotContains('Lucía Fernández', $names);
     }
 
     #[Test]
@@ -124,7 +132,7 @@ class AnalyticalFunctionsTest extends TestCase
         $this->assertSame(3, $result['days']);
         $this->assertCount(3, $result['trend']);
         $this->assertSame('2026-09-01', $result['trend'][2]['date']);
-        $this->assertSame(2, $result['trend'][2]['students']);
+        $this->assertSame(3, $result['trend'][2]['students']);
         $this->assertSame(0, $result['trend'][0]['students']);
     }
 
@@ -148,34 +156,116 @@ class AnalyticalFunctionsTest extends TestCase
 
         $this->assertSame(1, $result['days']);
         $this->assertSame(1, $result['min_absences']);
-        $this->assertContains('Ana Martínez', $names);
         $this->assertContains('Diego López', $names);
+        $this->assertContains('Lucía Fernández', $names);
         $this->assertNotContains('Maria González', $names);
+        $this->assertNotContains('Ana Martínez', $names);
     }
 
     #[Test]
-    public function time_in_school_pairs_the_gate_session(): void
+    public function missed_meals_names_present_enrolled_not_served(): void
+    {
+        // Fixture (generateDay): Ana Martínez is lunch-only, present, and
+        // got NO lunch → missed. Maria/Carlos ate; Lucía (absent) is not
+        // "missed" (no attendance); Carlos is not lunch-enrolled.
+        $result = $this->registry->execute('get_missed_meals', ['meal' => 'lunch', 'date' => '2026-09-01']);
+        $names = array_column($result['missed_students'], 'name');
+
+        $this->assertSame('lunch', $result['meal']);
+        $this->assertSame(1, $result['missed_count']);
+        $this->assertSame(['Ana Martínez'], $names);
+    }
+
+    #[Test]
+    public function missed_meal_count_matches_the_list(): void
+    {
+        $count = $this->registry->execute('get_missed_meal_count', ['meal' => 'lunch', 'date' => '2026-09-01']);
+        $list = $this->registry->execute('get_missed_meals', ['meal' => 'lunch', 'date' => '2026-09-01']);
+
+        $this->assertSame($list['missed_count'], $count['missed_count']);
+        $this->assertNull($count['missed_students']);
+    }
+
+    #[Test]
+    public function missed_meals_on_a_non_school_day_is_empty(): void
+    {
+        // 2026-09-05 is a Saturday: no school day, no missed meals —
+        // honest empty, never an invented list.
+        $result = $this->registry->execute('get_missed_meals', ['meal' => 'lunch', 'date' => '2026-09-05']);
+
+        $this->assertSame(0, $result['missed_count']);
+        $this->assertSame([], $result['missed_students']);
+    }
+
+    #[Test]
+    public function missed_meal_trend_counts_per_day(): void
+    {
+        $result = $this->registry->execute('get_missed_meal_trend', ['meal' => 'lunch', 'days' => 2]);
+
+        $this->assertSame('lunch', $result['meal']);
+        $this->assertSame(2, $result['days']);
+        $this->assertSame(0, $result['trend'][0]['missed']);
+        $this->assertSame(1, $result['trend'][1]['missed']);
+    }
+
+    #[Test]
+    public function pae_enrollment_summarizes_per_meal(): void
+    {
+        // Demo roster: Maria both, Carlos breakfast-only, Ana lunch-only,
+        // Diego neither, Lucía both.
+        $result = $this->registry->execute('get_pae_enrollment', []);
+
+        $this->assertSame(5, $result['total_students']);
+        $this->assertSame(3, $result['breakfast']);
+        $this->assertSame(3, $result['lunch']);
+        $this->assertSame(2, $result['both']);
+        $this->assertSame(1, $result['breakfast_only']);
+        $this->assertSame(1, $result['lunch_only']);
+        $this->assertSame(1, $result['neither']);
+    }
+
+    #[Test]
+    public function student_pae_history_returns_per_day_rows(): void
     {
         $maria = Student::where('name', 'Maria González')->firstOrFail();
 
-        $result = $this->registry->execute(
-            'get_student_time_in_school',
-            ['student_id' => $maria->id, 'days' => 1]
-        );
+        $result = $this->registry->execute('get_student_pae_history', ['student_id' => $maria->id, 'days' => 1]);
 
-        $this->assertSame($maria->id, $result['student_id']);
-        $this->assertSame('Maria González', $result['student_name']);
-        $this->assertCount(1, $result['sessions_by_day']);
-        $this->assertSame(300, $result['sessions_by_day'][0]['minutes_in_school']);
-        $this->assertFalse($result['sessions_by_day'][0]['open_session']);
+        $this->assertSame('Maria González', $result['student']['name']);
+        $this->assertTrue($result['student']['breakfast_enrolled']);
+        $this->assertTrue($result['student']['lunch_enrolled']);
+        $this->assertSame(1, $result['totals']['breakfasts']);
+        $this->assertSame(1, $result['totals']['lunches']);
+        // The flagged duplicate attempt counts as flagged, not as a lunch.
+        $this->assertSame(1, $result['totals']['flagged']);
+        $this->assertCount(1, $result['days']);
+        $this->assertSame('served', $result['days'][0]['breakfast']['status']);
+        $this->assertSame('served', $result['days'][0]['lunch']['status']);
     }
 
     #[Test]
-    public function time_in_school_for_an_unknown_student_is_an_error(): void
+    public function student_meals_on_answers_did_they_eat(): void
     {
-        $result = $this->registry->execute('get_student_time_in_school', ['student_id' => 999999]);
+        $maria = Student::where('name', 'Maria González')->firstOrFail();
+        $carlos = Student::where('name', 'Carlos Pérez')->firstOrFail();
 
-        $this->assertArrayHasKey('error', $result);
+        $mariaResult = $this->registry->execute('get_student_meals_on', ['student_id' => $maria->id, 'date' => '2026-09-01']);
+        $this->assertTrue($mariaResult['breakfast']);
+        $this->assertTrue($mariaResult['lunch']);
+
+        $carlosResult = $this->registry->execute('get_student_meals_on', ['student_id' => $carlos->id, 'date' => '2026-09-01']);
+        $this->assertTrue($carlosResult['breakfast']);
+        $this->assertFalse($carlosResult['lunch']); // flagged attempt ≠ meal
+    }
+
+    #[Test]
+    public function flagged_meal_attempts_reports_reasons(): void
+    {
+        $result = $this->registry->execute('get_flagged_meal_attempts', ['date_from' => '2026-09-01', 'date_to' => '2026-09-01']);
+
+        $this->assertSame(2, $result['flagged_count']);
+        $this->assertSame(1, $result['by_reason']['duplicate']);
+        $this->assertSame(1, $result['by_reason']['not_enrolled']);
     }
 
     #[Test]
@@ -206,11 +296,13 @@ class AnalyticalFunctionsTest extends TestCase
 
         $result = $this->registry->execute('get_class_status', ['class_id' => $classId, 'date' => '2026-09-01']);
 
-        $this->assertSame(['present' => 0, 'late' => 2, 'absent' => 2], $result['totals']);
-        $this->assertCount(4, $result['students']);
+        // TASK-037 — 5 students: Ana on time, Maria + Carlos late,
+        // Diego + Lucía absent.
+        $this->assertSame(['present' => 1, 'late' => 2, 'absent' => 2], $result['totals']);
+        $this->assertCount(5, $result['students']);
         $byName = collect($result['students'])->keyBy('name');
         $this->assertSame('late', $byName['Maria González']['status']);
-        $this->assertSame('absent', $byName['Ana Martínez']['status']);
+        $this->assertSame('present', $byName['Ana Martínez']['status']);
     }
 
     #[Test]
@@ -220,19 +312,19 @@ class AnalyticalFunctionsTest extends TestCase
 
         $this->assertNotEmpty($result['classes']);
         $row = collect($result['classes'])->firstWhere('class_name', '5° B');
-        $this->assertSame(4, $row['enrolled']);
-        $this->assertSame(2, $row['present']);
+        $this->assertSame(5, $row['enrolled']);
+        $this->assertSame(3, $row['present']);
         $this->assertSame(2, $row['absent']);
-        $this->assertSame(50, $row['rate']);
+        $this->assertSame(60, $row['rate']);
     }
 
     #[Test]
     public function enrollment_count_counts_the_roster(): void
     {
-        $this->assertSame(4, $this->registry->execute('get_enrollment_count', [])['enrollment_count']);
+        $this->assertSame(5, $this->registry->execute('get_enrollment_count', [])['enrollment_count']);
 
         $classId = Student::where('name', 'Maria González')->firstOrFail()->class_id;
-        $this->assertSame(4, $this->registry->execute('get_enrollment_count', ['class_id' => $classId])['enrollment_count']);
+        $this->assertSame(5, $this->registry->execute('get_enrollment_count', ['class_id' => $classId])['enrollment_count']);
     }
 
     #[Test]
@@ -275,27 +367,6 @@ class AnalyticalFunctionsTest extends TestCase
     }
 
     #[Test]
-    public function students_in_school_lists_the_not_yet_exited(): void
-    {
-        // Fixture: Maria entered AND exited (outside). Carlos enters with
-        // no exit (inside).
-        $gate = Reader::where('type', 'entry')->firstOrFail();
-        PresenceEvent::create([
-            'card_id' => $this->cardOf('Carlos Pérez')->id,
-            'reader_id' => $gate->id,
-            'type' => 'ENTRY',
-            'occurred_at' => Carbon::parse('2026-09-01 07:30:00'),
-        ]);
-
-        $result = $this->registry->execute('get_students_in_school', []);
-        $byName = collect($result['inside'])->keyBy('name');
-
-        $this->assertSame(1, $result['inside_count']);
-        $this->assertSame('07:30', $byName['Carlos Pérez']['entry_at']);
-        $this->assertFalse($byName->has('Maria González'));
-    }
-
-    #[Test]
     public function recycling_leaderboard_ranks_by_points(): void
     {
         $maria = Student::where('name', 'Maria González')->firstOrFail()->id;
@@ -334,8 +405,9 @@ class AnalyticalFunctionsTest extends TestCase
 
         $this->assertContains('Maria González', $names);
         $this->assertContains('Carlos Pérez', $names);
-        $this->assertNotContains('Ana Martínez', $names);
+        $this->assertContains('Ana Martínez', $names);
         $this->assertNotContains('Diego López', $names);
+        $this->assertNotContains('Lucía Fernández', $names);
     }
 
     #[Test]
@@ -354,7 +426,7 @@ class AnalyticalFunctionsTest extends TestCase
             'name' => 'Fuera Alcance',
             'grade' => '9°',
             'class_id' => $other->id,
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
 
         $teacher = User::where('email', 'teacher@presence.test')->firstOrFail();
@@ -368,13 +440,21 @@ class AnalyticalFunctionsTest extends TestCase
         );
         $this->assertArrayHasKey('error', $denied);
 
-        // Out-of-scope student for time-in-school: hard error.
+        // Out-of-scope student for the PAE history: hard error.
         $walled = $this->registry->execute(
-            'get_student_time_in_school',
+            'get_student_pae_history',
             ['student_id' => $outsider->id],
             $scope
         );
         $this->assertArrayHasKey('error', $walled);
+
+        // Missed meals ride the same class fence.
+        $missedDenied = $this->registry->execute(
+            'get_missed_meals',
+            ['meal' => 'lunch', 'date' => '2026-09-01', 'class_id' => $other->id],
+            $scope
+        );
+        $this->assertArrayHasKey('error', $missedDenied);
 
         // New list functions ride the same fence.
         $lateDenied = $this->registry->execute(

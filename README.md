@@ -17,7 +17,11 @@ backend changes**), and derives three applications from one unified event
 stream:
 
 1. **Attendance tracking** — the foundational application
-2. **PAE (school feeding program)** — mandatory breakfast/lunch tracking
+2. **PAE (school feeding program)** — a complete operational meal
+   service: per-meal enrollment (breakfast/lunch independently),
+   auto-detected serving windows, an attendance prerequisite,
+   duplicate/flagged-attempt audit, a realtime kitchen desk, missed-meal
+   reporting and PDF/CSV exports (TASK-037)
 3. **Recycling incentives** — tap → classify material → **earn** points →
    **spend** them on rewards (a real earn+spend loop with a verification
    step, unlike points displays with no spend mechanism)
@@ -104,6 +108,9 @@ Full endpoint documentation: [docs/API.md](docs/API.md) ·
 | `/login` | — | EN/ES login |
 | `/teacher` | teacher (or admin) | Today's class attendance: present / late (after configurable cutoff) / absent |
 | `/admin` | admin | School-wide stats (attendance, PAE breakfast/lunch, recycling items+points), reader mode control, NL query box, redemption desk, parent-view links |
+| `/kitchen` | kitchen (or admin) | **Kitchen desk** (TASK-037): the meal-service workflow — a fullscreen glanceable green/red accept-reject state driven by realtime tap frames (with the rejection reason), the detected meal, and a recent-taps list. Kitchen users are restricted to this desk |
+| `/admin/settings` | admin | **Settings desk** (TASK-037): the safe presence/PAE knobs — meal serving windows, late cutoff, pairing window, student account conventions — saved through the API and live immediately |
+| `/admin/reports/pae` | admin | **PAE reports** (TASK-037): daily/monthly meals served with charts, missed meals (list + trend), excluded attempts by reason, per-meal enrollment, per-student meal history — with PDF and CSV exports |
 | `/admin/pairing` | admin | **Pairing desk** (TASK-011): one-click "Arm pairing" per student, live 45 s countdown, the moment the paired card lands, and recent pairing history — pairs new cards without curl or a PAT. Live over the realtime WebSocket channel (TASK-020): armed / paired / rejected updates arrive within ~300 ms, with the status poll as the honest fallback |
 | `/parent/students/{id}` | admin/teacher | One student's full event timeline (simplified parent stand-in — a real parent-auth system is intentionally out of scope) |
 
@@ -156,7 +163,8 @@ container with **no PHP at all**). CI jobs dogfood `./run setup --ci` and
 ## Architecture in one paragraph
 
 `events` is the **event-type spine**: one tap = one row
-(`card_id`, `reader_id`, `type`, `occurred_at`). Attendance, PAE and
+(`card_id`, `reader_id`, `type`, `occurred_at`, `served`, `reason`).
+Attendance, PAE and
 recycling numbers are **always derived** from that table — never stored
 separately — so the three applications can never drift apart. Readers
 authenticate with a static Bearer key (the key IS the reader identity).

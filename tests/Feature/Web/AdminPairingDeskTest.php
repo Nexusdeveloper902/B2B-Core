@@ -77,7 +77,7 @@ class AdminPairingDeskTest extends TestCase
         $student = Student::create([
             'name' => 'Estudiante Escritorio',
             'grade' => '5°',
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
         $reader = Reader::where('type', 'classroom')->firstOrFail();
 
@@ -166,7 +166,7 @@ class AdminPairingDeskTest extends TestCase
         $target = Student::create([
             'name' => 'Estudiante Escritorio',
             'grade' => '5°',
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
         $burnedUid = $this->cardUidFor('Maria González');
 
@@ -192,7 +192,7 @@ class AdminPairingDeskTest extends TestCase
         $target = Student::create([
             'name' => 'Estudiante Escritorio ES',
             'grade' => '5°',
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
         $burnedUid = $this->cardUidFor('Maria González');
 
@@ -223,7 +223,7 @@ class AdminPairingDeskTest extends TestCase
         $student = Student::create([
             'name' => 'Estudiante Script',
             'grade' => '5°',
-            'pae_enrolled' => false,
+            'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
         ]);
 
         $pairings = $this->app->make(PairingService::class);

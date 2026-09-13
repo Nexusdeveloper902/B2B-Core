@@ -53,7 +53,7 @@ class StudentAccountService
             $user = User::create([
                 'name' => $student->name,
                 'email' => $this->emailForName($student->name),
-                'password' => (string) config('presence.student_initial_password', 'password'),
+                'password' => (string) settings()->studentInitialPassword(),
                 'role' => UserRole::Student->value,
                 'student_id' => $student->id,
                 'must_change_password' => true,
@@ -88,7 +88,7 @@ class StudentAccountService
      */
     public function provisionMany(Collection $students): array
     {
-        $domain = (string) config('presence.student_email_domain', 'presence.test');
+        $domain = (string) settings()->studentEmailDomain();
 
         $taken = User::query()
             ->where('email', 'like', '%@'.$domain)
@@ -115,7 +115,7 @@ class StudentAccountService
                 $user = User::create([
                     'name' => $student->name,
                     'email' => $email,
-                    'password' => (string) config('presence.student_initial_password', 'password'),
+                    'password' => (string) settings()->studentInitialPassword(),
                     'role' => UserRole::Student->value,
                     'student_id' => $student->id,
                     'must_change_password' => true,
@@ -153,7 +153,7 @@ class StudentAccountService
             $slug = 'student';
         }
 
-        $domain = (string) config('presence.student_email_domain', 'presence.test');
+        $domain = (string) settings()->studentEmailDomain();
         $candidate = "{$slug}@{$domain}";
 
         $suffix = 2;

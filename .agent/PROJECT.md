@@ -1193,3 +1193,43 @@ The owner's eight HTML mockups are now the design source of truth:
   commit — see CHAT entry above + ADR-051.)
 - Gates pre-push: phpunit 472 tests (469 passed, 3 by-design
   skips), Pint clean, postman JSON valid.
+
+## TASK-037 additions (2026-09-14, RUN-2026-09-14-core-042)
+
+The PAE subsystem is now a complete operational school-feeding program:
+
+- **Per-meal enrollment** (ADR-052): `students.pae_breakfast_enrolled`
+  + `pae_lunch_enrolled` — independent flags, two-checkbox desk, CSV
+  columns (`pae_breakfast`/`pae_lunch`, legacy single column = both).
+- **The meal-serving engine** (`MealServingService`, ADR-052): meal
+  readers (type `pae` or relabeled PAE mode) get their meal
+  AUTO-DETECTED from the admin-configurable windows (the mode label is
+  never the meal authority). Five rules before any row is written:
+  Mon–Fri, exactly one active window, per-meal enrollment, strictly
+  earlier same-day CLASS_ATTENDANCE, one meal per student per day.
+  Rejected attempts persist as FLAGGED rows (`events.served=false` +
+  `reason` — weekend/out_of_window/window_overlap/no_student/
+  not_enrolled/no_attendance/duplicate); only served rows ever count
+  (choke-point filters in AttendanceService/PaeReportService).
+- **ENTRY/EXIT is REMOVED** (ADR-054 supersedes ADR-038): no gate
+  readers, no sessions, no in-school derivations; the NL pair left with
+  them.
+- **Kitchen role + `/kitchen`** (ADR-053): normal login, restricted to
+  the meal-service workflow; fullscreen green/red glanceable states
+  driven by realtime tap frames (served/reason ride the wire), admins
+  may verify; kitchen WS connections never see pairing/roster frames.
+- **Runtime settings** (ADR-055): `settings` table + `SettingsService`
+  (registry/validation/fallback chain); GET/PUT
+  `/api/v1/admin/settings` + the `/admin/settings` desk; the windows,
+  late cutoff, pairing window and account conventions are live on the
+  next request.
+- **Reporting + exports** (ADR-056): `/admin/reports/pae` (+ per-student
+  page) — SVG charts, missed meals (list + trend), flagged attempts
+  with reason breakdown, enrollment summary; dompdf PDF + CSV exports.
+- **NL parity** (ADR-057): 27 functions — the PAE family grew by
+  missed-meals (list/count/trend), enrollment, per-student history,
+  meals-on and flagged attempts, all through the same
+  PaeReportService the report pages use.
+- Everything bilingual EN/ES; DemoSeeder ships the full scenario
+  matrix on one past school day (today stays clean); the e2e gained a
+  meal phase with weekday/weekend branching; 530 tests / 33 e2e checks.

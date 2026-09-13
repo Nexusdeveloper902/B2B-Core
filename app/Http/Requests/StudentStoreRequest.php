@@ -29,7 +29,9 @@ class StudentStoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'grade' => ['required', 'string', 'max:64'],
             'class_id' => ['required', 'integer', 'exists:classes,id'],
-            'pae_enrolled' => ['sometimes', 'boolean'],
+            // TASK-037 — breakfast and lunch enroll independently.
+            'pae_breakfast_enrolled' => ['sometimes', 'boolean'],
+            'pae_lunch_enrolled' => ['sometimes', 'boolean'],
         ];
     }
 }

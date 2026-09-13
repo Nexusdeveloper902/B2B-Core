@@ -52,7 +52,7 @@
      nav grammar) is unchanged; only the surface changed. --}}
 <header class="topbar">
     <div class="shell topbar-in">
-        <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}"
+        <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : (auth()->user()->isKitchen() ? route('kitchen') : route('dashboard'))) : route('login') }}"
            aria-label="{{ __('app.app_name') }}">
             {{-- The real Pulse mark (brand suite, knockout on transparent) —
                  replaces the placeholder "P" tile. --}}
@@ -81,6 +81,13 @@
                        @class(['is-active' => request()->routeIs('student.leaderboard')])>
                         {{ __('app.student_standings') }}
                     </a>
+                @elseif(auth()->user()->isKitchen())
+                    {{-- TASK-037 — kitchen staff nav: the kitchen desk is the
+                         whole workflow (role walls 403 everything else). --}}
+                    <a href="{{ route('kitchen') }}"
+                       @class(['is-active' => request()->routeIs('kitchen')])>
+                        {{ __('app.kitchen_desk') }}
+                    </a>
                 @else
                     @if(auth()->user()->isAdmin())
                         <a href="{{ route('admin.dashboard') }}"
@@ -105,6 +112,17 @@
                         <a href="{{ route('admin.ecostation') }}"
                            @class(['is-active' => request()->routeIs('admin.ecostation')])>
                             {{ __('app.ecostation') }}
+                        </a>
+                        {{-- TASK-037 — the PAE reporting desk + the settings
+                             desk (nav pin rule: a page the owner can't
+                             click is a page that didn't ship). --}}
+                        <a href="{{ route('admin.reports.pae') }}"
+                           @class(['is-active' => request()->routeIs('admin.reports.pae', 'admin.reports.pae.student')])>
+                            {{ __('app.reports_pae') }}
+                        </a>
+                        <a href="{{ route('admin.settings') }}"
+                           @class(['is-active' => request()->routeIs('admin.settings')])>
+                            {{ __('app.settings_page') }}
                         </a>
                     @endif
                     <a href="{{ route('teacher.dashboard') }}"
@@ -156,6 +174,8 @@
                                 <a href="{{ route('student.history') }}">{{ __('app.student_history') }}</a>
                                 <a href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }}</a>
                                 <a href="{{ route('student.leaderboard') }}">{{ __('app.student_standings') }}</a>
+                            @elseif(auth()->user()->isKitchen())
+                                <a href="{{ route('kitchen') }}">{{ __('app.kitchen_desk') }}</a>
                             @else
                                 @if(auth()->user()->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}">{{ __('app.admin_dashboard') }}</a>
@@ -163,6 +183,8 @@
                                     <a href="{{ route('admin.readers') }}">{{ __('app.readers_page') }}</a>
                                     <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
                                     <a href="{{ route('admin.ecostation') }}">{{ __('app.ecostation') }}</a>
+                                    <a href="{{ route('admin.reports.pae') }}">{{ __('app.reports_pae') }}</a>
+                                    <a href="{{ route('admin.settings') }}">{{ __('app.settings_page') }}</a>
                                 @endif
                                 <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>
                             @endif
@@ -192,7 +214,7 @@
     <div class="shell">
         <div class="footer-in">
             <div class="footer-brand">
-                <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}">
+                <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : (auth()->user()->isKitchen() ? route('kitchen') : route('dashboard'))) : route('login') }}">
                     <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
                     <span class="wordmark-name">{{ __('app.app_name') }}</span>
                 </a>

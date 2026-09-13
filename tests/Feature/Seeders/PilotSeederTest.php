@@ -40,13 +40,16 @@ class PilotSeederTest extends TestCase
         $this->assertSame(3, SchoolClass::count());
         $this->assertSame(24, Student::count());
         $this->assertSame(24, Card::count());
-        $this->assertSame(5, Reader::count());
+        // TASK-037 — the gate reader left with ENTRY/EXIT: four readers
+        // (classroom, two cafeteria stations, EcoStation).
+        $this->assertSame(4, Reader::count());
         $this->assertSame(24, User::where('role', 'student')->count());
         $this->assertSame(4, User::whereIn('role', ['admin', 'teacher'])->count());
+        $this->assertSame(1, User::where('role', 'kitchen')->count());
 
         // Deterministic story: same seed, same volumes.
-        $this->assertSame(993, PresenceEvent::count());
-        $this->assertSame(69, RecyclingDeposit::count());
+        $this->assertSame(504, PresenceEvent::count());
+        $this->assertSame(73, RecyclingDeposit::count());
         $this->assertSame(2, RewardRedemption::count());
     }
 
@@ -71,18 +74,49 @@ class PilotSeederTest extends TestCase
     }
 
     #[Test]
-    public function pae_taps_honor_enrollment(): void
+    public function pae_taps_honor_enrollment_and_attendance(): void
     {
-        $paeStudentIds = Student::where('pae_enrolled', true)->pluck('id')->all();
+        // TASK-037 — per-meal: a breakfast tap may only belong to a
+        // breakfast-enrolled student (and lunch to lunch-enrolled), and
+        // every meal follows a same-day attendance tap for that student.
+        $breakfastIds = Student::where('pae_breakfast_enrolled', true)->pluck('id')->all();
+        $lunchIds = Student::where('pae_lunch_enrolled', true)->pluck('id')->all();
 
-        $offenders = PresenceEvent::query()
-            ->whereIn('type', ['PAE_BREAKFAST', 'PAE_LUNCH'])
-            ->whereHas('card', fn ($q) => $q->whereNotIn('student_id', $paeStudentIds))
+        $breakfastOffenders = PresenceEvent::query()
+            ->where('type', 'PAE_BREAKFAST')
+            ->whereHas('card', fn ($q) => $q->whereNotIn('student_id', $breakfastIds))
+            ->count();
+        $lunchOffenders = PresenceEvent::query()
+            ->where('type', 'PAE_LUNCH')
+            ->whereHas('card', fn ($q) => $q->whereNotIn('student_id', $lunchIds))
             ->count();
 
-        $this->assertSame(0, $offenders, 'no PAE tap may belong to a non-enrolled student');
+        $this->assertSame(0, $breakfastOffenders, 'no breakfast tap may belong to a breakfast-not-enrolled student');
+        $this->assertSame(0, $lunchOffenders, 'no lunch tap may belong to a lunch-not-enrolled student');
         $this->assertGreaterThan(100, PresenceEvent::where('type', 'PAE_BREAKFAST')->count());
         $this->assertGreaterThan(100, PresenceEvent::where('type', 'PAE_LUNCH')->count());
+
+        // The engine's attendance prerequisite, honored by the seed:
+        // every meal is preceded by a same-day class attendance tap of
+        // the same student (any of their cards).
+        $mealWithoutAttendance = 0;
+        PresenceEvent::query()
+            ->whereIn('type', ['PAE_BREAKFAST', 'PAE_LUNCH'])
+            ->with('card')
+            ->get()
+            ->each(function (PresenceEvent $meal) use (&$mealWithoutAttendance): void {
+                $attended = PresenceEvent::query()
+                    ->where('type', 'CLASS_ATTENDANCE')
+                    ->whereDate('occurred_at', $meal->occurred_at->toDateString())
+                    ->whereTime('occurred_at', '<', $meal->occurred_at->format('H:i:s'))
+                    ->whereHas('card', fn ($q) => $q->where('student_id', $meal->card->student_id))
+                    ->exists();
+                if (! $attended) {
+                    $mealWithoutAttendance++;
+                }
+            });
+
+        $this->assertSame(0, $mealWithoutAttendance, 'every seeded meal follows a same-day attendance tap');
     }
 
     #[Test]
@@ -116,25 +150,6 @@ class PilotSeederTest extends TestCase
             $this->assertFalse($when->isWeekend(), "{$event->occurred_at} falls on a weekend");
             $this->assertSame('-05:00', $when->format('P'));
         }
-    }
-
-    #[Test]
-    public function entry_exit_days_pair_into_sessions(): void
-    {
-        $service = new AttendanceService;
-        $rows = 0;
-        $minutes = 0;
-
-        foreach (Student::all() as $student) {
-            foreach ($service->studentSessions($student, 10) as $day) {
-                $this->assertGreaterThanOrEqual(0, $day['minutes_in_school']);
-                $rows++;
-                $minutes += $day['minutes_in_school'];
-            }
-        }
-
-        $this->assertGreaterThan(100, $rows, 'ten days must pair into plenty of day-rows');
-        $this->assertGreaterThan(0, $minutes, 'paired sessions must accumulate time in school');
     }
 
     #[Test]

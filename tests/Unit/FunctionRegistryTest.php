@@ -46,8 +46,12 @@ class FunctionRegistryTest extends TestCase
         $names = array_column($this->registry->declarations(), 'name');
 
         // TASK-027 — the analytical half joins the fixed set: absences,
-        // repeat absentees, trends, late counts, name lookup, and
-        // time-in-school (all scope-aware for the teacher interface).
+        // repeat absentees, trends, late counts, name lookup (all
+        // scope-aware for the teacher interface).
+        // TASK-037 — PAE parity: missed meals (list/count/trend),
+        // per-meal enrollment, per-student PAE history + meals-on, and
+        // flagged meal attempts. The entry/exit pair (time-in-school,
+        // in-school) left with the feature (supersedes ADR-038).
         $this->assertSame(
             [
                 'get_attendance_count',
@@ -60,7 +64,6 @@ class FunctionRegistryTest extends TestCase
                 'get_late_count',
                 'get_attendance_trend',
                 'get_repeatedly_absent_students',
-                'get_student_time_in_school',
                 'find_student',
                 'get_late_students',
                 'get_class_status',
@@ -68,10 +71,16 @@ class FunctionRegistryTest extends TestCase
                 'get_enrollment_count',
                 'get_pae_students',
                 'get_pae_trend',
-                'get_students_in_school',
                 'get_recycling_leaderboard',
                 'get_student_points',
                 'get_perfect_attendance',
+                'get_missed_meals',
+                'get_missed_meal_count',
+                'get_missed_meal_trend',
+                'get_pae_enrollment',
+                'get_student_pae_history',
+                'get_student_meals_on',
+                'get_flagged_meal_attempts',
             ],
             $names
         );
@@ -183,6 +192,13 @@ class FunctionRegistryTest extends TestCase
         $this->assertSame($student->name, $result['student_name']);
         $this->assertCount(5, $result['timeline']); // attendance x2 (duplicate tap), pae breakfast, pae lunch, recycling
 
+        // TASK-037 — timeline rows carry the meal semantics (served,
+        // reason) so the parent view and the NL answers agree.
+        $first = $result['timeline'][0];
+        $this->assertArrayHasKey('served', $first);
+        $this->assertArrayHasKey('reason', $first);
+        $this->assertArrayHasKey('meal', $first);
+
         $times = array_column($result['timeline'], 'occurred_at');
         $sorted = $times;
         sort($sorted);
@@ -210,6 +226,10 @@ class FunctionRegistryTest extends TestCase
      */
     private function generateEvents(): void
     {
+        // TASK-037 — the fixture owns ALL events: the demo seeder's
+        // past-day PAE scenario rows are wiped so counts stay exact.
+        PresenceEvent::query()->delete();
+
         $classroom = $this->reader('classroom');
         $recycling = $this->reader('recycling');
 

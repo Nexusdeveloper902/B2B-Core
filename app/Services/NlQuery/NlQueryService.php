@@ -30,7 +30,9 @@ class NlQueryService
     private const MAX_TOOL_ROUNDS = 3;
 
     private const SYSTEM_PROMPT = 'You answer questions about a school presence platform: '
-        .'class attendance, the PAE school feeding program, and recycling points. '
+        .'class attendance, the PAE school feeding program (breakfast and lunch '
+        .'with independent per-meal enrollment, serving windows and missed '
+        .'meals), and recycling points. '
         .'When a question needs data, call one of the provided functions; the backend '
         .'executes the real query and returns the numbers — never invent numbers. '
         .'The caller is either an admin with school-wide access or a teacher whose '
@@ -58,7 +60,9 @@ class NlQueryService
             .' Current date and time: '.$now->format('Y-m-d H:i').' ('.$now->getTimezone()->getName().', '.$now->format('l').').'
             .' Resolve relative dates/times against it and never ask the user for the date or time.'
             .' "Who came / quién vino / quién ha venido / who attended" means PRESENT students (get_present_students);'
-            .' "who was absent / quién faltó / quién no vino / ausentes" means ABSENT students (get_absent_students).';
+            .' "who was absent / quién faltó / quién no vino / ausentes" means ABSENT students (get_absent_students).'
+            .' "Missed a meal / no almorzó / no desayunó / se quedó sin almuerzo" means present + enrolled but not served (get_missed_meals);'
+            .' meal counts (get_pae_count) include only SERVED meals — rejected or duplicate taps never count.';
     }
 
     public function __construct(

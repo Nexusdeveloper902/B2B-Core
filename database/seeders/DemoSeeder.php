@@ -7,12 +7,16 @@ use App\Enums\EventType;
 use App\Enums\ReaderType;
 use App\Enums\UserRole;
 use App\Models\Card;
+use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\Reward;
 use App\Models\SchoolClass;
+use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\SettingsService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -21,6 +25,15 @@ use Illuminate\Support\Str;
  * reader api_key to the console, ready to paste into Postman/curl.
  *
  * Output is bilingual (EN + ES) per the platform requirement.
+ *
+ * TASK-037 — the PAE full program demo dataset: per-meal enrollment
+ * (breakfast/lunch independently), the kitchen user, the default
+ * meal-serving settings, a dedicated cafeteria reader (auto meal
+ * detection), and one past school day's worth of scenario events —
+ * accepted meals, an out-of-window attempt, a duplicate, not-enrolled
+ * rejections, a no-attendance rejection and a missed meal. TODAY is
+ * deliberately left clean so demo taps and the e2e journey always start
+ * from an empty school day.
  *
  * DEV/DEMO ONLY (finding 7.2): every credential below is a published,
  * shared secret — never run this seeder against a production database.
@@ -39,6 +52,18 @@ class DemoSeeder extends Seeder
                 'name' => 'School Admin',
                 'password' => 'password',
                 'role' => UserRole::Admin->value,
+                'must_change_password' => false,
+            ],
+        );
+
+        // TASK-037 — the kitchen account: normal login flow, restricted
+        // to the /kitchen meal-service workflow (ADR-054).
+        $kitchen = User::firstOrCreate(
+            ['email' => 'kitchen@presence.test'],
+            [
+                'name' => 'Sofía Vargas',
+                'password' => 'password',
+                'role' => UserRole::Kitchen->value,
                 'must_change_password' => false,
             ],
         );
@@ -72,12 +97,37 @@ class DemoSeeder extends Seeder
 
         $class->update(['teacher_user_id' => $teacher->id]);
 
-        // ---------- Students + cards ----------
+        // ---------- TASK-037: runtime settings (ADR-055) ----------
+        // Seed the canonical defaults as rows (the settings desk then
+        // shows configured values instead of implicit defaults). The
+        // values resolve through config — env overrides apply here too
+        // (the e2e suite exports full-day windows before seeding).
+        $settings = [
+            'pae.breakfast_start' => config('presence.pae.breakfast_start', '06:30'),
+            'pae.breakfast_end' => config('presence.pae.breakfast_end', '08:30'),
+            'pae.lunch_start' => config('presence.pae.lunch_start', '11:30'),
+            'pae.lunch_end' => config('presence.pae.lunch_end', '13:30'),
+            'attendance.late_cutoff' => config('presence.late_cutoff', '08:15'),
+            'pairing.window_seconds' => config('presence.pairing_window_seconds', 45),
+            'accounts.student_email_domain' => config('presence.student_email_domain', 'presence.test'),
+            'accounts.student_initial_password' => config('presence.student_initial_password', 'password'),
+        ];
+
+        foreach ($settings as $key => $value) {
+            Setting::firstOrCreate(['key' => $key], ['value' => $value]);
+        }
+
+        SettingsService::flushCache();
+
+        // ---------- Students + cards (per-meal PAE enrollment) ----------
+        // TASK-037 — breakfast and lunch enroll independently: the demo
+        // roster covers all four combinations.
         $students = [
-            ['name' => 'Maria González', 'grade' => '5°', 'pae_enrolled' => true],
-            ['name' => 'Carlos Pérez', 'grade' => '5°', 'pae_enrolled' => true],
-            ['name' => 'Ana Martínez', 'grade' => '5°', 'pae_enrolled' => false],
-            ['name' => 'Diego López', 'grade' => '5°', 'pae_enrolled' => true],
+            ['name' => 'Maria González', 'grade' => '5°', 'breakfast' => true, 'lunch' => true],
+            ['name' => 'Carlos Pérez', 'grade' => '5°', 'breakfast' => true, 'lunch' => false],
+            ['name' => 'Ana Martínez', 'grade' => '5°', 'breakfast' => false, 'lunch' => true],
+            ['name' => 'Diego López', 'grade' => '5°', 'breakfast' => false, 'lunch' => false],
+            ['name' => 'Lucía Fernández', 'grade' => '5°', 'breakfast' => true, 'lunch' => true],
         ];
 
         $cards = [];
@@ -88,7 +138,8 @@ class DemoSeeder extends Seeder
                 ['name' => $data['name']],
                 [
                     'grade' => $data['grade'],
-                    'pae_enrolled' => $data['pae_enrolled'],
+                    'pae_breakfast_enrolled' => $data['breakfast'],
+                    'pae_lunch_enrolled' => $data['lunch'],
                     'class_id' => $class->id,
                 ],
             );
@@ -108,7 +159,7 @@ class DemoSeeder extends Seeder
                 ],
             );
 
-            $studentRows[] = $student;
+            $studentRows[$data['name']] = $student;
 
             $card = Card::firstOrCreate(
                 ['student_id' => $student->id],
@@ -123,10 +174,23 @@ class DemoSeeder extends Seeder
 
         // ---------- Readers ----------
         $classroomReader = Reader::firstOrCreate(
-            ['label' => 'Demo Reader — Classroom/PAE'],
+            ['label' => 'Demo Reader — Classroom'],
             [
                 'type' => ReaderType::Classroom->value,
                 'active_event_type' => EventType::ClassAttendance->value,
+                'api_key' => Str::random(32),
+            ],
+        );
+
+        // TASK-037 — the cafeteria reader: type `pae`, so its taps go
+        // through the serving engine with AUTO meal detection from the
+        // configured windows (no manual meal mode). The mode column
+        // stays informational for this reader type.
+        $cafeteriaReader = Reader::firstOrCreate(
+            ['label' => 'Demo Reader — Cafeteria'],
+            [
+                'type' => ReaderType::Pae->value,
+                'active_event_type' => EventType::PaeLunch->value,
                 'api_key' => Str::random(32),
             ],
         );
@@ -156,11 +220,79 @@ class DemoSeeder extends Seeder
             Reward::firstOrCreate(['name' => $reward['name']], $reward);
         }
 
+        // ---------- TASK-037: one past school day of PAE scenarios ----------
+        $scenarioDate = $this->seedScenarioDay($studentRows, $cafeteriaReader, $classroomReader);
+
         // ---------- Console output (hard requirement, bilingual) ----------
-        $this->printCredentials($cards, $classroomReader, $recyclingReader, $admin, $teacher, $studentRows);
+        $this->printCredentials($cards, $classroomReader, $cafeteriaReader, $recyclingReader, $admin, $teacher, $kitchen, array_values($studentRows), $scenarioDate);
     }
 
-    private function printCredentials(array $cards, Reader $classroom, Reader $recycling, User $admin, User $teacher, array $studentRows = []): void
+    /**
+     * Seed ONE past school day demonstrating every PAE serving outcome.
+     * Today stays empty (demo taps + the e2e journey start clean).
+     *
+     * @param  array<string, Student>  $students
+     * @return string the scenario date (Y-m-d)
+     */
+    private function seedScenarioDay(array $students, Reader $cafeteria, Reader $classroom): string
+    {
+        $day = Carbon::yesterday();
+        while (! $day->isWeekday()) {
+            $day = $day->subDay();
+        }
+
+        $tap = function (Student $student, Reader $reader, string $time, string $type, bool $served, ?string $reason = null) use ($day): void {
+            PresenceEvent::firstOrCreate(
+                [
+                    'card_id' => $student->cards()->first()->id,
+                    'type' => $type,
+                    'occurred_at' => $day->format('Y-m-d').' '.$time.':00',
+                ],
+                [
+                    'reader_id' => $reader->id,
+                    'served' => $served,
+                    'reason' => $reason,
+                ],
+            );
+        };
+
+        // Maria (both meals): attendance → breakfast + lunch served, then
+        // a duplicate lunch attempt (flagged, counted once).
+        $maria = $students['Maria González'];
+        $tap($maria, $classroom, '07:05', EventType::ClassAttendance->value, true);
+        $tap($maria, $cafeteria, '07:20', EventType::PaeBreakfast->value, true);
+        $tap($maria, $cafeteria, '12:10', EventType::PaeLunch->value, true);
+        $tap($maria, $cafeteria, '12:40', EventType::PaeLunch->value, false, 'duplicate');
+
+        // Carlos (breakfast only): attendance → breakfast served; a lunch
+        // attempt is rejected (not enrolled for lunch) and a 15:30 tap
+        // falls outside every window (flagged out-of-window attempt).
+        $carlos = $students['Carlos Pérez'];
+        $tap($carlos, $classroom, '07:10', EventType::ClassAttendance->value, true);
+        $tap($carlos, $cafeteria, '07:30', EventType::PaeBreakfast->value, true);
+        $tap($carlos, $cafeteria, '12:15', EventType::PaeLunch->value, false, 'not_enrolled');
+        $tap($carlos, $cafeteria, '15:30', EventType::PaeAttempt->value, false, 'out_of_window');
+
+        // Ana (lunch only): attendance + breakfast attempt rejected (not
+        // enrolled for breakfast); lunch NOT served → the missed-meal
+        // report's canonical case (present + enrolled + not served).
+        $ana = $students['Ana Martínez'];
+        $tap($ana, $classroom, '07:15', EventType::ClassAttendance->value, true);
+        $tap($ana, $cafeteria, '07:40', EventType::PaeBreakfast->value, false, 'not_enrolled');
+
+        // Diego (neither meal): absent — no attendance, no meal.
+        $diego = $students['Diego López'];
+        unset($diego);
+
+        // Lucía (both meals): no attendance tap — her lunch attempt is
+        // rejected (no prior same-day class attendance).
+        $lucia = $students['Lucía Fernández'];
+        $tap($lucia, $cafeteria, '12:25', EventType::PaeLunch->value, false, 'no_attendance');
+
+        return $day->toDateString();
+    }
+
+    private function printCredentials(array $cards, Reader $classroom, Reader $cafeteria, Reader $recycling, User $admin, User $teacher, User $kitchen, array $studentRows = [], ?string $scenarioDate = null): void
     {
         $line = str_repeat('=', 74);
 
@@ -176,6 +308,8 @@ class DemoSeeder extends Seeder
                 [
                     [$admin->name, $admin->email, 'password', $admin->role],
                     [$teacher->name, $teacher->email, 'password', $teacher->role],
+                    // TASK-037 — the kitchen account (meal-service staff).
+                    [$kitchen->name, $kitchen->email, 'password', $kitchen->role],
                     // TASK-025 item 5 — demo student accounts (own data only).
                 ],
                 array_map(
@@ -193,21 +327,39 @@ class DemoSeeder extends Seeder
         $this->command->info(' [EN] Cards — use credential_uid as {"credential_uid": "..."} in POST /api/v1/events/tap');
         $this->command->info(' [ES] Tarjetas — usa credential_uid como {"credential_uid": "..."} en POST /api/v1/events/tap');
         $this->command->table(
-            ['Student / Estudiante', 'credential_uid'],
-            array_map(fn (Card $card) => [$card->student->name, $card->credential_uid], $cards),
+            ['Student / Estudiante', 'Breakfast / Desayuno', 'Lunch / Almuerzo', 'credential_uid'],
+            array_map(fn (Card $card) => [
+                $card->student->name,
+                $card->student->pae_breakfast_enrolled ? '✓' : '—',
+                $card->student->pae_lunch_enrolled ? '✓' : '—',
+                $card->credential_uid,
+            ], $cards),
         );
 
         $this->command->info(' [EN] Readers — send as header: Authorization: Bearer <api_key>');
         $this->command->info(' [ES] Lectores — envía como cabecera: Authorization: Bearer <api_key>');
+        $this->command->info(' [EN] The Cafeteria reader AUTO-DETECTS the meal from the serving windows — no mode to set.');
+        $this->command->info(' [ES] El lector de Cafetería DETECTA la comida automáticamente según las ventanas — sin modo que cambiar.');
         $this->command->table(
             ['Reader / Lector', 'Type / Tipo', 'active_event_type', 'api_key (Bearer)'],
             [
                 [$classroom->label, $classroom->type->value, $classroom->active_event_type, $classroom->api_key],
+                [$cafeteria->label, $cafeteria->type->value, $cafeteria->active_event_type.' (auto)', $cafeteria->api_key],
                 [$recycling->label, $recycling->type->value, $recycling->active_event_type, $recycling->api_key],
             ],
         );
 
         $this->command->warn($line);
+        if ($scenarioDate !== null) {
+            $this->command->warn(' [EN] PAE demo scenarios (accepted / duplicate / not-enrolled / no-attendance /');
+            $this->command->warn("     out-of-window / missed meal) are seeded on {$scenarioDate} — open");
+            $this->command->warn('     /admin/reports/pae with that date, or the parent timeline of any student.');
+            $this->command->warn(' [ES] Los escenarios PAE de demo (aceptado / duplicado / no inscrito / sin');
+            $this->command->warn("     asistencia / fuera de ventana / comida perdida) están sembrados el {$scenarioDate} —");
+            $this->command->warn('     abre /admin/reports/pae con esa fecha, o la línea de tiempo de cualquier estudiante.');
+            $this->command->warn($line);
+        }
+
         $this->command->warn(' [EN] The recycling reader returns next_step="awaiting_classification" —');
         $this->command->warn('     then POST /api/v1/recycling/classify with event_id + an image file.');
         $this->command->warn(' [ES] El lector de reciclaje devuelve next_step="awaiting_classification" —');

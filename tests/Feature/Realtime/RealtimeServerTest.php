@@ -232,7 +232,7 @@ class RealtimeServerTest extends TestCase
         $ownStudentId = $conn->table('students')->insertGetId([
             'name' => 'OWN STUDENT',
             'grade' => '3°',
-            'pae_enrolled' => 0,
+            'pae_breakfast_enrolled' => 0, 'pae_lunch_enrolled' => 0,
             'class_id' => null,
             'created_at' => now()->format('Y-m-d H:i:s'),
             'updated_at' => now()->format('Y-m-d H:i:s'),
@@ -354,7 +354,7 @@ class RealtimeServerTest extends TestCase
         $db = $this->freshFileDatabase();
         $adminId = $this->seedUser($db, 'admin');
         $teacherId = $this->seedUser($db, 'teacher');
-        $seededId = $this->seedRosterUpdate($db, 'student_created', ['id' => 9, 'name' => 'Roster Live One', 'grade' => '2°', 'class_name' => '2° A', 'pae_enrolled' => false]);
+        $seededId = $this->seedRosterUpdate($db, 'student_created', ['id' => 9, 'name' => 'Roster Live One', 'grade' => '2°', 'class_name' => '2° A', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         $port = $this->startServer($db);
         $this->assertNotNull($port, 'the realtime server failed to boot');
 
@@ -394,6 +394,52 @@ class RealtimeServerTest extends TestCase
 
     // ------------------------------------------------------------------ helpers
 
+    #[Test]
+    public function kitchen_connections_receive_meal_frames_but_no_admin_channels(): void
+    {
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $kitchenId = $this->seedUser($db, 'kitchen');
+        $seededId = $this->seedTap($db, 'PAE_LUNCH', '12:02', 'KITCHEN LIVE One');
+
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        $token = RealtimeToken::issue($kitchenId, time() + 120);
+        [$sock] = $this->upgrade($port, $token);
+
+        $hello = $this->readMessage($sock);
+        $this->assertNotNull($hello, 'no hello frame arrived');
+        $this->assertSame('hello', $hello['type']);
+        // Kitchen connections see the tap channel (the kitchen page's
+        // glanceable state is driven by meal frames)...
+        $this->assertContains('KITCHEN LIVE One', array_column($hello['events'], 'student_name'));
+        // ...but NEVER the admin channels: no pairing snapshot (card
+        // UIDs), no roster snapshot (roster management payloads).
+        $this->assertArrayNotHasKey('pairing', $hello);
+        $this->assertArrayNotHasKey('roster', $hello);
+
+        // A flagged meal attempt broadcasts with its meal semantics:
+        // served=false + reason ride the wire (the kitchen page colors
+        // its big state from these fields).
+        $flaggedId = $this->seedTap($db, 'PAE_LUNCH', '12:40', 'KITCHEN LIVE Two', null, false, 'duplicate');
+
+        $tap = $this->readMessage($sock);
+        $this->assertNotNull($tap, 'no tap frame arrived after a flagged meal row');
+        $this->assertSame('tap', $tap['type']);
+        $this->assertSame($flaggedId, $tap['event']['id']);
+        $this->assertFalse($tap['event']['served']);
+        $this->assertSame('duplicate', $tap['event']['reason']);
+
+        // Roster writes broadcast to admins only: the kitchen socket
+        // stays silent (readMessage with a short timeout returns null).
+        $this->seedRosterUpdate($db, 'reader_created', ['id' => 77, 'label' => 'No Kitchen Wire']);
+        $this->assertNull($this->readMessageIfAny($sock, 1.5), 'kitchen connections must not receive roster frames');
+
+        fclose($sock);
+    }
+
     private function freshFileDatabase(): string
     {
         $db = storage_path('framework/testing/realtime-'.uniqid().'.sqlite');
@@ -412,7 +458,7 @@ class RealtimeServerTest extends TestCase
     }
 
     /** Insert one complete tap (reader + student + card + event) and return the event id. */
-    private function seedTap(string $db, string $type, string $time, string $studentName, ?int $classId = null): int
+    private function seedTap(string $db, string $type, string $time, string $studentName, ?int $classId = null, bool $served = true, ?string $reason = null): int
     {
         $conn = DB::connection('realtime_file');
         $now = now()->format('Y-m-d H:i:s');
@@ -432,7 +478,7 @@ class RealtimeServerTest extends TestCase
         $studentId = $conn->table('students')->insertGetId([
             'name' => $studentName,
             'grade' => '3°',
-            'pae_enrolled' => 0,
+            'pae_breakfast_enrolled' => 0, 'pae_lunch_enrolled' => 0,
             'class_id' => $classId,
             'created_at' => $now,
             'updated_at' => $now,
@@ -452,6 +498,9 @@ class RealtimeServerTest extends TestCase
             'type' => $type,
             'occurred_at' => now()->toDateString()." {$time}:00",
             'metadata' => null,
+            // TASK-037 — meal semantics on the wire.
+            'served' => $served,
+            'reason' => $reason,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -527,7 +576,7 @@ class RealtimeServerTest extends TestCase
         $studentId = $conn->table('students')->insertGetId([
             'name' => $studentName,
             'grade' => '3°',
-            'pae_enrolled' => 0,
+            'pae_breakfast_enrolled' => 0, 'pae_lunch_enrolled' => 0,
             'class_id' => null,
             'created_at' => $now,
             'updated_at' => $now,

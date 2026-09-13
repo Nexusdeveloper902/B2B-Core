@@ -45,8 +45,8 @@ class ReaderProvisioningTest extends TestCase
         $response = $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/readers', [
                 'label' => 'Aula 12 — Entrada',
-                'type' => 'entry',
-                'active_event_type' => 'ENTRY',
+                'type' => 'pae',
+                'active_event_type' => 'PAE_LUNCH',
             ]);
 
         $response->assertOk()
@@ -54,8 +54,8 @@ class ReaderProvisioningTest extends TestCase
                 'status' => 'ok',
                 'reader' => [
                     'label' => 'Aula 12 — Entrada',
-                    'type' => 'entry',
-                    'active_event_type' => 'ENTRY',
+                    'type' => 'pae',
+                    'active_event_type' => 'PAE_LUNCH',
                 ],
             ]);
 
@@ -70,8 +70,8 @@ class ReaderProvisioningTest extends TestCase
 
         $this->assertDatabaseHas('readers', [
             'label' => 'Aula 12 — Entrada',
-            'type' => 'entry',
-            'active_event_type' => 'ENTRY',
+            'type' => 'pae',
+            'active_event_type' => 'PAE_LUNCH',
             'api_key' => $key,
         ]);
 
@@ -79,7 +79,7 @@ class ReaderProvisioningTest extends TestCase
         // material.
         $frame = RosterUpdate::where('type', 'reader_created')->latest('id')->firstOrFail();
         $this->assertSame('Aula 12 — Entrada', $frame->payload['label']);
-        $this->assertSame('entry', $frame->payload['type']);
+        $this->assertSame('pae', $frame->payload['type']);
         $this->assertStringNotContainsString('api_key', json_encode($frame->payload));
     }
 
@@ -158,7 +158,8 @@ class ReaderProvisioningTest extends TestCase
             ->postJson("/api/v1/admin/readers/{$reader->id}/rotate-key")
             ->assertForbidden();
 
-        $this->assertSame(2, Reader::count());
+        // DemoSeeder ships three readers (classroom + cafeteria + recycling).
+        $this->assertSame(3, Reader::count());
     }
 
     #[Test]
@@ -291,7 +292,7 @@ class ReaderProvisioningTest extends TestCase
         // Pinned decision: labels are display names, not identity (the
         // key is) — duplicates are allowed, short/missing fields are not.
         $payload = [
-            'label' => 'Demo Reader — Classroom/PAE',
+            'label' => 'Demo Reader — Classroom',
             'type' => 'classroom',
             'active_event_type' => 'CLASS_ATTENDANCE',
         ];
@@ -304,15 +305,15 @@ class ReaderProvisioningTest extends TestCase
         $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/readers', [
                 'label' => 'ABC',
-                'type' => 'entry',
-                'active_event_type' => 'EXIT',
+                'type' => 'pae',
+                'active_event_type' => 'PAE_BREAKFAST',
             ])
             ->assertOk();
 
         $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/readers', [
                 'label' => 'No Type Reader',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['type']);
@@ -320,7 +321,7 @@ class ReaderProvisioningTest extends TestCase
         $this->actingAs($this->admin())
             ->postJson('/api/v1/admin/readers', [
                 'label' => 'No Mode Reader',
-                'type' => 'entry',
+                'type' => 'pae',
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['active_event_type']);
@@ -340,14 +341,15 @@ class ReaderProvisioningTest extends TestCase
             ->json('api_key');
 
         $this->postJson('/api/v1/recycling/classify', [
-            'event_id' => 1,
+            'event_id' => 999999,
         ], ['Authorization' => "Bearer {$oldKey}"])->assertUnauthorized();
 
         // The fresh key authenticates (the request sails past auth
         // into endpoint validation — 422 for the nonexistent event,
-        // not 401).
+        // not 401). TASK-037: event id 1 exists now (demo scenario
+        // rows), so the fixture pins a truly missing id.
         $this->postJson('/api/v1/recycling/classify', [
-            'event_id' => 1,
+            'event_id' => 999999,
         ], ['Authorization' => "Bearer {$fresh}"])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['event_id']);

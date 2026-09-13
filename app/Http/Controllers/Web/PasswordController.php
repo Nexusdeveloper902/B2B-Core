@@ -40,7 +40,7 @@ class PasswordController extends Controller
                 'min:8',
                 'confirmed',
                 'different:current_password',
-                Rule::notIn([(string) config('presence.student_initial_password', 'password')]),
+                Rule::notIn([(string) settings()->studentInitialPassword()]),
             ],
         ]);
 

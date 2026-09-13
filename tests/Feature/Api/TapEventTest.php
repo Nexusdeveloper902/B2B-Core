@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\PresenceEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -15,6 +16,9 @@ class TapEventTest extends TestCase
     {
         parent::setUp();
         $this->seedDemo();
+        // TASK-037 — the fixture owns ALL events (the demo seeder's
+        // past-day PAE scenario rows would leak into the counts).
+        PresenceEvent::query()->delete();
     }
 
     #[Test]
@@ -139,11 +143,29 @@ class TapEventTest extends TestCase
         $reader = $this->reader('classroom');
         $reader->update(['active_event_type' => 'PAE_BREAKFAST']);
 
+        // TASK-037 — a relabeled PAE-mode reader routes through the meal
+        // engine: the meal comes from the clock (auto-detected), the
+        // eligibility rules apply. Freeze a school day inside breakfast.
+        $this->travelTo(Carbon::parse('2026-09-01 07:15:00'));
+        $this->wideMealWindows();
+
+        // Same-day attendance prerequisite: tap class attendance first
+        // (the classroom reader — its mode is the reader's own business).
+        PresenceEvent::create([
+            'card_id' => $this->cardOf('Maria González')->id,
+            'reader_id' => $this->reader('classroom')->id,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => Carbon::parse('2026-09-01 07:00:00'),
+        ]);
+
         $this->postJson('/api/v1/events/tap', [
             'credential_uid' => $this->cardUidFor('Maria González'),
+            'client_timestamp' => '2026-09-01 07:15:00',
         ], ['Authorization' => 'Bearer '.$reader->api_key])
             ->assertOk()
             ->assertJsonPath('event_type', 'PAE_BREAKFAST');
+
+        $this->travelBack();
     }
 
     #[Test]

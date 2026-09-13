@@ -195,7 +195,7 @@ class RealtimePassoverTest extends TestCase
                 'name' => 'Pager Student '.$i,
                 'grade' => '5°',
                 'class_id' => $class->id,
-                'pae_enrolled' => false,
+                'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
             ]);
         }
 

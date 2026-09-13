@@ -47,7 +47,7 @@ class RealtimeFeedTest extends TestCase
         $this->assertSame('07:50', $row['time']);
         $this->assertSame(now()->toDateString(), $row['date']);
         $this->assertSame('Maria González', $row['student_name']);
-        $this->assertSame('Demo Reader — Classroom/PAE', $row['reader_label']);
+        $this->assertSame('Demo Reader — Classroom', $row['reader_label']);
         $this->assertIsInt($row['student_id']);
         $this->assertNotSame('', (string) $row['class_name']);
     }

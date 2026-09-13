@@ -28,7 +28,7 @@ class ReaderStoreRequest extends FormRequest
         return [
             'label' => ['required', 'string', 'min:3', 'max:255'],
             'type' => ['required', 'string', Rule::enum(ReaderType::class)],
-            'active_event_type' => ['required', 'string', Rule::enum(EventType::class)],
+            'active_event_type' => ['required', 'string', Rule::in(EventType::validReaderModes()->all())],
         ];
     }
 }

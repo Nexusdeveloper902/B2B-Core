@@ -88,4 +88,34 @@ return [
     // Genérico
     'forbidden_role' => 'No tienes permiso para realizar esta acción.',
     'not_found' => 'Recurso no encontrado',
+
+    /* TASK-037 — el motor de servicio de comidas (ADR-053): mensajes
+       para dispositivos, localizados por Accept-Language. Los rechazos
+       de comida siempre NOMBRAN la comida. */
+    'meal_breakfast' => 'Desayuno',
+    'meal_lunch' => 'Almuerzo',
+    'pae_meal_served' => ':student recibió :meal',
+    'pae_weekend' => 'Hoy no hay servicio de comidas — el programa alimentario funciona de lunes a viernes',
+    'pae_out_of_window' => 'Ahora no se está sirviendo ninguna comida. Desayuno :breakfast · Almuerzo :lunch',
+    'pae_window_overlap' => 'Las ventanas de servicio se solapan — revisa el escritorio de configuración',
+    'pae_no_student' => 'Esta tarjeta no está vinculada a ningún estudiante',
+    'pae_not_enrolled_meal' => ':student no está inscrito para el :meal',
+    'pae_no_attendance' => ':student debe registrar asistencia en clase antes de recibir el :meal',
+    'pae_duplicate' => ':student ya recibió el :meal hoy',
+
+    // Motivos de rechazo estables (etiquetas para reportes/cocina)
+    'pae_reason_weekend' => 'Fin de semana (sin servicio)',
+    'pae_reason_out_of_window' => 'Fuera de la ventana de servicio',
+    'pae_reason_window_overlap' => 'Ventanas solapadas',
+    'pae_reason_no_student' => 'Tarjeta sin estudiante',
+    'pae_reason_not_enrolled' => 'No inscrito',
+    'pae_reason_no_attendance' => 'Sin asistencia previa',
+    'pae_reason_duplicate' => 'Comida duplicada',
+
+    // Superficie de configuración (ADR-055)
+    'settings_empty' => 'No se recibió ninguna configuración',
+    'settings_invalid' => 'La configuración no es válida',
+    'settings_saved' => 'Configuración guardada — aplica de inmediato',
+    'settings_unknown_key' => 'Clave de configuración desconocida: :key',
+    'settings_windows_overlap' => 'Las ventanas de desayuno y almuerzo no deben solaparse',
 ];

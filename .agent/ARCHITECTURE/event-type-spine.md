@@ -59,3 +59,29 @@ Points are NOT stored on the student row. `points_ledger` is append-only
 (+config points per material, only after classification), redemption spends
 (−reward cost, transaction+lock). The ledger is the audit story of the
 earn-and-spend differentiator.
+
+---
+
+## TASK-037 appendendum — the meal semantics on the spine
+
+The spine gained two columns that make the valid-vs-flagged distinction
+EXPLICIT (see ADR-052):
+
+- `events.served` (default true): only served rows contribute to PAE
+  statistics. Every derived query goes through the AttendanceService /
+  PaeReportService choke points, all of which filter `served = true`.
+- `events.reason` (nullable): the machine-stable rejection reason for
+  flagged rows.
+
+Type set now: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
+`RECYCLING_DEPOSIT`, `PAE_ATTEMPT` (engine-written only — an
+out-of-window/weekend meal tap; NOT a valid reader mode:
+`EventType::validReaderModes()`). `ENTRY`/`EXIT` are GONE (ADR-054
+supersedes ADR-038): no gate readers, no session derivations, and the
+PAE attendance prerequisite rides `CLASS_ATTENDANCE` exclusively.
+
+Meal rows are written by `MealServingService` (never by the generic
+tap path): the meal is auto-detected from the serving windows (the
+reader mode label is a legacy entry point into the engine, not the
+meal authority). PAE_* rows may be served (real meals) or flagged
+(attempts with a known meal); PAE_ATTEMPT rows are always flagged.

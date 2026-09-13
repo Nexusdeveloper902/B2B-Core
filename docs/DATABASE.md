@@ -85,3 +85,24 @@ Unchanged by this migration (ADR-025): the app is single-timezone
 wall-clock (`America/Bogota`); MariaDB DATETIME columns store the same
 naive local timestamps SQLite stored. The `-05:00` ISO API strings come
 from the app layer, not the engine.
+
+## 6. Schema additions — TASK-037 (PAE full program)
+
+- **`students`**: the single `pae_enrolled` flag became two independent
+  columns — `pae_breakfast_enrolled` and `pae_lunch_enrolled` (both
+  boolean, default false). A student may be enrolled for breakfast only,
+  lunch only, both, or neither. The migration copies the old flag into
+  both (a superset — no enrolled student loses a meal) before dropping
+  the column; a fresh reseed is equally valid per the task spec.
+- **`events`**: two columns making the served-vs-flagged distinction
+  explicit on the event-type spine (ADR-053): `served` (boolean, default
+  true — only served rows count toward PAE statistics) and `reason`
+  (nullable string — the machine-stable rejection reason for flagged
+  rows: `weekend` / `out_of_window` / `window_overlap` / `no_student` /
+  `not_enrolled` / `no_attendance` / `duplicate`).
+- **`settings`** (new table, ADR-055): `key` (unique) + `value` (json) +
+  timestamps — the DB-backed runtime overrides read by
+  `SettingsService` (meal windows, late cutoff, pairing window, student
+  account conventions). Reads resolve row → config default; the config
+  defaults remain env-overridable (`PAE_BREAKFAST_START` etc. in
+  `.env.example`).

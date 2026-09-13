@@ -117,7 +117,9 @@ tests remain opt-in (`RUN_LIVE_LLM_TESTS=1` + `DEEPSEEK_API_KEY`).
 
 Boots `php artisan serve` against `database/e2e.sqlite` (your dev database is
 **never touched**), then exercises the whole platform story over plain HTTP
-with 30 bilingual checks: tap → classify → idempotent earn → reader relabel →
+with 33 bilingual checks: tap → classify → idempotent earn → reader relabel →
+meal-serving engine (auto-detected meal, duplicate flag, weekend flag, meal-
+specific Spanish rejection — TASK-037) →
 redeem → honest NL-query blocked state → dashboard routing. Exits non-zero if
 any check fails.
 

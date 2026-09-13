@@ -92,24 +92,50 @@ otorgan puntos en el momento del tap.**
 `404 Not Found` — tarjeta desconocida (`Tarjeta no reconocida`) o no activa
 (`La tarjeta no está activa`).
 
-`422 Unprocessable Entity` — **compuerta de inscripción PAE** (TASK-027):
-una tarjeta válida y activa cuyo estudiante **no está inscrito en el PAE**
-tocó un lector en modo `PAE_BREAKFAST`/`PAE_LUNCH`. El consumo NO se
-registra (mantiene honesto a `paeCount()`: la asistencia de comidas solo
-proviene de toques de estudiantes inscritos) y el intento queda escrito en
-`storage/logs/laravel.log` como pista de auditoría del programa:
+`422 Unprocessable Entity` — **motor de servicio de comidas** (TASK-037):
+una tarjeta válida y activa tocó un lector de comidas (`type: "pae"`, o
+cualquier lector reetiquetado a modo `PAE_BREAKFAST`/`PAE_LUNCH`) y una de
+las reglas de elegibilidad falló. El intento NO se sirve, pero SÍ se
+persiste como fila marcada (`served=false` + `reason`) — auditable en los
+feeds, el escritorio de cocina, los reportes y
+`storage/logs/laravel.log`, y nunca cuenta como comida:
 
 ```json
-{"status":"error","reason":"student_not_pae","event_type":"PAE_BREAKFAST","message":"Ana no está inscrita en el programa de alimentación"}
+{"status":"error","reason":"not_enrolled","meal":"breakfast","event_id":42,"event_type":"PAE_BREAKFAST","message":"Ana no está inscrito para el Desayuno"}
 ```
 
-**Pares entrada/salida (TASK-027):** un lector en modo `ENTRY` registra
-cada toque como evento `ENTRY` — y el mismo lector en modo `EXIT` registra
-`EXIT`. Varias filas por estudiante y día son el punto (cada entrada queda
-registrada); `AttendanceService::studentSessions()` las empareja al vuelo
-para derivar el tiempo en la escuela (una entrada sin salida cuenta como
-sesión abierta). Sin cambio de esquema: ambos valores cabalgan la misma
-columna `events.type`.
+Motivos estables y su significado:
+
+| `reason` | Regla que falló | Mensaje |
+|---|---|---|
+| `weekend` | Servicio de lunes a viernes (America/Bogota) | Hoy no hay servicio |
+| `out_of_window` | Ninguna ventana de servicio activa | Nombra ambas ventanas como pista |
+| `window_overlap` | Ambas ventanas activas (desconfiguración) | Revisar el escritorio de configuración |
+| `no_student` | Tarjeta sin estudiante vinculado | Tarjeta sin estudiante |
+| `not_enrolled` | El estudiante no está inscrito para ESA comida | Nombra la comida |
+| `no_attendance` | Sin `CLASS_ATTENDANCE` previa el mismo día | Debe registrar asistencia primero |
+| `duplicate` | La comida ya se sirvió hoy | Ya recibió (:meal) |
+
+**Reglas de servicio (TASK-037):** una comida cuenta solo cuando (1) la
+fecha es día escolar (lun–vie), (2) exactamente UNA ventana de servicio
+está activa (auto-detectada desde las ventanas configurables por el
+administrador — la etiqueta de modo del lector NO es la autoridad), (3)
+el estudiante está inscrito para esa comida específica
+(`pae_breakfast_enrolled` / `pae_lunch_enrolled`, banderas
+independientes), (4) existe un evento `CLASS_ATTENDANCE` estrictamente
+anterior en el mismo día local escolar, y (5) el estudiante aún no
+recibió esa comida hoy. Los toques aceptados devuelven `meal` y un
+mensaje localizado:
+
+```json
+{"status":"ok","event_id":43,"event_type":"PAE_LUNCH","student_first_name":"Maria","meal":"lunch","message":"Maria recibió Almuerzo","next_step":null}
+```
+
+**ENTRY/EXIT fue eliminado** (TASK-037, reemplaza las sesiones de
+TASK-027): los lectores de puerta, los eventos `ENTRY`/`EXIT` y las
+derivaciones de tiempo en la escuela salieron de la plataforma — el
+prerrequisito de asistencia del PAE descansa exclusivamente en
+`CLASS_ATTENDANCE`.
 
 ---
 
@@ -126,7 +152,12 @@ se acepta `PUT`.
 ```
 
 Valores válidos: `CLASS_ATTENDANCE`, `PAE_BREAKFAST`, `PAE_LUNCH`,
-`RECYCLING_DEPOSIT`, `ENTRY`, `EXIT` (cualquier otro → 422).
+`RECYCLING_DEPOSIT` (cualquier otro → 422). `PAE_ATTEMPT` NO es un modo
+válido: es el tipo que escribe el motor para los intentos fuera de
+ventana/fin de semana (`served=false`), nunca una etiqueta asignable.
+TASK-037: un lector reetiquetado a un modo PAE enruta sus toques por el
+motor de servicio — la comida se auto-detecta por el reloj, no por la
+etiqueta.
 
 **Respuesta `200`**:
 
@@ -399,8 +430,14 @@ listas de asistencia `get_present_students(date, class_id?)`,
 `get_pae_count(meal, date, class_id?)`,
 `get_pae_students(meal, date, class_id?)`,
 `get_pae_trend(meal, days)`; presencia
-`get_students_in_school(class_id?)`,
-`get_student_time_in_school(student_id, days)`,
+(TASK-037, paridad PAE — el mismo PaeReportService de
+/admin/reports/pae) `get_missed_meals(meal, date?, class_id?)`,
+`get_missed_meal_count(meal, date?, class_id?)`,
+`get_missed_meal_trend(meal, days?, class_id?)`,
+`get_pae_enrollment(class_id?)`,
+`get_student_pae_history(student_id, days?)`,
+`get_student_meals_on(student_id, date?)` y
+`get_flagged_meal_attempts(date_from?, date_to?)` —
 `get_student_timeline(student_id)`; reciclaje/puntos
 `get_recycling_totals(date_from, date_to)` y
 `get_recycling_leaderboard(limit)` (ambas de toda la escuela por
@@ -453,6 +490,76 @@ exacto de DeepSeek con orientación bilingüe.
 
 ---
 
+## GET/PUT /api/v1/admin/settings — configuración en vivo (TASK-037, solo administradores)
+
+El entorno presence/PAE configurable por el administrador (ADR-055): la
+lectura devuelve los valores EFECTIVOS (fila en settings → valor por
+defecto de config); las escrituras validan y persisten lotes parciales
+que aplican en la siguiente petición (el motor de comidas, el corte de
+llegada tarde, la ventana de emparejamiento y las convenciones de cuentas
+de estudiantes resuelven todos por el mismo servicio). Los secretos
+nunca forman parte de esta superficie.
+
+**GET `/api/v1/admin/settings`**:
+
+```json
+{
+  "status": "ok",
+  "settings": {
+    "pae.breakfast_start": "06:30", "pae.breakfast_end": "08:30",
+    "pae.lunch_start": "11:30", "pae.lunch_end": "13:30",
+    "attendance.late_cutoff": "08:15",
+    "pairing.window_seconds": 45,
+    "accounts.student_email_domain": "presence.test",
+    "accounts.student_initial_password": "password"
+  },
+  "customized": ["pae.breakfast_start"],
+  "meal_windows": {
+    "breakfast": {"start": "06:30", "end": "08:30"},
+    "lunch": {"start": "11:30", "end": "13:30"}
+  }
+}
+```
+
+**PUT `/api/v1/admin/settings`** (también POST) — lotes parciales; se
+valida la vista combinada, así que un campo malo nunca corrompe el resto:
+
+```json
+{ "settings": { "pae.breakfast_start": "07:00", "pae.breakfast_end": "09:00" } }
+```
+
+`200` devuelve la configuración efectiva completa. `422` lleva errores
+por campo (formato `HH:MM`, fin estrictamente después del inicio, las
+ventanas de desayuno/almuerzo no deben solaparse, ventana de
+emparejamiento 10–600 s, claves desconocidas rechazadas).
+
+Superficies web que usan esta API: `/admin/settings` (el escritorio,
+bilingüe) y los reportes/exportaciones de solo web que siguen.
+
+---
+
+## Superficies web TASK-037 (autenticación de sesión, sin equivalente API)
+
+- `/kitchen` — el escritorio de cocina (ADR-054): un estado gigante
+  de aceptado/rechazado guiado por los toques en tiempo real (verde
+  servida / rojo rechazada + motivo), una lista de comidas recientes,
+  sin paneles densos. Los usuarios de cocina (`role: kitchen`) se
+  autentican por el flujo normal de inicio de sesión y quedan
+  restringidos a esta página; los administradores también pueden
+  abrirla.
+- `/admin/reports/pae` — el escritorio de reportes PAE (ADR-056):
+  comidas servidas diarias/mensuales con gráficas SVG de tendencia,
+  comidas perdidas (lista + tendencia), intentos excluidos con el
+  desglose por motivo, resumen de inscripción por comida e historial
+  por estudiante. Exportaciones:
+  `/admin/reports/pae/export/pdf?type=daily|monthly|missed|flagged` y
+  `/admin/reports/pae/export/csv?type=...` (PDF pulido vía dompdf —
+  encabezado de marca, tarjetas de resumen, barras, tablas; el CSV son
+  filas crudas estructuradas), más las variantes por estudiante
+  `/admin/reports/pae/student/{id}/export/{pdf|csv}`.
+
+---
+
 ## PUT /api/v1/admin/readers/{id} — ajustes del lector: nombre + modo (TASK-027, solo admin)
 
 El endpoint que respalda el escritorio de gestión `/admin/readers` (la
@@ -464,7 +571,7 @@ intacto — su contrato está fijado por pruebas.
 **Petición**:
 
 ```json
-{ "label": "Aula 12 — Entrada", "active_event_type": "ENTRY" }
+{ "label": "Aula 12 — Entrada", "active_event_type": "PAE_LUNCH" }
 ```
 
 `label`: obligatorio, 3–255 caracteres. `active_event_type`: obligatorio,
@@ -475,7 +582,7 @@ mismos valores válidos que el endpoint de modo.
 ```json
 {
   "status": "ok",
-  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "ENTRY" }
+  "reader": { "id": 1, "label": "Aula 12 — Entrada", "type": "classroom", "active_event_type": "PAE_LUNCH" }
 }
 ```
 
@@ -497,11 +604,11 @@ frame `reader_created` (misma transacción).
 **Petición**:
 
 ```json
-{ "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" }
+{ "label": "Aula 12 — Entrada", "type": "pae", "active_event_type": "PAE_LUNCH" }
 ```
 
 `label`: obligatorio, 3–255 caracteres. `type`: obligatorio, uno de
-`classroom` `pae` `recycling` `entry`. `active_event_type`:
+`classroom` `pae` `recycling`. `active_event_type`:
 obligatorio, cualquier tipo de evento (el mismo conjunto que el
 endpoint de ajustes).
 
@@ -510,7 +617,7 @@ endpoint de ajustes).
 ```json
 {
   "status": "ok",
-  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "entry", "active_event_type": "ENTRY" },
+  "reader": { "id": 7, "label": "Aula 12 — Entrada", "type": "pae", "active_event_type": "PAE_LUNCH" },
   "api_key": "…32 caracteres, aquí y nunca más…",
   "message": "Lector Aula 12 — Entrada creado.",
   "api_key_notice": "API key (cópiala ahora — no se vuelve a mostrar)"
@@ -591,7 +698,7 @@ roster solo llevan el email, nunca la contraseña.
 **Petición**:
 
 ```json
-{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_enrolled": true }
+{ "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "pae_breakfast_enrolled": true, "pae_lunch_enrolled": true }
 ```
 
 **Respuesta `200`**:
@@ -599,7 +706,7 @@ roster solo llevan el email, nunca la contraseña.
 ```json
 {
   "status": "ok",
-  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_enrolled": true, "account_email": "nueva@presence.test" },
+  "student": { "id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_name": "5° B", "pae_breakfast_enrolled": true, "pae_lunch_enrolled": true, "account_email": "nueva@presence.test" },
   "account": { "email": "nueva@presence.test", "temporary_password": "password", "must_change_password": true },
   "message": "Estudiante Nueva Estudiante creado.",
   "account_notice": "Acceso listo: nueva@presence.test / contraseña inicial password — debe cambiarse en el primer inicio de sesión"
@@ -619,11 +726,15 @@ silencioso; las filas rechazadas no crean ninguna cuenta).
 mayúsculas, orden libre, columnas extra ignoradas:
 
 ```csv
-name,grade,class,pae_enrolled
+name,grade,class,pae_breakfast,pae_lunch
 María Pérez,5°,5° B,yes
 ```
 
-`class` se resuelve por NOMBRE de clase (el flujo humano); `pae_enrolled`
+`class` se resuelve por NOMBRE de clase (el flujo humano); TASK-037 —
+`pae_breakfast` / `pae_lunch` (alias `breakfast` / `lunch`) inscriben
+para CADA comida de forma independiente; la columna única heredada
+`pae` (o `pae_enrolled`) sigue funcionando e inscribe para AMBAS
+comidas; `pae_enrolled`
 acepta `yes`/`no`/`true`/`false`/`1`/`0`/`si`/`sí`. Las fallas por fila se
 reportan por fila (número de fila + mensaje bilingüe) — una fila mala
 nunca bloquea a las buenas; los duplicados son errores de fila.
@@ -917,7 +1028,7 @@ REST admin; la misma disciplina del canal de emparejamiento):
 
 ```json
 {"type": "roster", "update": {"id": 3, "type": "student_created",
- "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_enrolled": false},
+ "payload": {"id": 9, "name": "Nueva Estudiante", "grade": "5°", "class_id": 1, "class_name": "5° B", "pae_breakfast_enrolled": false, "pae_lunch_enrolled": false},
  "at": "2026-09-09 08:00:00"}}
 ```
 

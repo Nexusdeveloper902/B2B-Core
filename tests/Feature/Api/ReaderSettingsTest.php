@@ -38,12 +38,12 @@ class ReaderSettingsTest extends TestCase
     #[Test]
     public function an_admin_renames_a_reader_and_switches_its_mode(): void
     {
-        $reader = Reader::where('label', 'Demo Reader — Classroom/PAE')->firstOrFail();
+        $reader = Reader::where('label', 'Demo Reader — Classroom')->firstOrFail();
 
         $response = $this->actingAs($this->admin())
             ->putJson("/api/v1/admin/readers/{$reader->id}", [
                 'label' => 'Aula 12 — Entrada',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ]);
 
         $response->assertOk()
@@ -52,14 +52,14 @@ class ReaderSettingsTest extends TestCase
                 'reader' => [
                     'id' => $reader->id,
                     'label' => 'Aula 12 — Entrada',
-                    'active_event_type' => 'ENTRY',
+                    'active_event_type' => 'PAE_LUNCH',
                 ],
             ]);
 
         $this->assertDatabaseHas('readers', [
             'id' => $reader->id,
             'label' => 'Aula 12 — Entrada',
-            'active_event_type' => 'ENTRY',
+            'active_event_type' => 'PAE_LUNCH',
         ]);
     }
 
@@ -90,7 +90,7 @@ class ReaderSettingsTest extends TestCase
         $this->actingAs($this->admin())
             ->putJson("/api/v1/admin/readers/{$reader->id}", [
                 'label' => 'AB',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['label']);
@@ -104,7 +104,7 @@ class ReaderSettingsTest extends TestCase
 
         $this->putJson("/api/v1/admin/readers/{$reader->id}", [
             'label' => 'Intento Anónimo',
-            'active_event_type' => 'ENTRY',
+            'active_event_type' => 'PAE_LUNCH',
         ])->assertUnauthorized();
 
         $this->assertDatabaseHas('readers', [
@@ -121,7 +121,7 @@ class ReaderSettingsTest extends TestCase
         $this->actingAs($this->teacher())
             ->putJson("/api/v1/admin/readers/{$reader->id}", [
                 'label' => 'Intento Docente',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ])
             ->assertForbidden();
 
@@ -137,7 +137,7 @@ class ReaderSettingsTest extends TestCase
         $this->actingAs($this->admin())
             ->putJson('/api/v1/admin/readers/999999', [
                 'label' => 'Fantasma',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ])
             ->assertNotFound();
     }
@@ -153,22 +153,22 @@ class ReaderSettingsTest extends TestCase
         $this->actingAs($this->admin())
             ->putJson("/api/v1/admin/readers/{$reader->id}", [
                 'label' => 'Live Reader — Puerta',
-                'active_event_type' => 'ENTRY',
+                'active_event_type' => 'PAE_LUNCH',
             ])->assertOk();
 
         $frame = RosterUpdate::where('type', 'reader_updated')->latest('id')->first();
         $this->assertNotNull($frame, 'no reader_updated roster frame was written');
         $this->assertSame($reader->id, $frame->payload['id']);
         $this->assertSame('Live Reader — Puerta', $frame->payload['label']);
-        $this->assertSame('ENTRY', $frame->payload['active_event_type']);
+        $this->assertSame('PAE_LUNCH', $frame->payload['active_event_type']);
 
         $this->actingAs($this->admin())
             ->postJson("/api/v1/admin/readers/{$reader->id}/mode", [
-                'active_event_type' => 'EXIT',
+                'active_event_type' => 'PAE_BREAKFAST',
             ])->assertOk();
 
         $modeFrame = RosterUpdate::where('type', 'reader_updated')->latest('id')->first();
         $this->assertNotSame($frame->id, $modeFrame->id, 'the mode-only endpoint logs its own frame');
-        $this->assertSame('EXIT', $modeFrame->payload['active_event_type']);
+        $this->assertSame('PAE_BREAKFAST', $modeFrame->payload['active_event_type']);
     }
 }

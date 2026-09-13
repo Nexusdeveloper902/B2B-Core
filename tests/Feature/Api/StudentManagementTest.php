@@ -48,7 +48,7 @@ class StudentManagementTest extends TestCase
                 'name' => 'Nueva Estudiante',
                 'grade' => '5°',
                 'class_id' => $class->id,
-                'pae_enrolled' => true,
+                'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true,
             ]);
 
         $response->assertOk()
@@ -58,14 +58,14 @@ class StudentManagementTest extends TestCase
                     'name' => 'Nueva Estudiante',
                     'grade' => '5°',
                     'class_name' => $class->name,
-                    'pae_enrolled' => true,
+                    'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true,
                 ],
             ]);
 
         $this->assertDatabaseHas('students', [
             'name' => 'Nueva Estudiante',
             'class_id' => $class->id,
-            'pae_enrolled' => true,
+            'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true,
         ]);
 
         // TASK-029 — the roster channel frame rides the create
@@ -92,8 +92,8 @@ class StudentManagementTest extends TestCase
         $response->assertStatus(422)
             ->assertJson(['status' => 'error', 'reason' => 'duplicate']);
 
-        // Still exactly four seeded students — nothing was written.
-        $this->assertSame(4, Student::count());
+        // Still exactly the five seeded students — nothing was written.
+        $this->assertSame(5, Student::count());
     }
 
     #[Test]
@@ -123,7 +123,7 @@ class StudentManagementTest extends TestCase
             'file' => UploadedFile::fake()->createWithContent('roster.csv', $csv, 'text/csv'),
         ])->assertUnauthorized();
 
-        $this->assertSame(4, Student::count());
+        $this->assertSame(5, Student::count());
     }
 
     #[Test]
@@ -141,17 +141,21 @@ class StudentManagementTest extends TestCase
                 'file' => UploadedFile::fake()->createWithContent('roster.csv', $csv, 'text/csv'),
             ])->assertForbidden();
 
-        $this->assertSame(4, Student::count());
+        $this->assertSame(5, Student::count());
     }
 
     #[Test]
     public function an_admin_imports_a_csv_roster(): void
     {
-        $csv = "name,grade,class,pae_enrolled\n"
-            ."Importada Uno,5°,5° B,yes\n"
-            ."Importada Dos,5°,5° B,no\n"
+        // TASK-037 — per-meal enrollment columns (breakfast/lunch
+        // independently; aliases work; the legacy single pae column
+        // still maps to both).
+        $csv = "name,grade,class,pae_breakfast,pae_lunch\n"
+            ."Importada Uno,5°,5° B,yes,yes\n"
+            ."Importada Dos,5°,5° B,no,no\n"
             ."\n"
-            ."Importada Tres,5°,5° b,si\n";
+            ."Importada Tres,5°,5° b,si,yes\n"
+            ."Importada Cuatro,5°,5° B,no,yes\n";
 
         $response = $this->actingAs($this->admin())
             ->post('/api/v1/admin/students/import', [
@@ -161,20 +165,23 @@ class StudentManagementTest extends TestCase
         $response->assertOk()
             ->assertJson([
                 'status' => 'ok',
-                'created' => 3,
+                'created' => 4,
                 'failed' => 0,
             ]);
 
-        $this->assertDatabaseHas('students', ['name' => 'Importada Uno', 'pae_enrolled' => true]);
-        $this->assertDatabaseHas('students', ['name' => 'Importada Dos', 'pae_enrolled' => false]);
+        $this->assertDatabaseHas('students', ['name' => 'Importada Uno', 'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true]);
+        $this->assertDatabaseHas('students', ['name' => 'Importada Dos', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         // "si" is a Spanish yes; the class name matched case-insensitively.
-        $this->assertDatabaseHas('students', ['name' => 'Importada Tres', 'pae_enrolled' => true]);
+        $this->assertDatabaseHas('students', ['name' => 'Importada Tres', 'pae_breakfast_enrolled' => true, 'pae_lunch_enrolled' => true]);
+        // Unknown truthy-false values read as NOT enrolled (honest false);
+        // per-meal independence: breakfast NO, lunch YES.
+        $this->assertDatabaseHas('students', ['name' => 'Importada Cuatro', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => true]);
 
         // TASK-029 — ONE students_imported frame per import (not one per
         // row): the desk prepends every row from the single payload.
         $frame = RosterUpdate::where('type', 'students_imported')->latest('id')->first();
         $this->assertNotNull($frame, 'no students_imported roster frame was written');
-        $this->assertCount(3, $frame->payload['students']);
+        $this->assertCount(4, $frame->payload['students']);
         $this->assertSame('Importada Uno', $frame->payload['students'][0]['name']);
         $this->assertSame('5° B', $frame->payload['students'][0]['class_name']);
     }
@@ -219,7 +226,7 @@ class StudentManagementTest extends TestCase
             ->assertStatus(422)
             ->assertJson(['status' => 'error']);
 
-        $this->assertSame(4, Student::count());
+        $this->assertSame(5, Student::count());
     }
 
     #[Test]
@@ -234,7 +241,7 @@ class StudentManagementTest extends TestCase
             ->assertStatus(422)
             ->assertJson(['status' => 'error', 'created' => 0]);
 
-        $this->assertSame(4, Student::count());
+        $this->assertSame(5, Student::count());
     }
 
     #[Test]

@@ -48,8 +48,12 @@
                 @endforeach
             </select>
             <label class="check-line">
-                <input type="checkbox" id="student-pae">
-                {{ __('app.student_pae') }}
+                <input type="checkbox" id="student-pae-breakfast">
+                {{ __('app.student_pae_breakfast') }}
+            </label>
+            <label class="check-line">
+                <input type="checkbox" id="student-pae-lunch">
+                {{ __('app.student_pae_lunch') }}
             </label>
             <button type="submit" class="btn btn-primary">{{ __('app.create_student') }}</button>
         </form>
@@ -106,7 +110,8 @@
                     <th scope="col">{{ __('app.student_name') }}</th>
                     <th scope="col">{{ __('app.student_class') }}</th>
                     <th scope="col">{{ __('app.student_grade') }}</th>
-                    <th scope="col">{{ __('app.pae_enrolled') }}</th>
+                    <th scope="col">{{ __('app.pae_breakfast') }}</th>
+                    <th scope="col">{{ __('app.pae_lunch') }}</th>
                     <th scope="col">{{ __('app.card') }}</th>
                     <th scope="col">{{ __('app.account') }}</th>
                     <th scope="col"></th>
@@ -118,7 +123,8 @@
                         <td data-label="{{ __('app.student_name') }}">{{ $student->name }}</td>
                         <td data-label="{{ __('app.student_class') }}">{{ $student->schoolClass?->name ?? '—' }}</td>
                         <td data-label="{{ __('app.student_grade') }}">{{ $student->grade }}</td>
-                        <td data-label="{{ __('app.pae_enrolled') }}">{{ $student->pae_enrolled ? '✓' : '—' }}</td>
+                        <td data-label="{{ __('app.pae_breakfast') }}">{{ $student->pae_breakfast_enrolled ? '✓' : '—' }}</td>
+                        <td data-label="{{ __('app.pae_lunch') }}">{{ $student->pae_lunch_enrolled ? '✓' : '—' }}</td>
                         <td data-label="{{ __('app.card') }}">
                             @forelse($student->cards as $card)
                                 <code>{{ \Illuminate\Support\Str::limit($card->credential_uid, 10) }}</code>
@@ -166,8 +172,8 @@
         var csrf = document.querySelector('meta[name="csrf-token"]').content;
         var NO_CARD = {!! Js::from(__('app.no_card')) !!};
         var VIEW_PARENT = {!! Js::from(__('app.view_parent')) !!};
-        var PAE_YES = {!! Js::from(__('app.pae_enrolled_yes')) !!};
-        var PAE_NO = {!! Js::from(__('app.pae_enrolled_no')) !!};
+        var PAE_B_LABEL = {!! Js::from(__('app.student_pae_breakfast')) !!};
+        var PAE_L_LABEL = {!! Js::from(__('app.student_pae_lunch')) !!};
         var NO_ACCOUNT = {!! Js::from(__('app.no_account')) !!};
         var PROVISION_ACCOUNT = {!! Js::from(__('app.provision_account')) !!};
         var ACCOUNT_LABEL = {!! Js::from(__('app.account')) !!};
@@ -223,7 +229,10 @@
             var name = td(s.name);
             var klass = td(s.class_name || '—');
             var grade = td(s.grade || '—');
-            var pae = td(s.pae_enrolled ? PAE_YES : PAE_NO);
+            var pae = td(s.pae_breakfast_enrolled ? 'B ✓' : 'B —');
+            var paeLunch = td(s.pae_lunch_enrolled ? 'L ✓' : 'L —');
+            pae.title = PAE_B_LABEL;
+            paeLunch.title = PAE_L_LABEL;
             var card = document.createElement('td');
             var noCard = document.createElement('span');
             noCard.className = 'muted';
@@ -246,6 +255,7 @@
             tr.appendChild(klass);
             tr.appendChild(grade);
             tr.appendChild(pae);
+            tr.appendChild(paeLunch);
             tr.appendChild(card);
             tr.appendChild(account);
             tr.appendChild(action);
@@ -293,7 +303,8 @@
                 }
                 if (s.class_name !== undefined) { cells[1].textContent = s.class_name || '—'; }
                 if (s.grade !== undefined) { cells[2].textContent = s.grade || '—'; }
-                if (s.pae_enrolled !== undefined) { cells[3].textContent = s.pae_enrolled ? PAE_YES : PAE_NO; }
+                if (s.pae_breakfast_enrolled !== undefined) { cells[3].textContent = s.pae_breakfast_enrolled ? 'B ✓' : 'B —'; }
+                if (s.pae_lunch_enrolled !== undefined) { cells[4].textContent = s.pae_lunch_enrolled ? 'L ✓' : 'L —'; }
             }
             // TASK-030-A — the account column updates independently of
             // the positional cells above (it owns its own selector, so
@@ -391,7 +402,8 @@
                 name: document.getElementById('student-name').value.trim(),
                 grade: document.getElementById('student-grade').value,
                 class_id: parseInt(document.getElementById('student-class').value, 10),
-                pae_enrolled: document.getElementById('student-pae').checked
+                pae_breakfast_enrolled: document.getElementById('student-pae-breakfast').checked,
+                pae_lunch_enrolled: document.getElementById('student-pae-lunch').checked
             }).then(function (r) {
                 busy(btn, false);
                 // TASK-030-A — the display-once credentials ride the

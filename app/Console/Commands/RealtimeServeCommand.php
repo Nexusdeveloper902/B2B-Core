@@ -330,6 +330,16 @@ class RealtimeServeCommand extends Command
             return $scope; // school-wide
         }
 
+        // TASK-037 — kitchen connections see the full tap channel (the
+        // kitchen page's glanceable state is driven by meal frames
+        // carrying student names — the same exposure level tap frames
+        // already have), but stay non-admin: pairing/roster frames
+        // (card UIDs, roster management payloads) never cross a
+        // kitchen wire.
+        if ($user->role === UserRole::Kitchen->value) {
+            return $scope; // school-wide taps, no admin channels
+        }
+
         if ($user->role === UserRole::Student->value) {
             // FAIL CLOSED (mirrors StudentScope::forUser): users.student_id
             // is nullable by design, and a student connection with no linked

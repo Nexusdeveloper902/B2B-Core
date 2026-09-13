@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\ReaderSettingsController;
 use App\Http\Controllers\Api\V1\RecyclingCaptureController;
 use App\Http\Controllers\Api\V1\RecyclingClassificationController;
 use App\Http\Controllers\Api\V1\RedemptionController;
+use App\Http\Controllers\Api\V1\SettingsController;
 use App\Http\Controllers\Api\V1\StudentController;
 use App\Http\Controllers\Api\V1\TapEventController;
 use Illuminate\Http\Request;
@@ -146,6 +147,22 @@ Route::prefix('v1')->group(function () {
     Route::get('/admin/pairing/status', [PairingStatusController::class, 'show'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.pairing.status');
+
+    // TASK-037 — the runtime settings surface (ADR-055): safe
+    // presence/PAE configuration through the API instead of .env
+    // editing. Reads are effective values (row override → config
+    // default); writes validate cross-field rules (meal windows must
+    // not overlap) and are live for the next request.
+    Route::get('/admin/settings', [SettingsController::class, 'index'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.settings.index');
+
+    Route::put('/admin/settings', [SettingsController::class, 'update'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.settings.update');
+
+    Route::post('/admin/settings', [SettingsController::class, 'update'])
+        ->middleware(['auth:sanctum', 'role:admin']);
 
     // TASK-025 item 4 — the leaderboard (spec §22/§28): ranking derived
     // from the real points ledger; students also receive their own
