@@ -30,6 +30,22 @@ class DocumentationTest extends TestCase
     }
 
     #[Test]
+    public function env_example_is_wellformed(): void
+    {
+        // CI provisions from this file (cp .env.example .env +
+        // key:generate). A fused line (APP_ENV=localAPP_KEY= — a lost
+        // newline once shipped exactly that) leaves the app without a
+        // usable APP_KEY: every encryption call dies with
+        // MissingAppKeyException on CI while a hand-maintained local
+        // .env masks it. Pin the load-bearing lines at line starts.
+        $lines = file(base_path('.env.example'), FILE_IGNORE_NEW_LINES);
+        $this->assertContains('APP_ENV=local', $lines, '.env.example: APP_ENV must be its own line');
+        $this->assertContains('APP_KEY=', $lines, '.env.example: APP_KEY must be its own (empty) line');
+        $this->assertContains('DB_CONNECTION=sqlite', $lines, '.env.example: DB_CONNECTION must be its own line');
+        $this->assertContains('APP_NAME=Pulse', $lines, '.env.example: the product name is Pulse');
+    }
+
+    #[Test]
     public function bilingual_api_docs_exist(): void
     {
         $this->assertFileExists(base_path('docs/API.md'));
