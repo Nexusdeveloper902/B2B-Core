@@ -68,7 +68,10 @@ sin JS) ahora enlaza ambos, fijado por un test de regresión.
   de padres, búsqueda de roster del escritorio de emparejamiento,
   búsqueda de ledger del profesor): pura presentación sobre filas
   renderizadas por el servidor — los propios scripts de
-  micro-interacción de las maquetas, honestos por construcción.
+  micro-interacción de las maquetas, honestos por construcción. El
+  roster de emparejamiento además muestra un grado a la vez (menú de
+  píldoras `?grade=` en servidor, el grado menor por defecto) para
+  que 300 nombres nunca se rendericen en una página.
 - **Página de clasificación estudiantil**: datos de
   `LeaderboardService` (la misma fuente que la API y el escritorio) +
   posiciones por curso derivadas agrupando la columna `class_name`.

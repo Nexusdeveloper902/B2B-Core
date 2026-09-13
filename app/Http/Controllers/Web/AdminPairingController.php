@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Services\PairingService;
 use App\Services\Realtime\RealtimeToken;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
@@ -30,7 +31,7 @@ class AdminPairingController extends Controller
         private readonly PairingService $pairings,
     ) {}
 
-    public function page(): View
+    public function page(Request $request): View
     {
         $active = $this->pairings->activeSession();
         $last = $this->pairings->recentCompletions(1)->first();
@@ -46,10 +47,32 @@ class AdminPairingController extends Controller
             ]);
         }
 
-        return view('admin.pairing', [
-            'students' => Student::orderBy('name')
+        // Grades present, numerically ordered ('10°' after '9°', not
+        // after '1°' — the column is free text, so PHP owns the sort).
+        $grades = Student::selectRaw('grade, COUNT(*) AS c')
+            ->groupBy('grade')
+            ->get()
+            ->sortBy(fn ($row) => (int) $row->grade)
+            ->mapWithKeys(fn ($row) => [$row->grade => (int) $row->c])
+            ->all();
+
+        $requested = (string) $request->query('grade', '');
+        $grade = array_key_exists($requested, $grades) ? $requested : array_key_first($grades);
+
+        $students = $grade === null
+            ? collect()
+            : Student::where('grade', $grade)->orderBy('name')
                 ->with(['schoolClass', 'cards'])
-                ->get(),
+                ->get();
+
+        return view('admin.pairing', [
+            // The roster is one grade at a time (300 names on one page
+            // is unusable): the grade menu (?grade=5°) switches, the
+            // default is the lowest grade with students, and an unknown
+            // grade falls back to that default instead of 404ing.
+            'students' => $students,
+            'grades' => $grades,
+            'activeGrade' => $grade,
             'activeSession' => $active,
             'activeSecondsLeft' => $active !== null
                 ? max(0, (int) now()->diffInSeconds($active->expires_at))

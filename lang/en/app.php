@@ -103,6 +103,7 @@ return [
     'pairing_expired' => 'Window expired without a card — arm again.',
     'pairing_success' => 'Card :uid paired to :name.',
     'pairing_status' => 'Pairing status',
+    'pairing_grade_filter' => 'Filter the roster by grade',
     'pairing_recent' => 'Recently paired cards',
     'pairing_uid' => 'Card UID',
     'pairing_paired_at' => 'Paired at',

@@ -103,6 +103,7 @@ return [
     'pairing_expired' => 'La ventana expiró sin tarjeta — arma de nuevo.',
     'pairing_success' => 'Tarjeta :uid emparejada con :name.',
     'pairing_status' => 'Estado del emparejamiento',
+    'pairing_grade_filter' => 'Filtrar el roster por grado',
     'pairing_recent' => 'Tarjetas emparejadas recientemente',
     'pairing_uid' => 'UID de tarjeta',
     'pairing_paired_at' => 'Emparejada',

@@ -26,6 +26,16 @@
     {{-- Arming table: one click per student (replaces the curl+PAT dance) --}}
     <x-panel :label="__('app.students')" rule>
         <div class="filterbar filterbar--flush">
+            {{-- Grade menu: the roster shows one grade at a time (server
+                 side, so the page stays light with 300 students); the
+                 search below keeps filtering the visible rows. --}}
+            <div class="pills" role="group" aria-label="{{ __('app.pairing_grade_filter') }}">
+                @foreach($grades as $gradeName => $gradeCount)
+                    <a href="{{ route('admin.pairing', ['grade' => $gradeName]) }}"
+                       class="pill{{ $gradeName === $activeGrade ? ' is-active' : '' }}"
+                       @if($gradeName === $activeGrade) aria-current="true" @endif>{{ $gradeName }} · {{ $gradeCount }}</a>
+                @endforeach
+            </div>
             <div class="searchbox">
                 <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
                 <input type="search" id="roster-search" aria-label="{{ __('app.search_students') }}"

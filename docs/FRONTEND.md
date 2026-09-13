@@ -64,7 +64,9 @@ both, pinned by a regression test.
 - **Client-side filters + search** (parent timeline event pills, pairing
   roster search, teacher ledger search): pure presentation over
   server-rendered rows — the mockups' own micro-interaction scripts,
-  honest by construction.
+  honest by construction. The pairing roster additionally shows one
+  grade at a time (server-side `?grade=` pill menu, lowest grade by
+  default) so 300 names never render on one page.
 - **Student standings page**: `LeaderboardService` data (same source as
   the API and the student desk) + class standings derived in the
   controller by grouping the board's `class_name` column.

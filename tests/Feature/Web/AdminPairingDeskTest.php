@@ -369,6 +369,48 @@ class AdminPairingDeskTest extends TestCase
         $this->assertStringContainsString('function renderStudentCard(last)', $html);
     }
 
+    #[Test]
+    public function the_roster_defaults_to_the_lowest_grade_with_a_menu_to_switch(): void
+    {
+        // 300 names on one page is unusable: the desk shows one grade at
+        // a time (lowest first) with a pill menu to switch grades.
+        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing');
+
+        $response->assertOk()
+            ->assertSeeText('Ana Primero')
+            ->assertDontSeeText('Maria González')
+            // the grade menu links to the other grades, marking the active one
+            ->assertSee('grade=5%C2%B0', false)
+            ->assertSee('pill is-active', false)
+            ->assertSee('aria-current="true"', false);
+    }
+
+    #[Test]
+    public function the_roster_shows_only_the_requested_grade(): void
+    {
+        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing?grade=5°');
+
+        $response->assertOk()
+            ->assertSeeText('Maria González')
+            ->assertDontSeeText('Ana Primero');
+    }
+
+    #[Test]
+    public function an_unknown_grade_falls_back_to_the_default_grade(): void
+    {
+        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+
+        $response = $this->actingAs($this->admin())->get('/admin/pairing?grade=99°');
+
+        $response->assertOk()
+            ->assertSeeText('Ana Primero')
+            ->assertDontSeeText('Maria González');
+    }
+
     private function admin(): User
     {
         return User::where('email', 'admin@presence.test')->firstOrFail();
