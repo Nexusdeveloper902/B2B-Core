@@ -70,7 +70,11 @@ class PaeReportService
     {
         $rows = $this->servedMealRows($from, $to, $classIds)
             ->selectRaw('date(events.occurred_at) as day, events.type, count(distinct students.id) as students')
-            ->groupBy('day', 'events.type')
+            // Portable GROUP BY: group the raw expression, not the `day`
+            // alias — MariaDB strict (ONLY_FULL_GROUP_BY) rejects alias
+            // grouping the same way it rejected class_id/class_name
+            // (mealsByClass already groups real columns for this reason).
+            ->groupByRaw('date(events.occurred_at), events.type')
             ->get();
 
         $byDay = [];

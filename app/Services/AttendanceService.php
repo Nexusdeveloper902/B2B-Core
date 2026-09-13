@@ -235,7 +235,9 @@ class AttendanceService
             ->join('students', 'students.id', '=', 'cards.student_id')
             ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
             ->selectRaw('date(events.occurred_at) as day, count(distinct students.id) as attended')
-            ->groupBy('day')
+            // Portable GROUP BY: raw expression, not the `day` alias
+            // (MariaDB strict ONLY_FULL_GROUP_BY rejects alias grouping).
+            ->groupByRaw('date(events.occurred_at)')
             ->get();
 
         $countsByDay = Collection::make($counts)->pluck('attended', 'day')->all();
@@ -467,7 +469,9 @@ class AttendanceService
             ->join('students', 'students.id', '=', 'cards.student_id')
             ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
             ->selectRaw('date(events.occurred_at) as day, count(distinct students.id) as attended')
-            ->groupBy('day')
+            // Portable GROUP BY: raw expression, not the `day` alias
+            // (MariaDB strict ONLY_FULL_GROUP_BY rejects alias grouping).
+            ->groupByRaw('date(events.occurred_at)')
             ->get();
 
         $countsByDay = Collection::make($counts)->pluck('attended', 'day')->all();
