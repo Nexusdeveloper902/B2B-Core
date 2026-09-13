@@ -94,6 +94,10 @@ Route::prefix('v1')->group(function () {
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.readers.rotate-key');
 
+    Route::delete('/admin/readers/{reader}', [ReaderController::class, 'destroy'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.readers.destroy');
+
     // TASK-027 — student management (admin-only): create single students
     // and bulk-import a CSV from the /admin/students desk (no more
     // hand-written SQL).

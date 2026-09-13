@@ -1156,3 +1156,40 @@ The owner's eight HTML mockups are now the design source of truth:
 - Bonus: marketplace gained a branded localized 404 (had Laravel's
   bare page). Locale route is /lang/{locale}.
 - Gates: Core 453/3 + quality PASS · Marketplace 20/20. Uncommitted.
+
+## CHAT 2026-09-13 — NL-query function surface 12→22 (owner chat, no run file)
+
+- Owner reports: (1) NL asked the USER for the date on "¿quién ha venido
+  hoy?"; (2) same question returned wrong-polarity data. Root cause of
+  (2): no present-LIST function existed (only a count) — the model
+  reached for the absent list and phrased it backwards.
+- Fix: system prompt now injects full date/time (America/Bogota) +
+  present/absent polarity pin; 10 new functions →
+  `get_late_students`, `get_class_status`, `get_attendance_by_class`,
+  `get_enrollment_count`, `get_pae_students`, `get_pae_trend`,
+  `get_students_in_school`, `get_recycling_leaderboard` (school-wide,
+  spec §22), `get_student_points` (new `PointsService::statement`),
+  `get_perfect_attendance` (chronic-absence query as exclusion set).
+- `classAttendanceToday()` delegates to `attendanceRowsForClass()`;
+  dashboard row shape unchanged. All new calls fenced by StudentScope.
+- Records: ADR-051, ARCHITECTURE/nl-query-functions.md, spine
+  derivations table, bilingual API lists + doc needles. Suite green
+  (202 unit + 288 feature at write time). Uncommitted.
+
+## RUN-2026-09-13-core-041 — reader deletion (owner chat)
+
+- Owner ask: readers had no exit path short of SQL. New `DELETE
+  /api/v1/admin/readers/{reader}` (admin-only; 403/401/404 walls):
+  child-first cascade (events + deposits + pending captures),
+  pairing history unlinked, ledger balances preserved via the
+  `nullOnDelete` FK, capture images off disk, `reader_deleted`
+  roster frame in-transaction, dead Bearer 401s.
+- Desk: Save stays out, Rotate/Delete behind a native ⋯ popover
+  (top-layer, no clipping, JS-pinned under its button); Datum
+  confirm; row removed client-side + on live roster frames.
+- Docs per house contract: API.md/.es.md section + table,
+  postman 04d, DocumentationTest needles. Records: RUN-041,
+  this entry, SNAPSHOT-041. (NL 12→22 surface rides the same
+  commit — see CHAT entry above + ADR-051.)
+- Gates pre-push: phpunit 472 tests (469 passed, 3 by-design
+  skips), Pint clean, postman JSON valid.

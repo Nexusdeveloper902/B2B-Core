@@ -30,6 +30,21 @@ class PointsService
     }
 
     /**
+     * Points statement for one student: current balance plus lifetime
+     * earned/spent split. Backs get_student_points ("¿cuántos puntos
+     * tiene Maria?"). spend is reported as a positive number.
+     *
+     * @return array{balance: int, earned: int, spent: int}
+     */
+    public function statement(Student $student): array
+    {
+        $earned = (int) PointsLedger::where('student_id', $student->id)->where('delta', '>', 0)->sum('delta');
+        $spent = (int) PointsLedger::where('student_id', $student->id)->where('delta', '<', 0)->sum('delta');
+
+        return ['balance' => $earned + $spent, 'earned' => $earned, 'spent' => -$spent];
+    }
+
+    /**
      * Award recycling points for a classified deposit (earn half of the loop).
      * Called inside ClassificationService's award transaction — frames ride it.
      */

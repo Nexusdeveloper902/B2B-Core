@@ -175,6 +175,32 @@ class NlQueryServiceTest extends TestCase
         $service->ask('anything');
     }
 
+    #[Test]
+    public function system_message_carries_today_so_relative_dates_resolve(): void
+    {
+        $fake = new class('fake-key', 'deepseek-flash') extends DeepSeekClient
+        {
+            public array $lastMessages = [];
+
+            public function generate(array $messages, ?array $tools = null): array
+            {
+                $this->lastMessages = $messages;
+
+                return ['text' => 'ok', 'tool_calls' => [], 'message' => ['role' => 'assistant', 'content' => 'ok']];
+            }
+        };
+
+        $this->makeService($fake)->ask('¿Quién ha venido hoy?');
+
+        $system = (string) $fake->lastMessages[0]['content'];
+        $this->assertStringContainsString(now()->format('Y-m-d H:i'), $system);
+        $this->assertStringContainsString(now()->getTimezone()->getName(), $system);
+        $this->assertStringContainsString('never ask the user for the date or time', $system);
+        $this->assertStringContainsString('language of the question', $system);
+        $this->assertStringContainsString('get_present_students', $system);
+        $this->assertStringContainsString('get_absent_students', $system);
+    }
+
     private function makeService(DeepSeekClient $client): NlQueryService
     {
         return new NlQueryService($client, app(FunctionRegistry::class));

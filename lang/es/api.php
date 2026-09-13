@@ -75,6 +75,7 @@ return [
 
     // TASK-030-B — aprovisionamiento de lectores (API keys de un solo vistazo)
     'reader_created' => 'Lector :label creado',
+    'reader_deleted' => 'Lector :label eliminado',
     'reader_key_notice' => 'API key (cópiala ahora — no se vuelve a mostrar)',
     'reader_key_rotated' => 'API key rotada para :label',
 

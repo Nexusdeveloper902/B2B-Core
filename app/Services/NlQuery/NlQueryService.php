@@ -42,6 +42,25 @@ class NlQueryService
         .'**bold** for key numbers, "- " bullets for short lists, `backticks` for '
         .'identifiers; never headings and never tables.';
 
+    /**
+     * System prompt plus full date/time context (America/Bogota via
+     * now()) so relative words ("hoy"/"today", "ayer", "ahora"/
+     * "right now") resolve without asking the user — the reported
+     * "Could you tell me the date?" bug. Present/absent polarity is
+     * pinned here too: "quién vino/ha venido" is the PRESENT list,
+     * "quién faltó/no vino" the ABSENT one — never swap them.
+     */
+    private function systemMessage(): string
+    {
+        $now = now();
+
+        return self::SYSTEM_PROMPT
+            .' Current date and time: '.$now->format('Y-m-d H:i').' ('.$now->getTimezone()->getName().', '.$now->format('l').').'
+            .' Resolve relative dates/times against it and never ask the user for the date or time.'
+            .' "Who came / quién vino / quién ha venido / who attended" means PRESENT students (get_present_students);'
+            .' "who was absent / quién faltó / quién no vino / ausentes" means ABSENT students (get_absent_students).';
+    }
+
     public function __construct(
         private readonly DeepSeekClient $client,
         private readonly FunctionRegistry $registry,
@@ -67,7 +86,7 @@ class NlQueryService
 
         $declarations = $this->registry->declarations();
         $messages = [
-            ['role' => 'system', 'content' => self::SYSTEM_PROMPT],
+            ['role' => 'system', 'content' => $this->systemMessage()],
             ['role' => 'user', 'content' => $question],
         ];
 

@@ -15,7 +15,7 @@ Base URL (local dev): `http://localhost:8000`
 | Endpoints | Auth | Notes |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
 **Localization:** device-facing messages are bilingual. Send
@@ -372,17 +372,35 @@ bullet list) and use **light Markdown** (`**bold**`, `- ` bullets,
 `` `backticks` ``) — the dashboards render it via `public/js/markdown.js`
 (escaped-first, never raw HTML).
 
-Callable functions: `get_attendance_count(date, class_id?)`,
+Callable functions, by family — each one executes a real Eloquent
+query server-side (the model only selects and phrases): attendance
+counts `get_attendance_count(date, class_id?)`,
+`get_absence_count(date, class_id?)`, `get_enrollment_count(class_id?)`;
+attendance lists `get_present_students(date, class_id?)`,
+`get_absent_students(date, class_id?)`,
+`get_late_students(date, class_id?)`; attendance views
+`get_class_status(class_id, date?)`, `get_attendance_by_class(date)`,
+`get_attendance_trend(days)`,
+`get_repeatedly_absent_students(days, min_absences, class_id?)`
+(TASK-027), `get_perfect_attendance(days, class_id?)`,
+`get_late_count(date, class_id?)`; PAE
 `get_pae_count(meal, date, class_id?)`,
-`get_recycling_totals(date_from, date_to)` (school-wide by design —
-public competition board, spec §22),
-`get_student_timeline(student_id)`, plus the **analytical half
-(TASK-027)**: `get_absence_count(date, class_id?)`,
-`get_absent_students(date, class_id?)`, `get_late_count(date,
-class_id?)`, `get_attendance_trend(days)`,
-`get_repeatedly_absent_students(days, min_absences, class_id?)`,
-`get_student_time_in_school(student_id, days)`, and
-`find_student(name)` (resolves a partial name to a `student_id` first).
+`get_pae_students(meal, date, class_id?)`,
+`get_pae_trend(meal, days)`; presence
+`get_students_in_school(class_id?)`,
+`get_student_time_in_school(student_id, days)`,
+`get_student_timeline(student_id)`; recycling/points
+`get_recycling_totals(date_from, date_to)` and
+`get_recycling_leaderboard(limit)` (both school-wide by design —
+public competition board, spec §22), `get_student_points(student_id)`;
+plus `find_student(name)` (resolves a partial name to a `student_id`
+first).
+
+Date/time context: the backend injects the current date and time
+(America/Bogota) into every request — "today", "right now" and
+"¿quién vino?" resolve server-side and the model never asks the user
+for a date. "Who came / quién vino" reads the PRESENT list, "who
+was absent / quién faltó" the ABSENT one.
 
 **Responses**
 
@@ -506,6 +524,33 @@ re-flashed — the desk confirms before calling). The rotation is logged
   "api_key": "…32 fresh chars, shown here and never again…",
   "message": "API key rotated for Aula 12 — Entrada.",
   "api_key_notice": "API key (copy it now — it is never shown again)"
+}
+```
+
+`404` — unknown reader.
+
+---
+
+## DELETE /api/v1/admin/readers/{reader} — delete one reader (admin-only)
+
+**Admin role required** (teacher → 403, guest → 401). Removes a
+decommissioned reader from the `/admin/readers` desk (⋯ overflow
+menu, Datum confirm): the reader row goes, its tap events +
+recycling deposits + pending captures go with it (explicit
+child-first deletes — deterministic where the sqlite foreign_key
+pragma is off). Pairing history rows survive with the reader link
+cleared; points ledger rows keep their value with `event_id`
+cleared; stored capture images are deleted from disk. A
+`reader_deleted` roster frame drops the desk row live; the old
+Bearer key 401s from that moment.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "deleted": { "id": 7, "label": "Aula 12 — Entrada", "events_deleted": 3 },
+  "message": "Reader Aula 12 — Entrada deleted."
 }
 ```
 

@@ -4,6 +4,8 @@ namespace App\Services\NlQuery;
 
 use App\Models\Student;
 use App\Services\AttendanceService;
+use App\Services\PointsService;
+use App\Services\Recycling\LeaderboardService;
 use App\Services\StudentScope;
 
 /**
@@ -33,6 +35,8 @@ class FunctionRegistry
 {
     public function __construct(
         private readonly AttendanceService $attendance,
+        private readonly PointsService $points,
+        private readonly LeaderboardService $leaderboard,
     ) {}
 
     /**
@@ -105,7 +109,19 @@ class FunctionRegistry
             ],
             [
                 'name' => 'get_absent_students',
-                'description' => 'List of students who were absent (no class attendance tap) on a given date, with their class. Optionally scoped to one class.',
+                'description' => 'List of students who were ABSENT (no class attendance tap) on a given date, with their class. Use for "who was absent / quién faltó / quién no vino". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => ['date'],
+                ],
+            ],
+            [
+                'name' => 'get_present_students',
+                'description' => 'List of students who tapped in for class attendance (PRESENT) on a given date, with their class. Use for "who came / quién vino / quién ha venido / who attended". Optionally scoped to one class.',
                 'parameters' => [
                     'type' => 'object',
                     'properties' => [
@@ -174,6 +190,122 @@ class FunctionRegistry
                     'required' => ['name'],
                 ],
             ],
+            [
+                'name' => 'get_late_students',
+                'description' => 'List of students whose first tap came AFTER the late cutoff on a given date, with tap times. Use for "who was late / quiénes llegaron tarde". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => ['date'],
+                ],
+            ],
+            [
+                'name' => 'get_class_status',
+                'description' => 'Whole-board status for one class on a date: every student with present/late/absent status and tap time, plus totals. Use for "how is class X / cómo está 5° B".',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'class_id' => ['type' => 'integer', 'description' => 'The class ID.'],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format (default today).'],
+                    ],
+                    'required' => ['class_id'],
+                ],
+            ],
+            [
+                'name' => 'get_attendance_by_class',
+                'description' => 'Per-class attendance breakdown (enrolled, present, absent, rate) for a date — the cross-class comparison. Use for "which class has the worst attendance". Teachers see their own classes.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
+                    ],
+                    'required' => ['date'],
+                ],
+            ],
+            [
+                'name' => 'get_enrollment_count',
+                'description' => 'How many students are enrolled, optionally in one class. Use for "how many students are there / cuántos hay en 5° B".',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the count.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'get_pae_students',
+                'description' => 'List of students who took a PAE meal on a given date. Use for "who had lunch / quiénes almorzaron". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format.'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => ['meal', 'date'],
+                ],
+            ],
+            [
+                'name' => 'get_pae_trend',
+                'description' => 'Daily distinct-student PAE counts for one meal over the last N days. Use for "is lunch uptake dropping".',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'meal' => ['type' => 'string', 'description' => "The meal: 'breakfast' or 'lunch'."],
+                        'days' => ['type' => 'integer', 'description' => 'How many days back (1-90, default 7).'],
+                    ],
+                    'required' => ['meal'],
+                ],
+            ],
+            [
+                'name' => 'get_students_in_school',
+                'description' => 'Students currently inside school (entered today with no later exit), with entry times. Use for "who is in school right now / quién está en el colegio". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'get_recycling_leaderboard',
+                'description' => 'Top students by recycling points (competition rank). Use for "who is winning recycling / quién va ganando". School-wide by design (public competition board).',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'limit' => ['type' => 'integer', 'description' => 'How many leaders (1-50, default 10).'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'get_student_points',
+                'description' => 'Points statement (balance, lifetime earned, spent) for one student. Use for "how many points does Maria have". Resolve the id with find_student first.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'student_id' => ['type' => 'integer', 'description' => 'The student ID (resolve it with find_student first).'],
+                    ],
+                    'required' => ['student_id'],
+                ],
+            ],
+            [
+                'name' => 'get_perfect_attendance',
+                'description' => 'Students with zero absences across the recent school days. Use for "who never misses class / quién no ha faltado". Optionally scoped to one class.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'days' => ['type' => 'integer', 'description' => 'How many days back to consider (1-90, default 30).'],
+                        'class_id' => ['type' => 'integer', 'description' => 'Optional class ID to scope the list.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
         ];
     }
 
@@ -196,6 +328,7 @@ class FunctionRegistry
             'get_student_timeline' => $this->studentTimelineResult((int) $args['student_id'], $scope),
             'get_absence_count' => $this->absenceCountResult($args, $scope),
             'get_absent_students' => $this->absentStudentsResult($args, $scope),
+            'get_present_students' => $this->presentStudentsResult($args, $scope),
             'get_late_count' => $this->lateCountResult($args, $scope),
             'get_attendance_trend' => [
                 'days' => $this->boundedDays((int) ($args['days'] ?? 7), 90),
@@ -213,6 +346,32 @@ class FunctionRegistry
                     $this->scopeClassIds($scope),
                 ),
             ],
+            'get_late_students' => $this->lateStudentsResult($args, $scope),
+            'get_class_status' => $this->classStatusResult($args, $scope),
+            'get_attendance_by_class' => [
+                'date' => (string) $args['date'],
+                'classes' => $this->attendance->attendanceByClass(
+                    (string) $args['date'],
+                    $this->scopeClassIds($scope),
+                ),
+            ],
+            'get_enrollment_count' => $this->enrollmentResult($args, $scope),
+            'get_pae_students' => $this->paeStudentsResult($args, $scope),
+            'get_pae_trend' => [
+                'meal' => (string) $args['meal'],
+                'days' => $this->boundedDays((int) ($args['days'] ?? 7), 90),
+                'trend' => $this->attendance->paeTrend(
+                    (string) $args['meal'],
+                    $this->boundedDays((int) ($args['days'] ?? 7), 90),
+                    $this->scopeClassIds($scope),
+                ),
+            ],
+            'get_students_in_school' => $this->inSchoolResult($args, $scope),
+            'get_recycling_leaderboard' => [
+                'leaders' => $this->leaderboard->top(max(1, min(50, (int) ($args['limit'] ?? 10)))),
+            ],
+            'get_student_points' => $this->studentPointsResult($args, $scope),
+            'get_perfect_attendance' => $this->perfectAttendanceResult($args, $scope),
             default => ['error' => "Unknown function [{$name}]"],
         };
     }
@@ -335,6 +494,156 @@ class FunctionRegistry
         return [
             'date' => (string) $args['date'],
             'absent_students' => $this->attendance->absentStudents((string) $args['date'], $classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function presentStudentsResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return [
+            'date' => (string) $args['date'],
+            'present_students' => $this->attendance->presentStudents((string) $args['date'], $classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function lateStudentsResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return [
+            'date' => (string) $args['date'],
+            'late_students' => $this->attendance->lateStudents((string) $args['date'], $classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function classStatusResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return $this->attendance->classStatus(
+            (int) $args['class_id'],
+            (string) ($args['date'] ?? now()->toDateString()),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function enrollmentResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return [
+            'class_id' => isset($args['class_id']) ? (int) $args['class_id'] : null,
+            'enrollment_count' => $this->attendance->studentCount($classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function paeStudentsResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        return [
+            'meal' => $args['meal'],
+            'date' => (string) $args['date'],
+            'pae_students' => $this->attendance->paeStudents((string) $args['meal'], (string) $args['date'], $classIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function inSchoolResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        $inside = $this->attendance->studentsInSchool($classIds);
+
+        return ['inside_count' => count($inside), 'inside' => $inside];
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function studentPointsResult(array $args, ?StudentScope $scope): array
+    {
+        $student = Student::find((int) $args['student_id']);
+
+        if ($student === null) {
+            return ['error' => 'Student ['.(int) $args['student_id'].'] not found'];
+        }
+
+        if ($scope !== null && ! $scope->allowsStudent($student)) {
+            return ['error' => 'Student is outside the caller\'s scope'];
+        }
+
+        return [
+            'student_id' => $student->id,
+            'student_name' => $student->name,
+        ] + $this->points->statement($student);
+    }
+
+    /**
+     * @param  array<string, mixed>  $args
+     * @return array<string, mixed>
+     */
+    private function perfectAttendanceResult(array $args, ?StudentScope $scope): array
+    {
+        [$classIds, $forbidden] = $this->resolveRequestedClass($args, $scope);
+
+        if ($forbidden !== null) {
+            return ['error' => "Class [{$forbidden}] is outside the caller's scope"];
+        }
+
+        $days = $this->boundedDays((int) ($args['days'] ?? 30), 90);
+
+        return [
+            'days' => $days,
+            'students' => $this->attendance->perfectAttendance($days, $classIds),
         ];
     }
 

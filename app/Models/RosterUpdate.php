@@ -34,6 +34,8 @@ class RosterUpdate extends Model
 
     public const TYPE_READER_CREATED = 'reader_created';
 
+    public const TYPE_READER_DELETED = 'reader_deleted';
+
     protected $fillable = ['type', 'payload'];
 
     protected function casts(): array

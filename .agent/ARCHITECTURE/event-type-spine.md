@@ -35,6 +35,13 @@ how "one reader, many roles" works.
 | PAE counts | distinct students with `type=PAE_BREAKFAST`/`PAE_LUNCH` on date |
 | Recycling totals | `recycling_deposits` joined to `events` on date range (items, points, by_material) |
 | Present/late/absent | per student: first CLASS_ATTENDANCE event of today vs `ATTENDANCE_LATE_CUTOFF` |
+| Late list | late students + tap times (first-tap > cutoff) |
+| Class board | whole-class rows + totals for any date (generalized `classAttendanceToday`) |
+| By-class breakdown | enrolled/present/absent/rate per class |
+| PAE list/trend | students per meal per date; per-day counts per meal |
+| In-school now | today's last gate event per student is ENTRY (first ENTRY as `entry_at`) |
+| Perfect attendance | zero absences across the window (chronic-absence query as exclusion set) |
+| Points statement | balance/earned/spent from the ledger (no denormalized counter) |
 | Student timeline | all events for a student's cards, chronological, with deposit join |
 
 `App\Services\AttendanceService` implements every derivation and is ALSO the

@@ -15,7 +15,7 @@ URL base (desarrollo local): `http://localhost:8000`
 | Endpoints | Auth | Notas |
 |---|---|---|
 | `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
-| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
+| `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
 | `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
 **Localización:** los mensajes para dispositivos son bilingües. Envía
@@ -384,17 +384,35 @@ compacta) y usan **Markdown ligero** (`**negrita**`, viñetas `- `,
 `` `comillas inversas` ``) — los paneles lo renderizan vía
 `public/js/markdown.js` (escape primero, nunca HTML crudo).
 
-Funciones disponibles: `get_attendance_count(date, class_id?)`,
+Funciones disponibles, por familia — cada una ejecuta una consulta
+Eloquent real en el servidor (el modelo solo elige y redacta):
+conteos de asistencia `get_attendance_count(date, class_id?)`,
+`get_absence_count(date, class_id?)`, `get_enrollment_count(class_id?)`;
+listas de asistencia `get_present_students(date, class_id?)`,
+`get_absent_students(date, class_id?)`,
+`get_late_students(date, class_id?)`; vistas de asistencia
+`get_class_status(class_id, date?)`, `get_attendance_by_class(date)`,
+`get_attendance_trend(days)`,
+`get_repeatedly_absent_students(days, min_absences, class_id?)`
+(TASK-027), `get_perfect_attendance(days, class_id?)`,
+`get_late_count(date, class_id?)`; PAE
 `get_pae_count(meal, date, class_id?)`,
-`get_recycling_totals(date_from, date_to)` (toda la escuela por diseño —
-tablero público de competencia, spec §22),
-`get_student_timeline(student_id)`, más la **mitad analítica
-(TASK-027)**: `get_absence_count(date, class_id?)`,
-`get_absent_students(date, class_id?)`, `get_late_count(date,
-class_id?)`, `get_attendance_trend(days)`,
-`get_repeatedly_absent_students(days, min_absences, class_id?)`,
-`get_student_time_in_school(student_id, days)` y
-`find_student(name)` (resuelve un nombre parcial a un `student_id`).
+`get_pae_students(meal, date, class_id?)`,
+`get_pae_trend(meal, days)`; presencia
+`get_students_in_school(class_id?)`,
+`get_student_time_in_school(student_id, days)`,
+`get_student_timeline(student_id)`; reciclaje/puntos
+`get_recycling_totals(date_from, date_to)` y
+`get_recycling_leaderboard(limit)` (ambas de toda la escuela por
+diseño — tablero público de competencia, spec §22),
+`get_student_points(student_id)`; más `find_student(name)` (resuelve
+un nombre parcial a un `student_id`).
+
+Contexto de fecha/hora: el backend inyecta la fecha y hora actual
+(America/Bogota) en cada petición — "hoy", "ahora mismo" y
+"¿quién vino?" se resuelven en el servidor y el modelo nunca pide la
+fecha al usuario. "Who came / quién vino" lee la lista PRESENT,
+"who was absent / quién faltó" la ABSENT.
 
 **Respuestas**
 
@@ -522,6 +540,34 @@ visible cambia).
   "api_key": "…32 caracteres frescos, aquí y nunca más…",
   "message": "API key rotada para Aula 12 — Entrada.",
   "api_key_notice": "API key (cópiala ahora — no se vuelve a mostrar)"
+}
+```
+
+`404` — lector desconocido.
+
+---
+
+## DELETE /api/v1/admin/readers/{reader} — eliminar un lector (solo admin)
+
+**Requiere rol admin** (docente → 403, invitado → 401). Retira un
+lector dado de baja desde el escritorio `/admin/readers` (menú ⋯,
+confirmación Datum): la fila del lector se va, y sus eventos de
+toque + depósitos de reciclaje + capturas pendientes se van con
+ella (borrados explícitos hijo-primero — deterministas donde el
+pragma foreign_key de sqlite está apagado). Las filas del historial
+de emparejamiento sobreviven con el enlace al lector en null; las
+filas del libro de puntos conservan su valor con `event_id` en null;
+las imágenes guardadas se borran del disco. Un frame de roster
+`reader_deleted` quita la fila del escritorio en vivo; la vieja
+clave Bearer responde 401 desde ese momento.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "deleted": { "id": 7, "label": "Aula 12 — Entrada", "events_deleted": 3 },
+  "message": "Lector Aula 12 — Entrada eliminado."
 }
 ```
 

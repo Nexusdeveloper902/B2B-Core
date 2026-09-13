@@ -67,6 +67,7 @@ return [
 
     // TASK-030-B — reader provisioning (display-once API keys)
     'reader_created' => 'Reader :label created',
+    'reader_deleted' => 'Reader :label deleted',
     'reader_key_notice' => 'API key (copy it now — it is never shown again)',
     'reader_key_rotated' => 'API key rotated for :label',
 

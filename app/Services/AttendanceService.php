@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\MaterialClass;
 use App\Models\PresenceEvent;
 use App\Models\RecyclingDeposit;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -40,8 +41,21 @@ class AttendanceService
      */
     public function classAttendanceToday(int $classId): array
     {
+        return $this->attendanceRowsForClass($classId, now()->toDateString());
+    }
+
+    /**
+     * Per-student status rows for one class on any date (Y-m-d) — the
+     * generalized core behind classAttendanceToday, shared with the NL
+     * class-status function. Row shape is the dashboard contract.
+     *
+     * @return array<int, array{
+     *   student: Student, status: 'present'|'late'|'absent', tappedAt: ?string
+     * }>
+     */
+    public function attendanceRowsForClass(int $classId, string $date): array
+    {
         $cutoff = (string) config('presence.late_cutoff');
-        $today = now()->toDateString();
 
         $students = Student::where('class_id', $classId)
             ->with('cards')
@@ -54,7 +68,7 @@ class AttendanceService
         // student, per class, on every teacher-dashboard render.
         $firstTaps = PresenceEvent::query()
             ->where('type', 'CLASS_ATTENDANCE')
-            ->whereDate('occurred_at', $today)
+            ->whereDate('occurred_at', $date)
             ->whereIn('card_id', $students->flatMap->cards->pluck('id'))
             ->join('cards', 'cards.id', '=', 'events.card_id')
             ->selectRaw('cards.student_id, min(events.occurred_at) as first_tap')
@@ -81,6 +95,65 @@ class AttendanceService
     }
 
     /**
+     * Whole-board status for one class on a date: per-student rows plus
+     * totals. Backs get_class_status ("¿cómo está 5° B hoy?").
+     *
+     * @return array{class_id: int, class_name: ?string, date: string, totals: array{present: int, late: int, absent: int}, students: array<int, array{id: int, name: string, status: string, tapped_at: ?string}>}
+     */
+    public function classStatus(int $classId, string $date): array
+    {
+        $totals = ['present' => 0, 'late' => 0, 'absent' => 0];
+
+        $students = array_map(function (array $row) use (&$totals): array {
+            $totals[$row['status']]++;
+
+            return [
+                'id' => (int) $row['student']->id,
+                'name' => (string) $row['student']->name,
+                'status' => $row['status'],
+                'tapped_at' => $row['tappedAt'],
+            ];
+        }, $this->attendanceRowsForClass($classId, $date));
+
+        return [
+            'class_id' => $classId,
+            'class_name' => SchoolClass::find($classId)?->name,
+            'date' => $date,
+            'totals' => $totals,
+            'students' => $students,
+        ];
+    }
+
+    /**
+     * Per-class attendance breakdown for a date (Y-m-d) — the admin
+     * comparison view ("¿qué curso tiene peor asistencia?").
+     *
+     * @param  array<int, int>|null  $classIds  null = every class
+     * @return array<int, array{class_id: int, class_name: string, enrolled: int, present: int, absent: int, rate: int}>
+     */
+    public function attendanceByClass(string $date, ?array $classIds = null): array
+    {
+        return SchoolClass::query()
+            ->when($classIds !== null, fn ($q) => $q->whereIn('id', $classIds))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(function (SchoolClass $class) use ($date): array {
+                $enrolled = $this->studentCount([$class->id]);
+                $present = $this->attendanceCount($date, $class->id);
+
+                return [
+                    'class_id' => (int) $class->id,
+                    'class_name' => (string) $class->name,
+                    'enrolled' => $enrolled,
+                    'present' => $present,
+                    'absent' => $enrolled - $present,
+                    'rate' => $enrolled > 0 ? (int) round(100 * $present / $enrolled) : 0,
+                ];
+            })
+            ->all();
+    }
+
+    /**
      * Distinct students with a CLASS_ATTENDANCE event on the given date
      * (Y-m-d), optionally scoped to one class.
      */
@@ -92,9 +165,75 @@ class AttendanceService
     /** Distinct students with a PAE meal event ('breakfast'|'lunch') on the given date. */
     public function paeCount(string $meal, string $date, ?array $classIds = null): int
     {
-        $type = $meal === 'breakfast' ? 'PAE_BREAKFAST' : 'PAE_LUNCH';
+        return $this->studentCountForEvent($this->paeMealType($meal), $date, $classIds);
+    }
 
-        return $this->studentCountForEvent($type, $date, $classIds);
+    /** Meal name → event type (unknown maps to lunch, same as paeCount always did). */
+    private function paeMealType(string $meal): string
+    {
+        return $meal === 'breakfast' ? 'PAE_BREAKFAST' : 'PAE_LUNCH';
+    }
+
+    /**
+     * Students who took a PAE meal on the given date (Y-m-d) — the PAE
+     * list behind get_pae_students ("¿quiénes almorzaron hoy?").
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{id: int, name: string, class_name: ?string}>
+     */
+    public function paeStudents(string $meal, string $date, ?array $classIds = null): array
+    {
+        $attended = $this->studentsWithEventOn($this->paeMealType($meal), $date, $classIds);
+
+        return $this->scopedStudents($classIds)
+            ->whereIn('students.id', $attended->isEmpty() ? [0] : $attended->all())
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->orderBy('students.name')
+            ->get(['students.id', 'students.name', 'classes.name as class_name'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
+            ])
+            ->all();
+    }
+
+    /**
+     * Per-day distinct-student PAE counts for one meal over the last
+     * $days days (inclusive of today). Mirrors attendanceTrend.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{date: string, students: int}>
+     */
+    public function paeTrend(string $meal, int $days, ?array $classIds = null): array
+    {
+        $days = max(1, min(90, $days));
+        $type = $this->paeMealType($meal);
+        $from = Carbon::today()->subDays($days - 1)->toDateString();
+        $to = Carbon::today()->toDateString();
+
+        $counts = PresenceEvent::query()
+            ->where('events.type', $type)
+            ->whereBetween('occurred_at', [
+                Carbon::parse($from)->startOfDay(),
+                Carbon::parse($to)->endOfDay(),
+            ])
+            ->join('cards', 'cards.id', '=', 'events.card_id')
+            ->join('students', 'students.id', '=', 'cards.student_id')
+            ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
+            ->selectRaw('date(events.occurred_at) as day, count(distinct students.id) as attended')
+            ->groupBy('day')
+            ->get();
+
+        $countsByDay = Collection::make($counts)->pluck('attended', 'day')->all();
+
+        $trend = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $day = Carbon::today()->subDays($i)->toDateString();
+            $trend[] = ['date' => $day, 'students' => (int) ($countsByDay[$day] ?? 0)];
+        }
+
+        return $trend;
     }
 
     /**
@@ -206,6 +345,32 @@ class AttendanceService
     }
 
     /**
+     * Students WITH a CLASS_ATTENDANCE event on the given date (Y-m-d) —
+     * the present list. Mirror of absentStudents (whereIn instead of
+     * whereNotIn); without it "quién vino" has no answerable function
+     * and the model reaches for the absent list with flipped polarity.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{id: int, name: string, class_name: ?string}>
+     */
+    public function presentStudents(string $date, ?array $classIds = null): array
+    {
+        $attended = $this->studentsWithAttendanceOn($date, $classIds);
+
+        return $this->scopedStudents($classIds)
+            ->whereIn('students.id', $attended->isEmpty() ? [0] : $attended->all())
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->orderBy('students.name')
+            ->get(['students.id', 'students.name', 'classes.name as class_name'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
+            ])
+            ->all();
+    }
+
+    /**
      * Distinct students whose FIRST CLASS_ATTENDANCE tap of the date came
      * after the late cutoff (school-local wall time, TASK-015).
      *
@@ -218,6 +383,40 @@ class AttendanceService
         return collect($this->firstTapByStudent($date, $classIds))
             ->filter(fn (string $time) => $time > $cutoff)
             ->count();
+    }
+
+    /**
+     * Students whose FIRST CLASS_ATTENDANCE tap of the date came after
+     * the late cutoff — the late list behind get_late_students.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{id: int, name: string, class_name: ?string, tapped_at: string}>
+     */
+    public function lateStudents(string $date, ?array $classIds = null): array
+    {
+        $cutoff = (string) config('presence.late_cutoff');
+
+        $lateIds = collect($this->firstTapByStudent($date, $classIds))
+            ->filter(fn (string $time) => $time > $cutoff);
+
+        if ($lateIds->isEmpty()) {
+            return [];
+        }
+
+        $tapByStudent = $lateIds->all();
+
+        return $this->scopedStudents($classIds)
+            ->whereIn('students.id', array_keys($tapByStudent))
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->orderBy('students.name')
+            ->get(['students.id', 'students.name', 'classes.name as class_name'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
+                'tapped_at' => substr($tapByStudent[(int) $row->id], 0, 5),
+            ])
+            ->all();
     }
 
     /**
@@ -272,11 +471,7 @@ class AttendanceService
         $days = max(1, min(90, $days));
         $minAbsences = max(1, $minAbsences);
 
-        $trend = $this->attendanceTrend($days, $classIds);
-        $schoolDays = collect($trend)
-            ->filter(fn ($row) => $row['students'] > 0)
-            ->pluck('date')
-            ->all();
+        $schoolDays = $this->schoolDaysInWindow($days, $classIds);
 
         if ($schoolDays === []) {
             return [];
@@ -327,6 +522,112 @@ class AttendanceService
         }
 
         return $result;
+    }
+
+    /**
+     * Dates in the last $days days on which at least one in-scope
+     * student attended — weekends/holidays drop out by construction.
+     * Shared by the repeat-absence and perfect-attendance signals.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, string>
+     */
+    private function schoolDaysInWindow(int $days, ?array $classIds): array
+    {
+        return collect($this->attendanceTrend($days, $classIds))
+            ->filter(fn ($row) => $row['students'] > 0)
+            ->pluck('date')
+            ->all();
+    }
+
+    /**
+     * Students with ZERO absences across the last $days' school days —
+     * the exact inverse of repeatedlyAbsentStudents ("¿quién no ha
+     * faltado ni una vez este mes?"). Anyone absent even once is out:
+     * the chronic-absence query with minAbsences=1 is the exclusion set.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{id: int, name: string, class_name: ?string, school_days: int}>
+     */
+    public function perfectAttendance(int $days, ?array $classIds = null): array
+    {
+        $days = max(1, min(90, $days));
+
+        $schoolDays = $this->schoolDaysInWindow($days, $classIds);
+
+        if ($schoolDays === []) {
+            return [];
+        }
+
+        $absentIds = collect($this->repeatedlyAbsentStudents($days, 1, $classIds))
+            ->pluck('id')
+            ->all();
+
+        return $this->scopedStudents($classIds)
+            ->whereNotIn('students.id', $absentIds === [] ? [0] : $absentIds)
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->orderBy('students.name')
+            ->get(['students.id', 'students.name', 'classes.name as class_name'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
+                'school_days' => count($schoolDays),
+            ])
+            ->all();
+    }
+
+    /**
+     * Students currently inside school: today's last gate event per
+     * student is an ENTRY with no later EXIT ("¿quién está en el
+     * colegio ahora mismo?"). entry_at is the day's first ENTRY.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array<int, array{id: int, name: string, class_name: ?string, entry_at: string}>
+     */
+    public function studentsInSchool(?array $classIds = null): array
+    {
+        $today = Carbon::today()->toDateString();
+
+        $events = PresenceEvent::query()
+            ->whereIn('events.type', ['ENTRY', 'EXIT'])
+            ->whereDate('occurred_at', $today)
+            ->join('cards', 'cards.id', '=', 'events.card_id')
+            ->join('students', 'students.id', '=', 'cards.student_id')
+            ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
+            ->orderBy('occurred_at')
+            ->get(['students.id as student_id', 'events.type as type', 'occurred_at']);
+
+        $byStudent = [];
+        foreach ($events as $event) {
+            $id = (int) $event->student_id;
+            $byStudent[$id] ??= ['first_entry' => null, 'last' => null];
+            if ($event->type === 'ENTRY' && $byStudent[$id]['first_entry'] === null) {
+                $byStudent[$id]['first_entry'] = Carbon::parse($event->occurred_at)->format('H:i');
+            }
+            $byStudent[$id]['last'] = $event->type;
+        }
+
+        $insideIds = array_keys(array_filter($byStudent, fn ($s) => $s['last'] === 'ENTRY'));
+
+        if ($insideIds === []) {
+            return [];
+        }
+
+        $entryAt = array_map(fn ($s) => $s['first_entry'], $byStudent);
+
+        return $this->scopedStudents($classIds)
+            ->whereIn('students.id', $insideIds)
+            ->join('classes', 'classes.id', '=', 'students.class_id')
+            ->orderBy('students.name')
+            ->get(['students.id', 'students.name', 'classes.name as class_name'])
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'name' => (string) $row->name,
+                'class_name' => $row->class_name !== null ? (string) $row->class_name : null,
+                'entry_at' => $entryAt[(int) $row->id],
+            ])
+            ->all();
     }
 
     /**
@@ -438,8 +739,19 @@ class AttendanceService
      */
     private function studentsWithAttendanceOn(string $date, ?array $classIds): Collection
     {
+        return $this->studentsWithEventOn('CLASS_ATTENDANCE', $date, $classIds);
+    }
+
+    /**
+     * Distinct student ids with an event of the given type on the date.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return Collection<int, int>
+     */
+    private function studentsWithEventOn(string $type, string $date, ?array $classIds): Collection
+    {
         return PresenceEvent::query()
-            ->where('events.type', 'CLASS_ATTENDANCE')
+            ->where('events.type', $type)
             ->whereDate('occurred_at', $date)
             ->join('cards', 'cards.id', '=', 'events.card_id')
             ->join('students', 'students.id', '=', 'cards.student_id')

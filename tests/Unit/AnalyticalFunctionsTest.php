@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Card;
+use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\SchoolClass;
@@ -92,6 +93,21 @@ class AnalyticalFunctionsTest extends TestCase
     }
 
     #[Test]
+    public function present_students_names_the_present(): void
+    {
+        // Mirror of absent_students_names_the_missing: Maria + Carlos
+        // tapped in, Ana + Diego did not — "quién ha venido" must name
+        // the tappers, never the absentees (polarity-flip regression).
+        $result = $this->registry->execute('get_present_students', ['date' => '2026-09-01']);
+        $names = array_column($result['present_students'], 'name');
+
+        $this->assertContains('Maria González', $names);
+        $this->assertContains('Carlos Pérez', $names);
+        $this->assertNotContains('Ana Martínez', $names);
+        $this->assertNotContains('Diego López', $names);
+    }
+
+    #[Test]
     public function late_count_counts_distinct_students_once(): void
     {
         // Both tappers arrived after the 08:15 cutoff.
@@ -173,6 +189,156 @@ class AnalyticalFunctionsTest extends TestCase
     }
 
     #[Test]
+    public function late_students_names_the_late_with_tap_times(): void
+    {
+        $result = $this->registry->execute('get_late_students', ['date' => '2026-09-01']);
+        $byName = collect($result['late_students'])->keyBy('name');
+
+        $this->assertSame('08:40', $byName['Maria González']['tapped_at']);
+        $this->assertSame('09:00', $byName['Carlos Pérez']['tapped_at']);
+        $this->assertFalse($byName->has('Ana Martínez'));
+    }
+
+    #[Test]
+    public function class_status_boards_one_class(): void
+    {
+        $classId = Student::where('name', 'Maria González')->firstOrFail()->class_id;
+
+        $result = $this->registry->execute('get_class_status', ['class_id' => $classId, 'date' => '2026-09-01']);
+
+        $this->assertSame(['present' => 0, 'late' => 2, 'absent' => 2], $result['totals']);
+        $this->assertCount(4, $result['students']);
+        $byName = collect($result['students'])->keyBy('name');
+        $this->assertSame('late', $byName['Maria González']['status']);
+        $this->assertSame('absent', $byName['Ana Martínez']['status']);
+    }
+
+    #[Test]
+    public function attendance_by_class_breaks_down_every_class(): void
+    {
+        $result = $this->registry->execute('get_attendance_by_class', ['date' => '2026-09-01']);
+
+        $this->assertNotEmpty($result['classes']);
+        $row = collect($result['classes'])->firstWhere('class_name', '5° B');
+        $this->assertSame(4, $row['enrolled']);
+        $this->assertSame(2, $row['present']);
+        $this->assertSame(2, $row['absent']);
+        $this->assertSame(50, $row['rate']);
+    }
+
+    #[Test]
+    public function enrollment_count_counts_the_roster(): void
+    {
+        $this->assertSame(4, $this->registry->execute('get_enrollment_count', [])['enrollment_count']);
+
+        $classId = Student::where('name', 'Maria González')->firstOrFail()->class_id;
+        $this->assertSame(4, $this->registry->execute('get_enrollment_count', ['class_id' => $classId])['enrollment_count']);
+    }
+
+    #[Test]
+    public function pae_students_lists_who_ate(): void
+    {
+        $classroom = Reader::where('type', 'classroom')->firstOrFail();
+        foreach (['Maria González', 'Carlos Pérez'] as $name) {
+            PresenceEvent::create([
+                'card_id' => $this->cardOf($name)->id,
+                'reader_id' => $classroom->id,
+                'type' => 'PAE_BREAKFAST',
+                'occurred_at' => now()->subMinutes(100),
+            ]);
+        }
+
+        $result = $this->registry->execute('get_pae_students', ['meal' => 'breakfast', 'date' => '2026-09-01']);
+        $names = array_column($result['pae_students'], 'name');
+
+        $this->assertContains('Maria González', $names);
+        $this->assertContains('Carlos Pérez', $names);
+        $this->assertNotContains('Ana Martínez', $names);
+    }
+
+    #[Test]
+    public function pae_trend_counts_per_day(): void
+    {
+        $classroom = Reader::where('type', 'classroom')->firstOrFail();
+        PresenceEvent::create([
+            'card_id' => $this->cardOf('Maria González')->id,
+            'reader_id' => $classroom->id,
+            'type' => 'PAE_LUNCH',
+            'occurred_at' => now()->subMinutes(60),
+        ]);
+
+        $result = $this->registry->execute('get_pae_trend', ['meal' => 'lunch', 'days' => 2]);
+
+        $this->assertSame(2, $result['days']);
+        $this->assertSame(0, $result['trend'][0]['students']);
+        $this->assertSame(1, $result['trend'][1]['students']);
+    }
+
+    #[Test]
+    public function students_in_school_lists_the_not_yet_exited(): void
+    {
+        // Fixture: Maria entered AND exited (outside). Carlos enters with
+        // no exit (inside).
+        $gate = Reader::where('type', 'entry')->firstOrFail();
+        PresenceEvent::create([
+            'card_id' => $this->cardOf('Carlos Pérez')->id,
+            'reader_id' => $gate->id,
+            'type' => 'ENTRY',
+            'occurred_at' => Carbon::parse('2026-09-01 07:30:00'),
+        ]);
+
+        $result = $this->registry->execute('get_students_in_school', []);
+        $byName = collect($result['inside'])->keyBy('name');
+
+        $this->assertSame(1, $result['inside_count']);
+        $this->assertSame('07:30', $byName['Carlos Pérez']['entry_at']);
+        $this->assertFalse($byName->has('Maria González'));
+    }
+
+    #[Test]
+    public function recycling_leaderboard_ranks_by_points(): void
+    {
+        $maria = Student::where('name', 'Maria González')->firstOrFail()->id;
+        $carlos = Student::where('name', 'Carlos Pérez')->firstOrFail()->id;
+        PointsLedger::create(['student_id' => $maria, 'delta' => 10, 'reason' => 'recycling_deposit']);
+        PointsLedger::create(['student_id' => $carlos, 'delta' => 25, 'reason' => 'recycling_deposit']);
+
+        $result = $this->registry->execute('get_recycling_leaderboard', ['limit' => 2]);
+
+        $this->assertSame('Carlos Pérez', $result['leaders'][0]['student_name']);
+        $this->assertSame(1, $result['leaders'][0]['rank']);
+        $this->assertSame(25, $result['leaders'][0]['points']);
+        $this->assertSame('Maria González', $result['leaders'][1]['student_name']);
+    }
+
+    #[Test]
+    public function student_points_reports_balance_earned_spent(): void
+    {
+        $maria = Student::where('name', 'Maria González')->firstOrFail();
+        PointsLedger::create(['student_id' => $maria->id, 'delta' => 10, 'reason' => 'recycling_deposit']);
+        PointsLedger::create(['student_id' => $maria->id, 'delta' => 15, 'reason' => 'recycling_deposit']);
+        PointsLedger::create(['student_id' => $maria->id, 'delta' => -5, 'reason' => 'reward_redeem']);
+
+        $result = $this->registry->execute('get_student_points', ['student_id' => $maria->id]);
+
+        $this->assertSame(20, $result['balance']);
+        $this->assertSame(25, $result['earned']);
+        $this->assertSame(5, $result['spent']);
+    }
+
+    #[Test]
+    public function perfect_attendance_names_the_never_absent(): void
+    {
+        $result = $this->registry->execute('get_perfect_attendance', ['days' => 1]);
+        $names = array_column($result['students'], 'name');
+
+        $this->assertContains('Maria González', $names);
+        $this->assertContains('Carlos Pérez', $names);
+        $this->assertNotContains('Ana Martínez', $names);
+        $this->assertNotContains('Diego López', $names);
+    }
+
+    #[Test]
     public function unknown_functions_are_structured_errors_never_exceptions(): void
     {
         $result = $this->registry->execute('get_breakfast_menu', []);
@@ -209,6 +375,21 @@ class AnalyticalFunctionsTest extends TestCase
             $scope
         );
         $this->assertArrayHasKey('error', $walled);
+
+        // New list functions ride the same fence.
+        $lateDenied = $this->registry->execute(
+            'get_late_students',
+            ['date' => '2026-09-01', 'class_id' => $other->id],
+            $scope
+        );
+        $this->assertArrayHasKey('error', $lateDenied);
+
+        $pointsWalled = $this->registry->execute(
+            'get_student_points',
+            ['student_id' => $outsider->id],
+            $scope
+        );
+        $this->assertArrayHasKey('error', $pointsWalled);
 
         // In-scope calls still answer (scoped to the teacher's class).
         $allowed = $this->registry->execute('get_absence_count', ['date' => '2026-09-01'], $scope);

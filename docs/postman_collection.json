@@ -288,6 +288,36 @@
             }
         },
         {
+            "name": "04d Admin — Delete reader / Eliminar lector",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{admin_pat}}"
+                    },
+                    {
+                        "key": "Accept",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/api/v1/admin/readers/{{reader_id}}",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "readers",
+                        "{{reader_id}}"
+                    ]
+                },
+                "description": "Decommission a reader from the /admin/readers desk (overflow menu + confirm). The row goes with its tap events + deposits + pending captures (child-first deletes); pairing history survives unlinked, ledger balances keep their value, capture images are deleted, a reader_deleted roster frame drops the desk row live. Admin-only.\n\nResponse 200: { status, deleted: { id, label, events_deleted }, message }.\nResponse 404: unknown reader."
+            }
+        },
+        {
             "name": "05 Desk — Redeem reward / Canjear recompensa",
             "request": {
                 "method": "POST",

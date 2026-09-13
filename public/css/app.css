@@ -1141,6 +1141,20 @@ select::-ms-expand { display: none; }
    70px column was the crammed look. */
 .row-actions { display: flex; flex-direction: column; gap: var(--sp-2xs); align-items: stretch; }
 .row-actions .btn-small { white-space: nowrap; width: 100%; }
+/* Readers desk overflow: Save stays out, Rotate/Delete float in a native
+   popover off the ⋯ button. Top-layer by construction — never clipped
+   by the ledger scroll container, light-dismiss + Esc come free. The
+   UA's centered `inset: 0; margin: auto` is overridden; JS pins it
+   under its button on toggle. */
+.reader-menu { position: fixed; inset: auto; margin: 0; padding: var(--sp-2xs); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-container-lowest); box-shadow: var(--shadow-md); min-width: 160px; }
+/* Author display must not beat the UA's closed-popover hiding. */
+.reader-menu:popover-open { display: flex; flex-direction: column; gap: var(--sp-2xs); }
+/* Readers desk trigger: a quiet icon at Save's side, not another
+   button — the cell runs horizontal, Save flexes, the dots sit fixed. */
+#readers-body .row-actions { flex-direction: row; align-items: center; }
+#readers-body .row-actions .reader-save { flex: 1 1 auto; width: auto; }
+.reader-dots { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; padding: 0; background: transparent; border: none; border-radius: var(--radius-sm); color: var(--text-meta); cursor: pointer; }
+.reader-dots:hover { background: var(--surface-container-high); color: var(--text); }
 /* Editable ledger cells (readers desk): the label input flexes with
    its column instead of forcing its intrinsic width on the table —
    that forced width is what pushed the actions out of the panel. */
