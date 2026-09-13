@@ -614,7 +614,10 @@ class RealtimeServerTest extends TestCase
         if ($this->server === null) {
             return;
         }
-        $this->server['process']->stop(0, SIGTERM);
+        // stop(0) is the portable terminate: SIGTERM-then-SIGKILL on
+        // POSIX, Process's own terminator on Windows (SIGTERM is not
+        // defined there — the Windows smoke caught it).
+        $this->server['process']->stop(0);
         @unlink($this->server['db']);
         $this->server = null;
     }
