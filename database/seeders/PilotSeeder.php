@@ -17,6 +17,7 @@ use App\Models\SchoolClass;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\SettingsService;
 use App\Services\StudentAccountService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -35,6 +36,11 @@ use Illuminate\Database\Seeder;
  * TASK-037 — ENTRY/EXIT is gone from the platform (supersedes ADR-038):
  * no gate reader, no gate taps; PAE enrollment is per meal (breakfast
  * / lunch independently) and meals only happen for present students.
+ *
+ * TASK-039 — seeder-convention refresh: the initial password resolves
+ * through the accounts preset (never hardcoded), the settings cache is
+ * flushed after seeding rows, and the summary prints every staff login
+ * including kitchen.
  *
  * Fresh databases only: refuses to run when students already exist
  * (events/deposits are append-only rows — re-running would double the
@@ -107,15 +113,21 @@ class PilotSeeder extends Seeder
 
         mt_srand(self::RNG_SEED);
 
+        // TASK-039 — every fixture password equals the effective
+        // accounts preset (falls back to config before the settings
+        // rows exist): an overridden STUDENT_INITIAL_PASSWORD still
+        // yields one-tap fixture logins that match the printed table.
+        $initialPassword = (string) settings()->studentInitialPassword();
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@presence.test'],
-            ['name' => 'School Admin', 'password' => 'password', 'role' => UserRole::Admin->value, 'must_change_password' => false],
+            ['name' => 'School Admin', 'password' => $initialPassword, 'role' => UserRole::Admin->value, 'must_change_password' => false],
         );
 
         // TASK-037 — kitchen account (ADR-054) + runtime settings rows.
-        User::firstOrCreate(
+        $kitchen = User::firstOrCreate(
             ['email' => 'kitchen@presence.test'],
-            ['name' => 'Sofía Vargas', 'password' => 'password', 'role' => UserRole::Kitchen->value, 'must_change_password' => false],
+            ['name' => 'Sofía Vargas', 'password' => $initialPassword, 'role' => UserRole::Kitchen->value, 'must_change_password' => false],
         );
 
         foreach ([
@@ -130,6 +142,8 @@ class PilotSeeder extends Seeder
         ] as $key => $value) {
             Setting::firstOrCreate(['key' => $key], ['value' => $value]);
         }
+
+        SettingsService::flushCache();
 
         $classes = $this->seedClasses();
         $students = $this->seedStudents($classes);
@@ -150,7 +164,7 @@ class PilotSeeder extends Seeder
 
         $redemptions = $this->seedRedemptions($students);
 
-        $this->printSummary($admin, $classes, $students, $readers, $days, $eventCount, $depositCount, $redemptions);
+        $this->printSummary($admin, $kitchen, $classes, $students, $readers, $days, $eventCount, $depositCount, $redemptions, $initialPassword);
     }
 
     /** @return array<string, SchoolClass> */
@@ -167,7 +181,7 @@ class PilotSeeder extends Seeder
         foreach ($defs as $name => [$teacherName, $email]) {
             $teacher = User::firstOrCreate(
                 ['email' => $email],
-                ['name' => $teacherName, 'password' => 'password', 'role' => UserRole::Teacher->value, 'must_change_password' => false],
+                ['name' => $teacherName, 'password' => (string) settings()->studentInitialPassword(), 'role' => UserRole::Teacher->value, 'must_change_password' => false],
             );
 
             $class = SchoolClass::firstOrCreate(['name' => $name]);
@@ -210,7 +224,7 @@ class PilotSeeder extends Seeder
                 User::create([
                     'name' => $name,
                     'email' => $accounts->emailForName($name),
-                    'password' => 'password',
+                    'password' => (string) settings()->studentInitialPassword(),
                     'role' => UserRole::Student->value,
                     'student_id' => $student->id,
                     'must_change_password' => false,
@@ -459,7 +473,7 @@ class PilotSeeder extends Seeder
      * @param  array<string, Reader>  $readers
      * @param  array<int, Carbon>  $days
      */
-    private function printSummary(User $admin, array $classes, array $students, array $readers, array $days, int $events, int $deposits, int $redemptions): void
+    private function printSummary(User $admin, User $kitchen, array $classes, array $students, array $readers, array $days, int $events, int $deposits, int $redemptions, string $initialPassword): void
     {
         $line = str_repeat('=', 74);
         $this->command->warn($line);
@@ -480,11 +494,16 @@ class PilotSeeder extends Seeder
             $events, $deposits, $redemptions
         ));
 
-        $this->command->info(' [EN] Staff logins (password: password) / Accesos del personal (clave: password):');
+        $this->command->info(" [EN] Staff logins (password: {$initialPassword}) / Accesos del personal (clave: {$initialPassword}):");
         $this->command->table(
             ['User / Usuario', 'Email', 'Role / Rol'],
             array_merge(
-                [[$admin->name, $admin->email, $admin->role]],
+                [
+                    [$admin->name, $admin->email, $admin->role],
+                    // TASK-039 — the kitchen login was seeded but never
+                    // printed: operators couldn't discover it.
+                    [$kitchen->name, $kitchen->email, $kitchen->role],
+                ],
                 array_map(
                     fn (SchoolClass $c) => [$c->teacher->name ?? '?', $c->teacher->email ?? '?', 'teacher'],
                     array_values($classes),

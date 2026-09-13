@@ -15,6 +15,7 @@ use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\SettingsService;
+use App\Services\StudentAccountService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -37,6 +38,11 @@ use Illuminate\Support\Str;
  *
  * DEV/DEMO ONLY (finding 7.2): every credential below is a published,
  * shared secret — never run this seeder against a production database.
+ *
+ * TASK-039 — seeder-convention refresh: student emails resolve through
+ * the accounts preset (not a hardcoded domain), logins allocate through
+ * the real StudentAccountService allocator, and the printed table shows
+ * the ACTUAL account emails (never a recomputed slug that could lie).
  */
 class DemoSeeder extends Seeder
 {
@@ -46,11 +52,17 @@ class DemoSeeder extends Seeder
         // TASK-030-A (ADR-044) — demo accounts opt OUT of the forced
         // rotation (must_change_password=false): one-tap demo logins
         // keep working. Real enrollments (desk create/import) opt IN.
+        // TASK-039 — the fixture password equals the effective accounts
+        // preset (config fallback before the settings rows exist), so an
+        // overridden STUDENT_INITIAL_PASSWORD still yields matching
+        // one-tap logins and an honest printed table.
+        $initialPassword = (string) settings()->studentInitialPassword();
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@presence.test'],
             [
                 'name' => 'School Admin',
-                'password' => 'password',
+                'password' => $initialPassword,
                 'role' => UserRole::Admin->value,
                 'must_change_password' => false,
             ],
@@ -62,7 +74,7 @@ class DemoSeeder extends Seeder
             ['email' => 'kitchen@presence.test'],
             [
                 'name' => 'Sofía Vargas',
-                'password' => 'password',
+                'password' => $initialPassword,
                 'role' => UserRole::Kitchen->value,
                 'must_change_password' => false,
             ],
@@ -89,7 +101,7 @@ class DemoSeeder extends Seeder
             ['email' => 'teacher@presence.test'],
             [
                 'name' => 'Prof. Elena Ramírez',
-                'password' => 'password',
+                'password' => $initialPassword,
                 'role' => UserRole::Teacher->value,
                 'must_change_password' => false,
             ],
@@ -122,6 +134,12 @@ class DemoSeeder extends Seeder
         // ---------- Students + cards (per-meal PAE enrollment) ----------
         // TASK-037 — breakfast and lunch enroll independently: the demo
         // roster covers all four combinations.
+        // TASK-039 — the account preset resolves through settings (the
+        // same effective values the desks use), never hardcoded: a
+        // school that overrides the domain/password gets seeded logins
+        // that match its own convention (the allocator resolves the
+        // domain internally; $initialPassword was read above).
+        $accounts = new StudentAccountService;
         $students = [
             ['name' => 'Maria González', 'grade' => '5°', 'breakfast' => true, 'lunch' => true],
             ['name' => 'Carlos Pérez', 'grade' => '5°', 'breakfast' => true, 'lunch' => false],
@@ -134,30 +152,36 @@ class DemoSeeder extends Seeder
         $studentRows = [];
 
         foreach ($students as $data) {
+            // Match the students_name_class_unique invariant (name IN a
+            // class), not the bare name: re-runs stay idempotent even if
+            // the roster ever spreads across classes.
             $student = Student::firstOrCreate(
-                ['name' => $data['name']],
+                ['name' => $data['name'], 'class_id' => $class->id],
                 [
                     'grade' => $data['grade'],
                     'pae_breakfast_enrolled' => $data['breakfast'],
                     'pae_lunch_enrolled' => $data['lunch'],
-                    'class_id' => $class->id,
                 ],
             );
 
             // TASK-025 item 5 (spec §11/§30) — the 1:1 student account
             // layer: a users row REFERENCING the students row (never a
             // second identity). Same login path as staff.
-            $slug = str($data['name'])->before(' ')->lower()->ascii();
-            User::firstOrCreate(
-                ['email' => "{$slug}@presence.test"],
-                [
+            // TASK-039 — allocate through the REAL allocator (numeric
+            // suffixes on true collisions) and skip when the account
+            // already exists (the ADR-044 idempotency: keep, never
+            // re-issue) — firstOrCreate on the email alone could hand
+            // a student somebody else's login.
+            if ($student->account()->first() === null) {
+                User::create([
                     'name' => $data['name'],
-                    'password' => 'password',
+                    'email' => $accounts->emailForName($data['name']),
+                    'password' => $initialPassword,
                     'role' => UserRole::Student->value,
                     'student_id' => $student->id,
                     'must_change_password' => false,
-                ],
-            );
+                ]);
+            }
 
             $studentRows[$data['name']] = $student;
 
@@ -224,7 +248,7 @@ class DemoSeeder extends Seeder
         $scenarioDate = $this->seedScenarioDay($studentRows, $cafeteriaReader, $classroomReader);
 
         // ---------- Console output (hard requirement, bilingual) ----------
-        $this->printCredentials($cards, $classroomReader, $cafeteriaReader, $recyclingReader, $admin, $teacher, $kitchen, array_values($studentRows), $scenarioDate);
+        $this->printCredentials($cards, $classroomReader, $cafeteriaReader, $recyclingReader, $admin, $teacher, $kitchen, array_values($studentRows), $scenarioDate, $initialPassword);
     }
 
     /**
@@ -292,7 +316,7 @@ class DemoSeeder extends Seeder
         return $day->toDateString();
     }
 
-    private function printCredentials(array $cards, Reader $classroom, Reader $cafeteria, Reader $recycling, User $admin, User $teacher, User $kitchen, array $studentRows = [], ?string $scenarioDate = null): void
+    private function printCredentials(array $cards, Reader $classroom, Reader $cafeteria, Reader $recycling, User $admin, User $teacher, User $kitchen, array $studentRows = [], ?string $scenarioDate = null, string $initialPassword = 'password'): void
     {
         $line = str_repeat('=', 74);
 
@@ -306,17 +330,20 @@ class DemoSeeder extends Seeder
             ['User / Usuario', 'Email', 'Password', 'Role / Rol'],
             array_merge(
                 [
-                    [$admin->name, $admin->email, 'password', $admin->role],
-                    [$teacher->name, $teacher->email, 'password', $teacher->role],
+                    [$admin->name, $admin->email, $initialPassword, $admin->role],
+                    [$teacher->name, $teacher->email, $initialPassword, $teacher->role],
                     // TASK-037 — the kitchen account (meal-service staff).
-                    [$kitchen->name, $kitchen->email, 'password', $kitchen->role],
+                    [$kitchen->name, $kitchen->email, $initialPassword, $kitchen->role],
                     // TASK-025 item 5 — demo student accounts (own data only).
                 ],
+                // TASK-039 — print the ACTUAL account emails (the audit
+                // truth, OBS-014): never a recomputed slug that could
+                // disagree with the allocator on collisions.
                 array_map(
                     fn (Student $student) => [
                         $student->name,
-                        str($student->name)->before(' ')->lower()->ascii().'@presence.test',
-                        'password',
+                        $student->account?->email ?? '?',
+                        $initialPassword,
                         UserRole::Student->value,
                     ],
                     $studentRows,
