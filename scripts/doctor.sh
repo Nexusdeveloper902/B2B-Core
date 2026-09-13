@@ -33,7 +33,7 @@ note()  { printf '%b\n' "  ${*}"; }
 pass()  { ok "$*";  PASS=$((PASS + 1)); }
 fail()  { err "$*"; FAIL=$((FAIL + 1)); }
 
-log "Doctor — Presence Platform environment check / Revisión del entorno"
+log "Doctor — Pulse environment check / Revisión del entorno de Pulse"
 detect_distro
 if is_windows; then
     printf '%b\n' "  OS: $(uname -s) $(uname -m) · ${C_BOLD}Windows (Git Bash fallback / respaldo de Git Bash)${C_RESET} · B2B_OS=windows"
@@ -155,28 +155,70 @@ else
     fail "vendor/: missing — run ./run setup / falta — ejecuta ./run setup"
 fi
 
-DB_FILE="$B2B_ROOT/database/database.sqlite"
-if [ -f "$DB_FILE" ]; then
-    pass "database: $(du -h "$DB_FILE" | cut -f1) at database/database.sqlite"
-    if [ "$PHP_FOUND" -eq 1 ] && [ -d "$B2B_ROOT/vendor" ]; then
+DB_CONN="$(env_value DB_CONNECTION)"
+if [ -z "$DB_CONN" ]; then DB_CONN="sqlite"; fi
+if [ "$DB_CONN" = "mariadb" ]; then
+    # ADR-049 — server-based storage: pdo_mysql + reachability + schema depth.
+    if [ "$PHP_FOUND" -eq 1 ]; then
         resolve_php report
-        tables="$("$PHP_BIN" -r '
-            try {
-                $pdo = new PDO("sqlite:" . $argv[1]);
-                $n = (int) $pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type=\"table\" AND name LIKE \"%\"")->fetchColumn();
-                echo $n;
-            } catch (Throwable $e) { echo "err"; }
-        ' "$DB_FILE" 2>/dev/null || echo err)"
-        if [ "$tables" = "err" ]; then
-            fail "database schema: unreadable — run ./run setup / ilegible — ejecuta ./run setup"
-        elif [ "$tables" -ge 10 ]; then
-            pass "database schema: ${tables} tables (migrations applied / migraciones aplicadas)"
+        if "$PHP_BIN" -m | grep -qi '^pdo_mysql$'; then
+            pass "pdo_mysql: loaded"
         else
-            fail "database schema: only ${tables} tables — run ./run setup / solo ${tables} tablas — ejecuta ./run setup"
+            fail "pdo_mysql: missing (required for DB_CONNECTION=mariadb) — enable the PHP mysql extension / falta — habilita la extensión mysql de PHP"
+        fi
+    fi
+    if [ -f "$B2B_ROOT/.env" ] && [ "$PHP_FOUND" -eq 1 ]; then
+        resolve_php report
+        if mariadb_probe; then
+            pass "database: mariadb reachable at ${MARIADB_TARGET}"
+            tables="$(PDB_HOST="$(env_value DB_HOST)" PDB_PORT="$(env_value DB_PORT)" PDB_NAME="$(env_value DB_DATABASE)" \
+PDB_USER="$(env_value DB_USERNAME)" PDB_PASS="$(env_value DB_PASSWORD)" "$PHP_BIN" -r '
+try {
+    $pdo = new PDO(
+        "mysql:host=" . getenv("PDB_HOST") . ";port=" . getenv("PDB_PORT") . ";dbname=" . getenv("PDB_NAME"),
+        (string) getenv("PDB_USER"),
+        (string) getenv("PDB_PASS"),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+    echo (string) $pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()")->fetchColumn();
+} catch (Throwable $e) { echo "err";
+}' 2>/dev/null || echo err)"
+            if [ "$tables" = "err" ]; then
+                fail "database schema: unreadable — run ./run setup / ilegible — ejecuta ./run setup"
+            elif [ "$tables" -ge 10 ]; then
+                pass "database schema: ${tables} tables (migrations applied / migraciones aplicadas)"
+            else
+                fail "database schema: only ${tables} tables — run ./run setup / solo ${tables} tablas — ejecuta ./run setup"
+            fi
+        else
+            mariadb_remediation
+            fail "database: mariadb unreachable at ${MARIADB_TARGET}"
         fi
     fi
 else
-    warn "database: no database.sqlite yet — run ./run setup / aún no hay BD — ejecuta ./run setup"
+    DB_FILE="$B2B_ROOT/database/database.sqlite"
+    if [ -f "$DB_FILE" ]; then
+        pass "database: $(du -h "$DB_FILE" | cut -f1) at database/database.sqlite"
+        if [ "$PHP_FOUND" -eq 1 ] && [ -d "$B2B_ROOT/vendor" ]; then
+            resolve_php report
+            tables="$("$PHP_BIN" -r '
+                try {
+                    $pdo = new PDO("sqlite:" . $argv[1]);
+                    $n = (int) $pdo->query("SELECT COUNT(*) FROM sqlite_master WHERE type=\"table\" AND name LIKE \"%\"")->fetchColumn();
+                    echo $n;
+                } catch (Throwable $e) { echo "err"; }
+            ' "$DB_FILE" 2>/dev/null || echo err)"
+            if [ "$tables" = "err" ]; then
+                fail "database schema: unreadable — run ./run setup / ilegible — ejecuta ./run setup"
+            elif [ "$tables" -ge 10 ]; then
+                pass "database schema: ${tables} tables (migrations applied / migraciones aplicadas)"
+            else
+                fail "database schema: only ${tables} tables — run ./run setup / solo ${tables} tablas — ejecuta ./run setup"
+            fi
+        fi
+    else
+        warn "database: no database.sqlite yet — run ./run setup / aún no hay BD — ejecuta ./run setup"
+    fi
 fi
 
 # --- Verdict ---------------------------------------------------------------------------

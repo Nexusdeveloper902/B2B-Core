@@ -26,7 +26,7 @@ down() { printf '%s\n' "${C_RED}not running${C_RESET}"; }
 detect_distro
 resolve_php report
 resolve_composer report
-printf '%b\n' "${C_BOLD}Presence Platform — status${C_RESET}"
+printf '%b\n' "${C_BOLD}Pulse — status${C_RESET}"
 
 if is_windows; then
     row "OS" "Windows (Git Bash fallback) · B2B_OS=windows"
@@ -48,12 +48,22 @@ else
     row ".env" "${C_RED}missing — ./run setup${C_RESET}"
 fi
 
-# Database
-DB_FILE="$B2B_ROOT/database/database.sqlite"
-if [ -f "$DB_FILE" ]; then
-    row "database" "database/database.sqlite ($(du -h "$DB_FILE" | cut -f1))"
+# Database (ADR-049 — driver-aware)
+DB_CONN="$(env_value DB_CONNECTION)"
+if [ -z "$DB_CONN" ]; then DB_CONN="sqlite"; fi
+if [ "$DB_CONN" = "mariadb" ]; then
+    if mariadb_probe; then
+        row "database" "mariadb ${MARIADB_TARGET} ${C_GREEN}reachable${C_RESET}"
+    else
+        row "database" "mariadb ${MARIADB_TARGET} ${C_RED}unreachable — check server + .env${C_RESET}"
+    fi
 else
-    row "database" "${C_YELLOW}no dev DB yet — ./run setup${C_RESET}"
+    DB_FILE="$B2B_ROOT/database/database.sqlite"
+    if [ -f "$DB_FILE" ]; then
+        row "database" "database/database.sqlite ($(du -h "$DB_FILE" | cut -f1))"
+    else
+        row "database" "${C_YELLOW}no dev DB yet — ./run setup${C_RESET}"
+    fi
 fi
 if [ -d "$B2B_ROOT/vendor" ]; then row "vendor" "present"; else row "vendor" "${C_YELLOW}missing — ./run setup${C_RESET}"; fi
 

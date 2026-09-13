@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# scripts/_lib/common.sh — shared library for the Presence Platform run suite.
-# Biblioteca compartida para la suite de ejecución de Presence Platform.
+# scripts/_lib/common.sh — shared library for the Pulse run suite.
+# Biblioteca compartida para la suite de ejecución de Pulse.
 #
 # Sourced by `run` and every scripts/*.sh — NEVER executed directly.
 # No lowercased `php` call may appear anywhere in the suite: every invocation
@@ -100,6 +100,15 @@ B2B_PHP_MIN_VERSION="8.3"
 PHP_REQUIRED_MODULES=(
     ctype curl dom fileinfo gd iconv libxml mbstring openssl
     pdo_sqlite session sqlite3 tokenizer xml xmlwriter zip
+)
+
+# Runtime-extra tier (ADR-049): needed by the PRODUCT database driver,
+# NOT by the hermetic sqlite test path — doctor enforces these only when
+# DB_CONNECTION=mariadb, and they are deliberately OUT of the candidate
+# filtering above (a PHP without pdo_mysql is still a valid interpreter
+# for the tests, the e2e and the toolchain path).
+PHP_RUNTIME_EXTRA_MODULES=(
+    pdo_mysql
 )
 
 # Candidate interpreters, in resolution order: env override -> PATH -> .tools
@@ -349,6 +358,40 @@ env_value() {
 app_key_set() {
     [ -f "$B2B_ROOT/.env" ] || return 1
     grep -qE '^APP_KEY=base64:' "$B2B_ROOT/.env"
+}
+
+# --- ADR-049: MariaDB runtime helpers -------------------------------------------
+# mariadb_probe — exit 0 when the .env-configured MariaDB accepts a
+# connection. Requires resolve_php to have run. Secrets travel to the PHP
+# child as process env (getenv) — never as command-line arguments, never
+# echoed. Sets MARIADB_TARGET="db@host:port" for messages either way.
+mariadb_probe() {
+    local host port db user pass
+    host="$(env_value DB_HOST)";     [ -n "$host" ] || host="127.0.0.1"
+    port="$(env_value DB_PORT)";     [ -n "$port" ] || port="3306"
+    db="$(env_value DB_DATABASE)"
+    user="$(env_value DB_USERNAME)"
+    pass="$(env_value DB_PASSWORD)"
+    MARIADB_TARGET="${db}@${host}:${port}"
+    MARIADB_PROBE="$(PDB_HOST="$host" PDB_PORT="$port" PDB_NAME="$db" \
+PDB_USER="$user" PDB_PASS="$pass" "$PHP_BIN" -r '
+try {
+    $pdo = new PDO(
+        "mysql:host=" . getenv("PDB_HOST") . ";port=" . getenv("PDB_PORT") . ";dbname=" . getenv("PDB_NAME"),
+        (string) getenv("PDB_USER"),
+        (string) getenv("PDB_PASS"),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3]
+    );
+    echo "ok";
+} catch (Throwable $e) {
+    echo "err";
+}' 2>/dev/null)" || MARIADB_PROBE="err"
+    [ "$MARIADB_PROBE" = "ok" ]
+}
+
+mariadb_remediation() {
+    err "MariaDB unreachable at ${MARIADB_TARGET:-unknown} — check: (1) the server is running, (2) host/port/database/user/password in .env, (3) the database and user exist"
+    err "MariaDB inaccesible en ${MARIADB_TARGET:-desconocido} — revisa: (1) que el servidor esté corriendo, (2) host/port/database/user/password en .env, (3) que la base y el usuario existan"
 }
 
 # ensure_env_and_key — idempotent: create .env from .env.example when absent

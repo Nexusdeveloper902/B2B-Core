@@ -53,7 +53,7 @@ class BilingualJourneyTest extends TestCase
         auth()->logout();
         $this->withSession(['locale' => 'es'])->get('/login')
             ->assertOk()
-            ->assertSeeText('Inicia sesión en la Plataforma de Presencia');
+            ->assertSeeText('Inicia sesión en Pulse');
 
         // ---- An admin-only rejection is explained in Spanish ----
         $this->postJson('/api/v1/events/tap', ['credential_uid' => 'X'], [

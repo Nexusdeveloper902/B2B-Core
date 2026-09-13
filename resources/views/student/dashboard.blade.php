@@ -11,6 +11,7 @@
     unchanged; the WS script below is byte-identical in behavior.
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.student_dashboard'))
 
@@ -27,6 +28,9 @@
             <span class="material-symbols-outlined is-16" aria-hidden="true">eco</span>
         </x-slot:icon>
         {{ $balance }}
+        <x-slot:footer>
+            <a href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }} →</a>
+        </x-slot:footer>
     </x-stat>
     <x-stat :label="__('app.student_rank')">
         <x-slot:icon>
@@ -74,8 +78,6 @@
     </x-panel>
 </div>
 
-<p class="muted small"><a class="tiny-link" href="{{ route('student.rewards') }}">{{ __('app.student_rewards') }} →</a></p>
-
 {{-- Live balance: WS points_awarded / reward_redeemed frames for THIS student --}}
 <div id="student-live" data-student-id="{{ $student->id }}" hidden></div>
 <script>
@@ -100,6 +102,14 @@
                             var p = frame.update.payload || {};
                             if (p.student_id !== Number(el.dataset.studentId)) { return; }
                             if (typeof p.new_balance === 'number' && stat) { stat.textContent = p.new_balance; }
+                            // Spec §23 — your own deposit is worth saying out
+                            // loud: "+N PTS" the moment the classification
+                            // commits. points_awarded frames carry the
+                            // points; other types only move the balance.
+                            if (frame.update.type === 'points_awarded' && window.PulseToast && !document.hidden) {
+                                PulseToast.success({!! Js::from(__('app.toast_points_earned', ['points' => ':points'])) !!}
+                                    .replace(':points', String(p.points)));
+                            }
                         } catch (err) { /* not JSON — ignore */ }
                     };
                 })

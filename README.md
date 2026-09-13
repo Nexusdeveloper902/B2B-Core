@@ -1,4 +1,4 @@
-# Presence Platform — Core Platform (Backend + Dashboards)
+# Pulse — Core Platform (Backend + Dashboards)
 
 > **Read this in:** [Español](README.es.md)
 >

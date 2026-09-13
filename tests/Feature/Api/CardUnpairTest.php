@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\PresenceEvent;
+use App\Models\Reader;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\PairingService;
@@ -44,17 +45,21 @@ class CardUnpairTest extends TestCase
     {
         $student = Student::where('name', 'Maria González')->firstOrFail();
         $card = $student->cards()->firstOrFail();
+        // Named-fixture rule (RUN-033): readers are looked up, never
+        // assumed to be id 1 — InnoDB auto-increment survives rolled-back
+        // tests, so positional ids break on MariaDB.
+        $readerId = Reader::orderBy('id')->firstOrFail()->id;
 
         // The card's tap history + a pairing history row pointing at it.
         PresenceEvent::create([
             'card_id' => $card->id,
-            'reader_id' => 1,
+            'reader_id' => $readerId,
             'type' => 'CLASS_ATTENDANCE',
             'occurred_at' => now()->subDay(),
         ]);
         PendingPairing::create([
             'student_id' => $student->id,
-            'reader_id' => 1,
+            'reader_id' => $readerId,
             'card_id' => $card->id,
             'expires_at' => now()->addMinute(),
             'consumed_at' => now()->subMinutes(5),

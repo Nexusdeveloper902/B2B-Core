@@ -204,6 +204,41 @@ cuyas filas repintan Y anteponen en vivo).
   fixture `DemoSeeder` sigue siendo el valor por defecto de las
   pruebas automatizadas.
 
+## 3f. Pasada de productización (2026-09-12) — identidad Pulse + toasts
+
+Los detalles completos en [BRAND.es.md](BRAND.es.md) /
+[BRAND.md](BRAND.md). Lo relevante para el frontend:
+
+- **Identidad**: el armazón (barra superior, pie, bandas de login y de
+  cambio de contraseña) lleva la marca REAL de Pulse
+  (`public/brand/mark-96.png`, derivada de B2B-Logo-Suite) junto al
+  nombre tipografiado. Los títulos son `<página> — Pulse`; el head
+  incluye favicon.ico + iconos PNG + `manifest.webmanifest` +
+  theme-color + metadatos og/twitter + `brand/og-image.png`. La vieja
+  ficha de reemplazo `wordmark-tap` fue eliminada —
+  `PulseIdentityTest` fija su ausencia.
+- **Paleta**: tokens.css queda anclado a los cinco valores de marca
+  Pulse (crema `#E8EDDF` de fondo, tinta `#242423` de acción, oro
+  `#F5CB5C` de acento, salvia `#CFDBD5`, grafito `#333533`); oro sobre
+  tinta es ahora la gramática de botones/nav activo. El rojo de error
+  sigue independiente. DashboardTest fija los anclajes.
+- **Toasts**: `public/js/toast.js` (window.PulseToast) + el bloque
+  `.toast-*` en app.css — un solo sistema de confirmación, cuatro
+  tonos, pila máxima de 4, auto-cierre por tipo, pausa al pasar el
+  cursor, aria-live, sin animación con movimiento reducido. Cableado
+  en: escritorios de estudiantes/lectores/emparejamiento, panel admin
+  (fallo NL + canje), fallo de red del NL docente — INCLUIDAS las rutas
+  `.catch` antes silenciosas. Los cuadros `.nl-answer` en línea
+  conservan el detalle; los eventos en tiempo real ambientales nunca
+  generan toasts.
+- **Páginas de error**: 419 y 429 se suman al conjunto con marca dentro
+  del armazón (`resources/views/errors/`), localizadas y con salida.
+- **Brecha de idioma en mensajes del servidor (descubierta, abierta)**:
+  los fetch de los escritorios no envían `Accept-Language`, así que los
+  mensajes de la API en los cuadros en línea salen en EN mientras el
+  texto de los toasts sigue el idioma de sesión. Comportamiento
+  preexistente; anotado como trabajo futuro.
+
 ## 4. Registro de brechas (gap ledger) — necesita funcionalidad que AÚN NO existe
 
 Todo lo de abajo fue **omitido o reemplazado con honestidad** (sin datos

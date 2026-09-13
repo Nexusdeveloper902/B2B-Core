@@ -40,9 +40,17 @@ done
 resolve_php
 [ -d "$B2B_ROOT/vendor" ]      || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
 ensure_env_and_key
-if [ "$(env_value DB_CONNECTION)" != "mysql" ] && [ "$(env_value DB_CONNECTION)" != "pgsql" ]; then
-    [ -f "$B2B_ROOT/database/database.sqlite" ] || die "database/database.sqlite missing — run: ./run setup / falta la BD — ejecuta: ./run setup"
-fi
+case "$(env_value DB_CONNECTION)" in
+    mariadb)
+        # ADR-049 — server-based storage: probe instead of file checks.
+        mariadb_probe || { mariadb_remediation; exit 1; }
+        ;;
+    mysql|pgsql)
+        ;; # server-based drivers: artisan fails loudly on its own
+    *)
+        [ -f "$B2B_ROOT/database/database.sqlite" ] || die "database/database.sqlite missing — run: ./run setup / falta la BD — ejecuta: ./run setup"
+        ;;
+esac
 
 # --- TASK-016: realtime feed server (background child) ----------------------------
 WS_PORT="${B2B_REALTIME_PORT:-8081}"
@@ -92,7 +100,7 @@ start_realtime() {
 
 URL="http://${HOST}:${PORT}"
 printf '%b\n' ""
-printf '%b\n' "${C_BOLD}Presence Platform / Plataforma de Presencia${C_RESET}  ${C_DIM}$(php_version_string "$PHP_BIN") · ${PHP_BIN_SOURCE}${C_RESET}"
+printf '%b\n' "${C_BOLD}Pulse${C_RESET}  ${C_DIM}$(php_version_string "$PHP_BIN") · ${PHP_BIN_SOURCE}${C_RESET}"
 printf '%b\n' "  ${C_GREEN}➜${C_RESET} App:    ${URL}"
 printf '%b\n' "  ${C_GREEN}➜${C_RESET} Health: ${URL}/up   ${C_DIM}(Laravel health route)${C_RESET}"
 printf '%b\n' "  ${C_GREEN}➜${C_RESET} Login:  ${URL}/login ${C_DIM}admin@presence.test · password${C_RESET}"

@@ -200,11 +200,19 @@ class UnpairCardsCommandTest extends TestCase
     #[Test]
     public function a_not_ready_database_fails_fast_with_remediation_instead_of_a_traceback(): void
     {
-        // A sqlite file that exists but was never migrated (setup
+        // A database where the cards table is unreachable (setup
         // interrupted mid-way): the counts run before ANY mutation, so
         // the command must fail fast with the bilingual remediation,
         // not a QueryException traceback.
-        Schema::drop('cards');
+        // MariaDB refuses to DROP a parent table on schema-level FK
+        // grounds even with no rows — the simulation suspends FK checks
+        // portably (PRAGMA on SQLite, SET on MariaDB) for the drop only.
+        Schema::disableForeignKeyConstraints();
+        try {
+            Schema::drop('cards');
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
 
         $this->artisan('cards:unpair', ['--force' => true])
             ->assertExitCode(1)

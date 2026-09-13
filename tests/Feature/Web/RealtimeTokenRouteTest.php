@@ -31,13 +31,18 @@ class RealtimeTokenRouteTest extends TestCase
     #[Test]
     public function admins_receive_a_verifiable_token_and_the_ws_url(): void
     {
-        $response = $this->actingAs(User::where('role', 'admin')->firstOrFail())
+        $admin = User::where('role', 'admin')->firstOrFail();
+        $response = $this->actingAs($admin)
             ->getJson('/realtime/token');
 
         $response->assertOk()
             ->assertJsonStructure(['token', 'expires_at', 'url']);
 
-        $this->assertSame(1, RealtimeToken::verify($response->json('token')));
+        // The token must carry THIS admin's id — never a positional id
+        // (InnoDB auto-increment survives rolled-back tests, so the
+        // seeded admin is not id 1 on MariaDB; RUN-033's named-fixture
+        // rule).
+        $this->assertSame($admin->id, RealtimeToken::verify($response->json('token')));
         $this->assertGreaterThan(time(), $response->json('expires_at'));
         $this->assertStringStartsWith('ws://', $response->json('url'));
         $this->assertStringContainsString(':'.(string) config('realtime.port'), $response->json('url'));

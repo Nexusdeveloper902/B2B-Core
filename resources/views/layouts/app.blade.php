@@ -4,8 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- Pulse identity (productization pass): app_name, real brand mark,
+         favicon/PWA icon set, social metadata. The description line is
+         the footer_note copy — one source of truth for the one-liner. --}}
     <title>@yield('title', __('app.app_name')) — {{ __('app.app_name') }}</title>
-    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <meta name="description" content="{{ __('app.footer_note') }}">
+    <meta name="theme-color" content="#E8EDDF">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('brand/favicon-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('brand/favicon-16.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('brand/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ __('app.app_name') }}">
+    <meta property="og:title" content="@yield('title', __('app.app_name'))">
+    <meta property="og:description" content="{{ __('app.footer_note') }}">
+    <meta property="og:image" content="{{ asset('brand/og-image.png') }}">
+    <meta name="twitter:card" content="summary_large_image">
     {{-- Versioned asset URLs (filemtime): browsers heuristically cache
          unversioned CSS/JS for days — without this, a stylesheet pass
          like TASK-032 is invisible until a force-refresh. Each file
@@ -24,6 +39,10 @@
         } catch (e) { /* no motion flags without JS APIs */ }
     </script>
     <script type="module" src="{{ asset('js/motion.js') }}?v={{ @filemtime(public_path('js/motion.js')) }}"></script>
+    {{-- Global toast feedback — loaded before the desk scripts so
+         window.PulseToast exists everywhere. --}}
+    <script src="{{ asset('js/toast.js') }}?v={{ @filemtime(public_path('js/toast.js')) }}"></script>
+    <script>window.PulseToastLabels = @json(['dismiss' => __('app.toast_dismiss'), 'region' => __('app.toast_notifications')]);</script>
 </head>
 <body>
 <a class="skip" href="#main">{{ __('app.skip_to_content') }}</a>
@@ -35,8 +54,10 @@
     <div class="shell topbar-in">
         <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}"
            aria-label="{{ __('app.app_name') }}">
-            <span class="wordmark-tap" aria-hidden="true"></span>
-            <span class="wordmark-name">Presence<em>Platform</em></span>
+            {{-- The real Pulse mark (brand suite, knockout on transparent) —
+                 replaces the placeholder "P" tile. --}}
+            <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
+            <span class="wordmark-name">{{ __('app.app_name') }}</span>
         </a>
 
         @auth
@@ -172,8 +193,8 @@
         <div class="footer-in">
             <div class="footer-brand">
                 <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : route('dashboard')) : route('login') }}">
-                    <span class="wordmark-tap" aria-hidden="true"></span>
-                    <span class="wordmark-name">Presence<em>Platform</em></span>
+                    <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
+                    <span class="wordmark-name">{{ __('app.app_name') }}</span>
                 </a>
                 <p class="footer-note">{{ __('app.footer_note') }}</p>
             </div>
@@ -195,7 +216,7 @@
             </span>
         </div>
         <div class="footer-legal">
-            <p>Presence Platform — Core · EN/ES</p>
+            <p>{{ __('app.app_name') }} — Core · EN/ES</p>
             <p>01 // CORE RUNTIME</p>
         </div>
     </div>

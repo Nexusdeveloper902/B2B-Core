@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Presence Platform — realtime feed client (TASK-016, ADR-026).
+   Pulse — realtime feed client (TASK-016, ADR-026).
    TASK-017 — Calm Ledger row shape: initial avatars, event chips and
    "just now → N min ago" relative time for live arrivals (history rows
    keep their absolute time — only the arrival moment is knowable

@@ -85,20 +85,31 @@ fi
 DB_FILE="$B2B_ROOT/database/database.sqlite"
 DB_CONN="$(env_value DB_CONNECTION)"
 if [ -z "$DB_CONN" ]; then DB_CONN="sqlite"; fi
-if [ "$DB_CONN" != "sqlite" ]; then
-    warn "DB_CONNECTION=${DB_CONN} — only sqlite is auto-managed; run migrations manually"
-    warn "DB_CONNECTION=${DB_CONN} — solo sqlite se gestiona automáticamente; corre las migraciones a mano"
-else
-    if [ "$FRESH" -eq 1 ] && [ -f "$DB_FILE" ]; then
-        rm -f "$DB_FILE"
-        log "Removed existing database (--fresh) / Base de datos eliminada (--fresh)"
-    fi
-    if [ ! -f "$DB_FILE" ]; then
-        mkdir -p "$B2B_ROOT/database"
-        touch "$DB_FILE"
-        log "Created database/database.sqlite / Base de datos creada"
-    fi
-fi
+case "$DB_CONN" in
+    sqlite)
+        if [ "$FRESH" -eq 1 ] && [ -f "$DB_FILE" ]; then
+            rm -f "$DB_FILE"
+            log "Removed existing database (--fresh) / Base de datos eliminada (--fresh)"
+        fi
+        if [ ! -f "$DB_FILE" ]; then
+            mkdir -p "$B2B_ROOT/database"
+            touch "$DB_FILE"
+            log "Created database/database.sqlite / Base de datos creada"
+        fi
+        ;;
+    mariadb)
+        # ADR-049 — MariaDB is auto-managed too: verify the server is
+        # reachable BEFORE the migration step so a bad .env or a down
+        # service fails with remediation, not a PDO traceback.
+        mariadb_probe || { mariadb_remediation; exit 1; }
+        ok "MariaDB reachable (${MARIADB_TARGET}) / MariaDB accesible (${MARIADB_TARGET})"
+        [ "$FRESH" -eq 1 ] && log "--fresh: the migrate step below runs migrate:fresh — use ./run reset for the guarded path"
+        ;;
+    *)
+        warn "DB_CONNECTION=${DB_CONN} — only sqlite and mariadb are auto-managed; run migrations manually"
+        warn "DB_CONNECTION=${DB_CONN} — solo sqlite y mariadb se gestionan automáticamente; corre las migraciones a mano"
+        ;;
+esac
 
 # --- 5. Migrations + demo data ----------------------------------------------------------
 log "Running migrations / Ejecutando migraciones"

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Presence Platform — Core dashboards
+   Pulse — Core dashboards
    Component layer, design system "Datum" (TASK-026, ADR-036).
    Mockup-faithful: light sage ground, sharp 2px corners on chips and 8px
    on cards, black+gold accents, Epilogue/Manrope/Space Grotesk/Plex Mono,
@@ -43,6 +43,10 @@ h1, h2, h3, h4 {
     color: var(--text);
     margin: 0;
     font-weight: var(--fw-headline-sm);
+    /* Headings own a real line box: without this they inherit the
+       body's 24px, so a 40px lede title's ascenders overflow into the
+       kicker above (the "crammed headline" audit finding). */
+    line-height: 1.2;
 }
 
 p { margin: 0 0 var(--sp-sm); }
@@ -197,7 +201,7 @@ img { max-width: 100%; }
     background: color-mix(in srgb, var(--surface) 90%, transparent);
     -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
-    box-shadow: 0 1px 8px rgba(24, 29, 21, 0.04);
+    box-shadow: 0 1px 8px rgba(36, 36, 35, 0.04);
     border-bottom: 1px solid var(--surface-container-high);
 }
 
@@ -217,20 +221,14 @@ img { max-width: 100%; }
     flex-shrink: 0;
 }
 
-.wordmark-tap {
-    width: 30px;
+/* The real Pulse mark (brand suite knockout) in the topbar, footer
+   and login band. Height-locked; width follows the asset ratio. */
+.wordmark-mark {
     height: 30px;
-    border-radius: var(--radius-md);
-    background: var(--primary);
-    color: var(--tertiary-fixed);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font: 700 15px/1 var(--font-label);
-    letter-spacing: 0;
-    position: relative;
+    width: auto;
+    display: inline-block;
+    flex-shrink: 0;
 }
-.wordmark-tap::after { content: "P"; }
 .wordmark-name {
     font-family: var(--font-display);
     font-weight: 600;
@@ -239,7 +237,6 @@ img { max-width: 100%; }
     color: var(--primary);
     white-space: nowrap;
 }
-.wordmark-name em { font-style: normal; color: var(--tertiary-fixed-dim); }
 .wordmark:hover .wordmark-name { color: var(--primary); }
 
 .topnav {
@@ -306,6 +303,9 @@ img { max-width: 100%; }
     line-height: 1.2;
     max-width: 220px;
     overflow: hidden;
+    /* Long names (and long ES labels sharing the bar) truncate instead
+       of wrapping the topbar into two ragged lines. */
+    white-space: nowrap;
 }
 .topbar-user .topbar-user-name::before {
     content: attr(data-greeting);
@@ -349,6 +349,10 @@ img { max-width: 100%; }
     letter-spacing: var(--ls-label-sm);
     text-transform: uppercase;
     text-decoration: none;
+    /* One line, always — "CERRAR SESIÓN" wrapping to two lines made the
+       whole topbar read broken under ES. */
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .logout-btn:hover { color: var(--primary); }
 
@@ -687,6 +691,19 @@ img { max-width: 100%; }
 .stat-strip .stat:first-child .stat-label { color: var(--primary-fixed); }
 .stat-strip .stat:first-child .kpi-icon { color: var(--tertiary-fixed); }
 .stat-strip .stat:first-child .stat-value { color: var(--tertiary-fixed); font-size: 44px; }
+/* Optional footer action inside a KPI card (student hub: balance →
+   rewards). Gold on the ink hero, muted elsewhere; sits after the
+   value with one step of air. */
+.stat-footer {
+    margin-top: var(--sp-2xs);
+    font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label);
+    letter-spacing: var(--ls-label-sm);
+    text-transform: uppercase;
+}
+.stat-footer a { color: var(--text-muted); text-decoration: none; }
+.stat-footer a:hover { color: var(--primary); text-decoration: underline; }
+.stat-strip .stat:first-child .stat-footer a { color: var(--tertiary-fixed); }
+.stat-strip .stat:first-child .stat-footer a:hover { color: var(--on-primary); text-decoration: underline; }
 
 /* ---------- Section grids ---------- */
 .grid-2 {
@@ -1003,13 +1020,15 @@ select::-ms-expand { display: none; }
 .field-hint { font-size: var(--fs-body-sm); color: var(--text-muted); }
 .field-error { color: var(--on-error-container); font-size: var(--fs-body-sm); background: var(--error-container); padding: 4px 8px; border-radius: var(--radius-sm); margin: 0; }
 
-.tool-form { display: flex; flex-wrap: wrap; gap: var(--sp-2xs); align-items: center; margin-bottom: var(--sp-sm); }
+/* Controls breathe: 8px between siblings (4px read as "crammed" —
+   controls nearly touching). Rows stack at the same step. */
+.tool-form { display: flex; flex-wrap: wrap; gap: var(--sp-xs); align-items: center; margin-bottom: var(--sp-sm); }
 .tool-form .bare-input { flex: 1 1 220px; }
 
 /* TASK-029 — the import desk's file input was the last bare form
    control: same surface language as .bare-input (frame, radius, field
    font), with a label-style selector button. */
-.file-row { display: flex; flex-wrap: wrap; gap: var(--sp-2xs); align-items: center; }
+.file-row { display: flex; flex-wrap: wrap; gap: var(--sp-xs); align-items: center; }
 .file-row input[type="file"] {
     flex: 1 1 240px;
     /* File inputs carry a large intrinsic min-width ("No file chosen…");
@@ -1091,7 +1110,7 @@ select::-ms-expand { display: none; }
     align-items: center;
     justify-content: center;
     padding: var(--sp-md);
-    background: rgba(18, 21, 15, 0.55);
+    background: rgba(36, 36, 35, 0.55);
 }
 .modal-card {
     width: 100%;
@@ -1116,10 +1135,12 @@ select::-ms-expand { display: none; }
 .modal-actions { display: flex; gap: var(--sp-2xs); justify-content: flex-end; flex-wrap: wrap; }
 .btn-danger { background: var(--error); color: var(--on-error); }
 .btn-danger:hover { background: var(--on-error-container); }
-/* Cramped action cells (readers desk): two small buttons share one
-   narrow td — flex + gap keeps them side by side with air, wrapping
-   with rhythm instead of touching when the cell runs out. */
-.row-actions { display: flex; gap: var(--sp-2xs); flex-wrap: wrap; align-items: center; }
+/* Cramped action cells (readers desk): the cell is narrow by design,
+   so the two small buttons stack as full-width, single-line rows with
+   one step of air — "ROTAR CLAVE" wrapping to two lines inside a
+   70px column was the crammed look. */
+.row-actions { display: flex; flex-direction: column; gap: var(--sp-2xs); align-items: stretch; }
+.row-actions .btn-small { white-space: nowrap; width: 100%; }
 /* Editable ledger cells (readers desk): the label input flexes with
    its column instead of forcing its intrinsic width on the table —
    that forced width is what pushed the actions out of the panel. */
@@ -1335,7 +1356,7 @@ select::-ms-expand { display: none; }
     background: var(--surface-container-high);
     padding: var(--sp-sm) var(--sp-lg);
 }
-.auth-band .wordmark-tap { width: 26px; height: 26px; font-size: 13px; }
+.auth-band .wordmark-mark { height: 26px; width: auto; }
 .auth-band-title { margin: 0; font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label); letter-spacing: var(--ls-label-sm); text-transform: uppercase; color: var(--on-surface-variant); }
 .auth-band-sub { margin: 0; font-size: 12px; color: var(--text-muted); }
 .auth-card .auth-body { padding: var(--sp-xl); }
@@ -1567,6 +1588,7 @@ select::-ms-expand { display: none; }
 .reward-afford .afford-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: currentColor; margin-right: 6px; display: inline-block; }
 .reward-note {
     text-align: center;
+    margin-top: var(--sp-sm); /* one step below the goal meter, not against it */
     padding: 9px var(--sp-sm);
     border-radius: var(--radius-sm);
     background: var(--surface-container);
@@ -1856,3 +1878,82 @@ select::-ms-expand { display: none; }
     color: var(--tertiary-fixed);
 }
 .pagination li.disabled span { opacity: 0.4; }
+
+/* ---------- Toasts (productization pass — the one feedback system) ----------
+   window.PulseToast (public/js/toast.js) acknowledges meaningful actions:
+   success / error / warning / info, stacked bottom-right (mobile:
+   full-width bottom), auto-dismiss with per-type durations, manual
+   dismiss, pause-on-hover, aria-live (polite, assertive for errors).
+   Inline result boxes (.nl-answer) keep the DETAILS — the toast is the
+   acknowledgment, the box is the documentation. */
+.toast-region {
+    position: fixed;
+    right: var(--sp-md);
+    bottom: var(--sp-md);
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-xs);
+    width: min(360px, calc(100vw - 2 * var(--sp-md)));
+    pointer-events: none;
+}
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-xs);
+    padding: var(--sp-sm) var(--sp-sm) var(--sp-sm) var(--sp-md);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface-container-lowest);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+}
+.toast-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.toast-body { flex: 1 1 auto; min-width: 0; }
+.toast-message { margin: 0; font: 600 var(--fs-body-sm)/var(--lh-body-sm) var(--font-body); color: var(--text); }
+.toast-description { margin: 2px 0 0; font: 400 var(--fs-body-sm)/var(--lh-body-sm) var(--font-body); color: var(--text-muted); white-space: pre-line; }
+.toast-dismiss {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: -3px -3px 0 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-meta);
+    cursor: pointer;
+}
+.toast-dismiss:hover { color: var(--text); background: var(--surface-container); }
+.toast-dismiss .material-symbols-outlined { font-size: 18px; }
+
+/* Type tones — the same semantic families as the notices/answers:
+   gold = ok (the brand's positive accent), red = error, amber-red
+   blend = warning, neutral = info. */
+.toast-success { border-color: var(--tertiary-fixed-dim); }
+.toast-success .toast-icon { color: var(--on-tertiary-fixed-variant); }
+.toast-error { border-color: color-mix(in srgb, var(--error) 35%, white); }
+.toast-error .toast-icon { color: var(--error); }
+.toast-warning { border-color: var(--tertiary-fixed-dim); background: color-mix(in srgb, var(--tertiary-fixed) 18%, var(--surface-container-lowest)); }
+.toast-warning .toast-icon { color: var(--on-tertiary-fixed-variant); }
+.toast-info .toast-icon { color: var(--secondary); }
+
+/* Entrance/exit — disabled under reduced motion (toast.js removes
+   directly instead of animating). */
+@media (prefers-reduced-motion: no-preference) {
+    .toast { animation: toast-in 180ms ease-out; }
+    .toast.is-leaving { transition: opacity 180ms ease-in, transform 180ms ease-in; opacity: 0; transform: translateY(6px); }
+    @keyframes toast-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+}
+
+/* Mobile: full-width strip docked to the bottom edge. */
+@media (max-width: 640px) {
+    .toast-region { right: 0; bottom: 0; left: 0; width: auto; gap: 0; }
+    .toast { border-radius: var(--radius) var(--radius) 0 0; border-left: none; border-right: none; border-bottom: none; }
+}

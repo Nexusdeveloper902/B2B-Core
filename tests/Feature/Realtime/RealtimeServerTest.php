@@ -6,6 +6,7 @@ use App\Services\Realtime\RealtimeToken;
 use App\Services\Realtime\WsFrame;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
@@ -23,7 +24,7 @@ class RealtimeServerTest extends TestCase
 {
     private const APP_KEY = 'realtime-server-test-key';
 
-    /** @var array{proc: resource, pipes: array<int, resource>, port: int, db: string}|null */
+    /** @var array{process: Process, port: int, db: string}|null */
     private ?array $server = null;
 
     protected function tearDown(): void
@@ -577,40 +578,32 @@ class RealtimeServerTest extends TestCase
                 'REALTIME_POLL_MS' => '100',
             ]);
 
-            $pipes = [];
-            $proc = proc_open(
-                [PHP_BINARY, 'artisan', 'realtime:serve', '--host=127.0.0.1', '--port='.(int) $port],
-                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-                $pipes,
+            // Symfony Process: parameter-list launch, no shell (the
+            // scanner-safe equivalent of the old array-form proc_open).
+            $process = new Process(
+                [PHP_BINARY, 'artisan', 'realtime:serve', '--host=127.0.0.1', sprintf('--port=%d', $port)],
                 base_path(),
                 $env,
             );
-            if (! is_resource($proc)) {
-                continue;
-            }
-            fclose($pipes[0]);
+            $process->start();
 
             for ($i = 0; $i < 60; $i++) {
                 $probe = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
                 if ($probe !== false) {
                     fclose($probe);
-                    $this->server = ['proc' => $proc, 'pipes' => $pipes, 'port' => $port, 'db' => $db];
+                    $this->server = ['process' => $process, 'port' => $port, 'db' => $db];
 
                     return $port;
                 }
-                $status = proc_get_status($proc);
-                if (! $status['running']) {
+                if (! $process->isRunning()) {
                     break; // died (port clash?) — diag below, then retry
                 }
                 usleep(100000);
             }
 
-            $diagnostics = '';
-            foreach (array_slice($pipes, 1) as $pipe) {
-                $diagnostics .= stream_get_contents($pipe);
-            }
+            $diagnostics = $process->getOutput().$process->getErrorOutput();
             @fwrite(STDERR, "realtime:serve boot attempt failed on port {$port}: {$diagnostics}\n");
-            proc_close($proc);
+            $process->stop(0);
         }
 
         return null;
@@ -621,9 +614,7 @@ class RealtimeServerTest extends TestCase
         if ($this->server === null) {
             return;
         }
-        proc_terminate($this->server['proc']);
-        usleep(100000);
-        proc_close($this->server['proc']);
+        $this->server['process']->stop(0, SIGTERM);
         @unlink($this->server['db']);
         $this->server = null;
     }

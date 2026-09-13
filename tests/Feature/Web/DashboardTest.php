@@ -73,6 +73,33 @@ class DashboardTest extends TestCase
     }
 
     #[Test]
+    public function the_teacher_dashboard_sorts_classes_descending_with_sort_and_search_controls(): void
+    {
+        // Default order: grade 11 → 1 (numeric, so "11°" beats "2°"),
+        // A before B — pinned over the full 22-class demo roster.
+        // The filterbar also carries a class search + a reverse-sort
+        // toggle (client-side: panels reorder, no round-trip).
+        $response = $this->actingAs($this->user('admin'))->get('/teacher');
+
+        $response->assertOk()
+            ->assertSee('id="class-search"', false)
+            ->assertSee('id="class-sort-toggle"', false)
+            ->assertSee('aria-pressed="false"', false)
+            ->assertSee('data-class-card', false);
+
+        $html = $response->getContent();
+
+        foreach (['11° A', '11° B', '10° A', '2° A', '1° A'] as $name) {
+            $this->assertStringContainsString("<h2>{$name}</h2>", $html);
+        }
+        $at = fn ($name) => strpos($html, "<h2>{$name}</h2>");
+        $this->assertLessThan($at('11° B'), $at('11° A'));
+        $this->assertLessThan($at('10° A'), $at('11° B'));
+        $this->assertLessThan($at('2° A'), $at('10° A'));
+        $this->assertLessThan($at('1° A'), $at('2° A'));
+    }
+
+    #[Test]
     public function the_admin_dashboard_shows_school_wide_stats_without_reader_controls(): void
     {
         // TASK-035 — the readers table left this page (the
@@ -401,11 +428,15 @@ class DashboardTest extends TestCase
         ] as $role) {
             $this->assertStringContainsString($role, $tokens, "tokens.css must define the semantic role {$role}");
         }
-        // literal value spot-checks (the mockups' exact hexes)
-        $this->assertMatchesRegularExpression('/--surface:\s*#f6fbed;/', $tokens);
-        $this->assertMatchesRegularExpression('/--primary:\s*#0e0f0e;/', $tokens);
-        $this->assertMatchesRegularExpression('/--tertiary-fixed:\s*#ffdf93;/', $tokens);
+        // literal value spot-checks (the Pulse brand anchors, ADR-047:
+        // #E8EDDF cream ground · #242423 ink action · #F5CB5C gold accent;
+        // error red stays independent of the brand set)
+        $this->assertMatchesRegularExpression('/--surface:\s*#e8eddf;/', $tokens);
+        $this->assertMatchesRegularExpression('/--primary:\s*#242423;/', $tokens);
+        $this->assertMatchesRegularExpression('/--tertiary-fixed:\s*#f5cb5c;/', $tokens);
         $this->assertMatchesRegularExpression('/--error:\s*#ba1a1a;/', $tokens);
+        $this->assertMatchesRegularExpression('/--surface-variant:\s*#cfdbd5;/', $tokens);
+        $this->assertMatchesRegularExpression('/--primary-container:\s*#333533;/', $tokens);
         // the mockup type scale ships verbatim
         $this->assertMatchesRegularExpression('/--fs-display:\s*56px;/', $tokens);
         $this->assertMatchesRegularExpression('/--fs-label-sm:\s*10px;/', $tokens);

@@ -1,15 +1,18 @@
 /* ==========================================================================
-   Presence Platform — Core dashboards
-   Design system "Datum" (TASK-026, ADR-036) — the owner-supplied mockup
-   set (8 HTML pages) is the design source of truth. Palette: a light
-   sage-ground Material-3 tonal set. Geometry: sharp 2px-radius
-   "architectural" corners. Accents: near-black primary, gold
-   tertiary-fixed (points/eco), error red.
+   Pulse — Core dashboards
+   Design system "Datum" (TASK-026, ADR-036) — component geometry, type
+   scale, spacing and motion survive; the PALETTE is now anchored to the
+   five established Pulse brand values (productization pass, ADR-047):
+   #CFDBD5 sage · #E8EDDF cream · #F5CB5C gold · #242423 ink ·
+   #333533 graphite. The mark's gold-on-ink chip language is the action
+   grammar; tonal container steps are derived around the brand anchors.
+   Semantic states (error red) stay independent so status never
+   collapses into decoration.
 
-   Supersedes the "Signal" value-match contract (ADR-013/ADR-028) for
-   Core only: the marketplace and Core no longer share literal token
-   values — they share a family of components instead. Local-first is
-   unchanged: every font below is self-hosted (see fonts.css).
+   Supersedes the ADR-036 "mockup hexes verbatim" palette source (the
+   mockup M3 set was already sage-toned; the brand anchors are the
+   owner-supplied Pulse values). Local-first is unchanged: every font
+   below is self-hosted (see fonts.css).
 
    Type: Epilogue (display/headline) · Manrope (body) · Space Grotesk
    (labels/data chips) · IBM Plex Mono (mono — value-match for the
@@ -27,30 +30,31 @@
    ========================================================================== */
 
 :root {
-    /* ---- palette (mockup Material-3 tonal, verbatim) ---- */
-    --background:                  #f6fbed;
-    --on-background:               #181d15;
+    /* ---- palette (Pulse brand anchors + derived tonal steps) ---- */
+    --background:                  #e8eddf;   /* brand cream */
+    --on-background:               #242423;   /* brand ink */
 
-    --surface:                     #f6fbed;
-    --surface-bright:              #f6fbed;
-    --surface-dim:                 #d7dcce;
+    --surface:                     #e8eddf;
+    --surface-bright:              #f4f6ec;
+    --surface-dim:                 #cfd8c8;
     --surface-container-lowest:    #ffffff;
-    --surface-container-low:       #f1f5e7;
-    --surface-container:           #ebf0e2;
-    --surface-container-high:      #e5eadc;
-    --surface-container-highest:   #dfe4d7;
-    --surface-variant:             #dfe4d7;
-    --on-surface:                  #181d15;
-    --on-surface-variant:          #454743;
+    --surface-container-low:       #f1f4e7;
+    --surface-container:           #eaeee0;
+    --surface-container-high:      #dfe4d2;
+    --surface-container-highest:   #cfd8c9;
+    --surface-variant:             #cfdbd5;   /* brand sage */
+    --on-surface:                  #242423;
+    --on-surface-variant:          #4a4c47;
 
-    --primary:                     #0e0f0e;
-    --on-primary:                  #ffffff;
-    --primary-container:           #242423;
-    --on-primary-container:        #8c8b89;
+    --primary:                     #242423;   /* brand ink = action color */
+    --on-primary:                  #f5cb5c;   /* brand gold — the mark's chip language */
+    --primary-container:           #333533;   /* brand graphite */
+    --on-primary-container:        #a5a39c;
     --primary-fixed:               #e5e2e0;
     --primary-fixed-dim:           #c8c6c4;
     --on-primary-fixed:            #1b1c1b;
     --on-primary-fixed-variant:    #474745;
+    --surface-tint:                #333533;   /* hover step for ink surfaces */
 
     --secondary:                   #5d5f5c;
     --on-secondary:                #ffffff;
@@ -61,25 +65,25 @@
     --on-secondary-fixed:          #1a1c1a;
     --on-secondary-fixed-variant:  #454745;
 
-    --tertiary:                    #150d00;
-    --on-tertiary:                 #ffffff;
-    --tertiary-container:          #2f2200;
-    --on-tertiary-container:       #aa861b;
-    --tertiary-fixed:              #ffdf93;
-    --tertiary-fixed-dim:          #ebc254;
-    --on-tertiary-fixed:           #241a00;
-    --on-tertiary-fixed-variant:   #594400;
+    --tertiary:                    #242423;
+    --on-tertiary:                 #f5cb5c;
+    --tertiary-container:          #33290b;
+    --on-tertiary-container:       #dfba50;
+    --tertiary-fixed:              #f5cb5c;   /* brand gold (points/eco accent) */
+    --tertiary-fixed-dim:          #e0b544;
+    --on-tertiary-fixed:           #242423;
+    --on-tertiary-fixed-variant:   #5c4d1a;
 
     --error:                       #ba1a1a;
     --on-error:                    #ffffff;
     --error-container:             #ffdad6;
     --on-error-container:          #93000a;
 
-    --outline:                     #767873;
-    --outline-variant:             #c6c7c1;
+    --outline:                     #6f736a;
+    --outline-variant:             #c3c9ba;
 
-    --inverse-surface:             #2d3229;
-    --inverse-on-surface:          #eef3e5;
+    --inverse-surface:             #333533;
+    --inverse-on-surface:          #e8eddf;
     --inverse-primary:             #c8c6c4;
 
     /* ---- semantic shortcuts (kept short for component authors) ---- */
@@ -138,10 +142,10 @@
     --radius-sm:   2px;   /* chips/buttons (rounded-DEFAULT) */
     --radius-pill: 999px; /* dots, pills */
 
-    /* ---- elevation (light theme: whisper-subtle) ---- */
-    --shadow-sm: 0 1px 2px rgba(24, 29, 21, 0.05), 0 1px 8px rgba(24, 29, 21, 0.04);
-    --shadow-md: 0 2px 6px rgba(24, 29, 21, 0.07), 0 8px 24px rgba(24, 29, 21, 0.06);
-    --shadow-xl: 0 4px 12px rgba(24, 29, 21, 0.10), 0 16px 40px rgba(24, 29, 21, 0.10);
+    /* ---- elevation (light theme: whisper-subtle, ink-shadowed) ---- */
+    --shadow-sm: 0 1px 2px rgba(36, 36, 35, 0.05), 0 1px 8px rgba(36, 36, 35, 0.04);
+    --shadow-md: 0 2px 6px rgba(36, 36, 35, 0.07), 0 8px 24px rgba(36, 36, 35, 0.06);
+    --shadow-xl: 0 4px 12px rgba(36, 36, 35, 0.10), 0 16px 40px rgba(36, 36, 35, 0.10);
 
     /* ---- frame ---- */
     --shell: 1360px;   /* mockup grid width */

@@ -1,4 +1,4 @@
-# Plataforma de Presencia — Plataforma Central (Backend + Paneles)
+# Pulse — Plataforma Central (Backend + Paneles)
 
 > **Léelo en:** [English](README.md)
 >

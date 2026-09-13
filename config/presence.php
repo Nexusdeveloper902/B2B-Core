@@ -4,7 +4,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Presence Platform
+    | Pulse (presence-event core)
     |--------------------------------------------------------------------------
     |
     | Core configuration for the presence-event model: a single tap becomes a

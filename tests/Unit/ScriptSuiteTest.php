@@ -172,7 +172,10 @@ class ScriptSuiteTest extends TestCase
     #[Test]
     public function required_module_list_covers_the_ci_extension_list(): void
     {
-        $modules = $this->requiredModulesFromCommonSh();
+        $modules = array_merge(
+            $this->requiredModulesFromCommonSh(),
+            $this->runtimeExtraModulesFromCommonSh(),
+        );
         $this->assertNotEmpty($modules, 'could not parse PHP_REQUIRED_MODULES from scripts/_lib/common.sh');
 
         // Every extension CI explicitly installs must be in the single
@@ -462,6 +465,28 @@ class ScriptSuiteTest extends TestCase
     {
         $content = (string) file_get_contents(base_path('scripts/_lib/common.sh'));
         preg_match('/PHP_REQUIRED_MODULES=\(([^)]+)\)/', $content, $match);
+        if (! isset($match[1])) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map('trim', preg_split('/\s+/', $match[1])),
+            fn ($module) => $module !== ''
+        ));
+    }
+
+    /**
+     * The runtime-extra tier (ADR-049): modules the PRODUCT database
+     * driver needs at runtime but the hermetic sqlite test path does
+     * not — enforced by doctor only when DB_CONNECTION=mariadb, never
+     * part of interpreter candidate filtering.
+     *
+     * @return array<int, string>
+     */
+    private function runtimeExtraModulesFromCommonSh(): array
+    {
+        $content = (string) file_get_contents(base_path('scripts/_lib/common.sh'));
+        preg_match('/PHP_RUNTIME_EXTRA_MODULES=\(([^)]+)\)/', $content, $match);
         if (! isset($match[1])) {
             return [];
         }

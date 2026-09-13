@@ -1,5 +1,5 @@
 """
-Reference local model-inference server for the Presence Platform.
+Reference local model-inference server for Pulse.
 
 Implements the exact HTTP contract the `local` classifier driver expects
 (see docs/LOCAL_MODEL.md):
@@ -25,7 +25,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 
 MATERIALS = ["plastic", "paper", "metal", "glass", "other"]
 
-app = FastAPI(title="Presence Platform — Local Material Classifier (reference)")
+app = FastAPI(title="Pulse — Local Material Classifier (reference)")
 
 
 @app.post("/v1/models/material:predict")

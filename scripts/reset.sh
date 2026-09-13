@@ -7,7 +7,8 @@
 #         ./run reset --force    # no prompt (CI / scripting)
 #         ./run reset --pilot    # rich 10-day pilot dataset instead of the small fixture
 #
-# Wipes the DEV database only (database/database.sqlite). The real-HTTP e2e
+# Wipes the DEV database only (database/database.sqlite, or the MariaDB
+# database configured in .env — migrate:fresh). The real-HTTP e2e
 # suite uses its own throwaway DB and is never affected. DemoSeeder is
 # idempotent, so this lands you in the exact post-setup state with fresh
 # credentials printed bilingually. --pilot seeds PilotSeeder instead: three
@@ -31,24 +32,39 @@ for arg in "$@"; do
 done
 
 DB_FILE="$B2B_ROOT/database/database.sqlite"
-if [ "$(env_value DB_CONNECTION)" != "sqlite" ] && [ -n "$(env_value DB_CONNECTION)" ]; then
-    die "DB_CONNECTION is not sqlite — reset only manages the dev sqlite DB (use artisan manually)
-DB_CONNECTION no es sqlite — reset solo gestiona la BD sqlite de desarrollo (usa artisan a mano)"
-fi
+DB_CONN="$(env_value DB_CONNECTION)"
+if [ -z "$DB_CONN" ]; then DB_CONN="sqlite"; fi
+case "$DB_CONN" in
+    sqlite|mariadb) : ;; # ADR-049 — both are auto-managed dev databases
+    *)
+        die "DB_CONNECTION=${DB_CONN} — reset only manages sqlite/mariadb dev DBs (use artisan manually)
+DB_CONNECTION=${DB_CONN} — reset solo gestiona BD de desarrollo sqlite/mariadb (usa artisan a mano)"
+        ;;
+esac
 
 if [ "$FORCE" -eq 0 ]; then
-    printf '%b\n' "${C_BOLD}${C_YELLOW}This DELETES all data in database/database.sqlite and reseeds demo data.${C_RESET}"
-    printf '%b\n' "${C_BOLD}${C_YELLOW}Esto BORRA todos los datos de database/database.sqlite y resembra datos demo.${C_RESET}"
+    if [ "$DB_CONN" = "mariadb" ]; then
+        printf '%b\n' "${C_BOLD}${C_YELLOW}This DELETES all data in the MariaDB dev database (migrate:fresh) and reseeds demo data.${C_RESET}"
+        printf '%b\n' "${C_BOLD}${C_YELLOW}Esto BORRA todos los datos de la BD MariaDB de desarrollo (migrate:fresh) y resembra datos demo.${C_RESET}"
+    else
+        printf '%b\n' "${C_BOLD}${C_YELLOW}This DELETES all data in database/database.sqlite and reseeds demo data.${C_RESET}"
+        printf '%b\n' "${C_BOLD}${C_YELLOW}Esto BORRA todos los datos de database/database.sqlite y resembra datos demo.${C_RESET}"
+    fi
     confirm "Proceed? / ¿Continuar?" || die "Aborted / Cancelado"
 fi
 
 resolve_php
 [ -d "$B2B_ROOT/vendor" ] || die "vendor/ missing — run: ./run setup / falta vendor/ — ejecuta: ./run setup"
 ensure_env_and_key
+if [ "$DB_CONN" = "mariadb" ]; then
+    mariadb_probe || { mariadb_remediation; exit 1; }
+fi
 
 log "Fresh migration + seed / Migración fresca + siembra"
-rm -f "$DB_FILE" "$DB_FILE-journal" "$DB_FILE-wal" "$DB_FILE-shm"
-touch "$DB_FILE"
+if [ "$DB_CONN" = "sqlite" ]; then
+    rm -f "$DB_FILE" "$DB_FILE-journal" "$DB_FILE-wal" "$DB_FILE-shm"
+    touch "$DB_FILE"
+fi
 if [ "$PILOT" -eq 1 ]; then
     "$PHP_BIN" artisan migrate:fresh --seed --seeder=PilotSeeder --force
 else

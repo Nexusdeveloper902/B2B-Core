@@ -16,7 +16,7 @@
 <div class="auth-wrap">
     <section class="panel auth-card">
         <div class="auth-band">
-            <span class="wordmark-tap" aria-hidden="true"></span>
+            <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
             <div>
                 <p class="auth-band-title">{{ __('app.app_name') }}</p>
                 <p class="auth-band-sub">{{ __('app.login_band_sub') }}</p>
@@ -28,12 +28,12 @@
             <h1>{{ __('app.login_title') }}</h1>
             <p class="panel-sub">{{ __('app.login_subtitle') }}</p>
 
-            <form method="POST" action="{{ route('login') }}">
+            <form method="POST" action="{{ route('login') }}" autocomplete="off">
                 @csrf
 
                 <x-field :label="__('app.email')" for="email">
                     <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus
-                           autocomplete="email" placeholder="admin@presence.test"
+                           autocomplete="off" placeholder="admin@presence.test"
                            @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
                     @error('email')
                         <p class="field-error" id="email-error">{{ $message }}</p>
@@ -42,7 +42,7 @@
 
                 <x-field :label="__('app.password')" for="password">
                     <div class="pw-wrap">
-                        <input id="password" type="password" name="password" required autocomplete="current-password"
+                        <input id="password" type="password" name="password" required autocomplete="off"
                                placeholder="••••••••"
                                @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
                         <button type="button" class="pw-toggle" id="pw-toggle" data-show="{{ __('app.show') }}"

@@ -9,6 +9,7 @@
     strip (gaps #T1-T3 in docs/FRONTEND.md).
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.teacher_dashboard'))
 
@@ -55,6 +56,15 @@
         <input type="search" id="student-search" aria-label="{{ __('app.search_students') }}"
                placeholder="{{ __('app.search_students') }}" autocomplete="off">
     </div>
+    <div class="searchbox">
+        <span class="material-symbols-outlined is-18" aria-hidden="true">search</span>
+        <input type="search" id="class-search" aria-label="{{ __('app.search_classes') }}"
+               placeholder="{{ __('app.search_classes') }}" autocomplete="off">
+    </div>
+    <button type="button" id="class-sort-toggle" class="btn btn-quiet btn-small" aria-pressed="false"
+            data-label-desc="{{ __('app.sort_classes_desc') }}" data-label-asc="{{ __('app.sort_classes_asc') }}">
+        <span data-sort-label>{{ __('app.sort_classes_desc') }}</span>
+    </button>
     <span class="t-label-sm muted t-uppercase">{{ __('app.today_attendance') }}</span>
 </div>
 
@@ -65,7 +75,7 @@
 @if(isset($nlQueryConfigured) && $nlQueryConfigured)
     <x-panel :label="__('app.nl_query')" rule>
         <p class="panel-sub">{{ __('app.nl_query_teacher_hint') }}</p>
-        <form id="nl-query-form" class="tool-form">
+        <form id="nl-query-form" class="tool-form" autocomplete="off">
             <input type="text" class="bare-input" id="nl-question"
                    placeholder="{{ __('app.nl_query_placeholder') }}" autocomplete="off"
                    aria-label="{{ __('app.nl_query') }}">
@@ -88,7 +98,7 @@
             @foreach($rows as $row)
                 @php($counts[$row['status']] = ($counts[$row['status']] ?? 0) + 1)
             @endforeach
-            <x-panel :label="__('app.class')" rule>
+            <x-panel :label="__('app.class')" rule data-class-card data-class-name="{{ mb_strtolower($class->name) }}">
                 <h2>{{ $class->name }}</h2>
                 @if($class->teacher)
                     <p class="panel-sub">{{ $class->teacher->name }}</p>
@@ -137,6 +147,7 @@
             </x-panel>
         @endforeach
     @endif
+    <p id="class-no-match" class="muted hidden">{{ __('app.no_classes_match') }}</p>
 </div>
 
 <script src="{{ asset('js/realtime.js') }}"></script>
@@ -201,6 +212,7 @@
                     box.classList.remove('hidden');
                     box.className = 'nl-answer answer-error';
                     box.textContent = '{{ __('app.error_generic') }}';
+                    if (window.PulseToast) { PulseToast.error({!! Js::from(__('app.toast_network_error')) !!}); }
                 });
             });
         }
@@ -222,6 +234,34 @@
         var labelPresent = stack.dataset.labelPresent || 'Present';
         var labelLate = stack.dataset.labelLate || 'Late';
         var labelAbsent = stack.dataset.labelAbsent || 'Absent';
+
+        // Class search filters panels by name; the sort toggle reverses
+        // panel order (default 11 → 1, toggled 1 → 11). Client-side only.
+        var classSearch = document.getElementById('class-search');
+        var sortBtn = document.getElementById('class-sort-toggle');
+        var noMatch = document.getElementById('class-no-match');
+        function applyClassFilter() {
+            var q = classSearch ? classSearch.value.trim().toLowerCase() : '';
+            var visible = 0;
+            stack.querySelectorAll('[data-class-card]').forEach(function (panel) {
+                var hide = q !== '' && (panel.dataset.className || '').indexOf(q) === -1;
+                panel.hidden = hide;
+                if (!hide) { visible++; }
+            });
+            if (noMatch) { noMatch.classList.toggle('hidden', visible !== 0); }
+        }
+        if (classSearch) { classSearch.addEventListener('input', applyClassFilter); }
+        if (sortBtn) {
+            sortBtn.addEventListener('click', function () {
+                var reversed = sortBtn.getAttribute('aria-pressed') === 'true';
+                Array.prototype.slice.call(stack.querySelectorAll('[data-class-card]')).reverse().forEach(function (panel) {
+                    stack.insertBefore(panel, noMatch);
+                });
+                sortBtn.setAttribute('aria-pressed', String(!reversed));
+                var label = sortBtn.querySelector('[data-sort-label]');
+                if (label) { label.textContent = reversed ? sortBtn.dataset.labelDesc : sortBtn.dataset.labelAsc; }
+            });
+        }
 
         function bumpStat(name, delta) {
             var stat = document.querySelector('[data-stat="' + name + '"]');
@@ -247,8 +287,28 @@
             });
         }
 
+        // Toast on taps (spec §23) — external events deserve the
+        // acknowledgment layer. Hidden tabs stay silent; a 2 s
+        // per-student cooldown collapses reader retry bursts. Only
+        // CLASS_ATTENDANCE toasts here: the teacher desk's live panel
+        // + row flips carry the rest, and every-tap-every-type would
+        // spam a page the teacher watches all day.
+        var TAP_LABEL = {!! Js::from(__('app.event_type_CLASS_ATTENDANCE')) !!};
+        var lastTapToastKey = '';
+        var lastTapToastAt = 0;
+        function toastTap(ev) {
+            if (document.hidden || !window.PulseToast) { return; }
+            var key = String(ev.student_id || '');
+            var now = Date.now();
+            if (lastTapToastKey === key && now - lastTapToastAt < 2000) { return; }
+            lastTapToastKey = key;
+            lastTapToastAt = now;
+            PulseToast.info(((ev.student_name || '') + ' — ' + TAP_LABEL).trim());
+        }
+
         document.addEventListener('realtime:tap', function (e) {
             var ev = e.detail || {};
+            toastTap(ev);
             if (ev.type !== 'CLASS_ATTENDANCE') return;
 
             var row = document.querySelector('tr[data-student-row="' + ev.student_id + '"]');

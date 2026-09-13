@@ -31,7 +31,7 @@
 <section class="grid-2" data-reveal>
     {{-- Create a reader (the key comes back exactly once). --}}
     <x-panel :label="__('app.create_reader')" rule>
-        <form id="reader-create-form" class="tool-form">
+        <form id="reader-create-form" class="tool-form" autocomplete="off">
             <input type="text" class="bare-input" id="reader-name-new" autocomplete="off" maxlength="255"
                    placeholder="{{ __('app.reader_name') }}" required minlength="3"
                    aria-label="{{ __('app.reader_name') }}">
@@ -67,7 +67,7 @@
                         <td data-label="{{ __('app.reader_name') }}">
                             <input type="text" class="bare-input reader-label"
                                    value="{{ $reader->label }}" data-original="{{ $reader->label }}"
-                                   aria-label="{{ __('app.reader_name') }}"
+                                   aria-label="{{ __('app.reader_name') }}" autocomplete="off"
                                    id="label-{{ $reader->id }}" maxlength="255">
                         </td>
                         <td data-label="{{ __('app.reader_type') }}"><code>{{ __('app.reader_type_'.$reader->type->value) }}</code></td>
@@ -134,6 +134,12 @@
         // quotes would break the script. JSON-encoded vars only.
         var READER_UPDATED_MSG = {!! Js::from(__('app.reader_updated')) !!};
         var ERROR_GENERIC_MSG = {!! Js::from(__('app.error_generic')) !!};
+        // Toast acknowledgments (details stay in the result boxes).
+        var TOAST_READER_CREATED = {!! Js::from(__('app.toast_reader_created')) !!};
+        var TOAST_READER_SAVED = {!! Js::from(__('app.toast_reader_saved')) !!};
+        var TOAST_READER_SAVE_FAILED = {!! Js::from(__('app.toast_reader_save_failed')) !!};
+        var TOAST_KEY_ROTATED = {!! Js::from(__('app.toast_key_rotated')) !!};
+        var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
 
         function busy(btn, on) {
             btn.disabled = on;
@@ -193,6 +199,7 @@
             var input = document.createElement('input');
             input.type = 'text';
             input.className = 'bare-input reader-label';
+            input.autocomplete = 'off';
             input.value = r.label || '';
             input.dataset.original = r.label || '';
             input.id = 'label-' + r.id;
@@ -301,10 +308,14 @@
                             r.ok);
                         if (r.ok) {
                             document.getElementById('label-' + id).dataset.original = label;
+                            if (window.PulseToast) { PulseToast.success(TOAST_READER_SAVED); }
+                        } else if (window.PulseToast) {
+                            PulseToast.error(TOAST_READER_SAVE_FAILED, (r.data && r.data.message) || '');
                         }
                     }).catch(function () {
                         busy(saveBtn, false);
                         show(resultBox, ERROR_GENERIC_MSG, false);
+                        if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
                     });
                 return;
             }
@@ -327,9 +338,15 @@
                                     text += '\n' + r.data.api_key_notice + '\n' + r.data.api_key;
                                 }
                                 show(resultBox, text, r.ok);
+                                if (r.ok) {
+                                    if (window.PulseToast) { PulseToast.success(TOAST_KEY_ROTATED); }
+                                } else if (window.PulseToast) {
+                                    PulseToast.error(ERROR_GENERIC_MSG, (r.data && r.data.message) || '');
+                                }
                             }).catch(function () {
                                 busy(rotateBtn, false);
                                 show(resultBox, ERROR_GENERIC_MSG, false);
+                                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
                             });
                     }
                 });
@@ -358,10 +375,14 @@
                 if (r.ok) {
                     if (r.data && r.data.reader) { applyReader(r.data.reader); }
                     createForm.reset();
+                    if (window.PulseToast) { PulseToast.success(TOAST_READER_CREATED); }
+                } else if (window.PulseToast) {
+                    PulseToast.error(ERROR_GENERIC_MSG, (r.data && r.data.message) || '');
                 }
             }).catch(function () {
                 busy(btn, false);
                 show(box, ERROR_GENERIC_MSG, false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
             });
         });
     })();

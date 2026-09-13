@@ -1,5 +1,5 @@
 /**
- * Presence Platform — Core dashboards
+ * Pulse — Core dashboards
  * Motion layer (TASK-019, 2026-09-06; UI-pass revision 2026-09-09).
  * anime.js v4.5.0, self-hosted ESM — the same vendored file and reveal
  * architecture the marketplace storefront uses (design system "Signal",

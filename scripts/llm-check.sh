@@ -47,7 +47,7 @@ fi
 [ -n "$MODEL" ] || MODEL="$DEFAULT_MODEL"
 [ -n "$VISION_MODEL" ] || VISION_MODEL="$DEFAULT_VISION_MODEL"
 
-printf '%b\n' "${C_BOLD}Presence Platform — DeepSeek llm-check${C_RESET}"
+printf '%b\n' "${C_BOLD}Pulse — DeepSeek llm-check${C_RESET}"
 
 # --- 1. configuration state ------------------------------------------------
 if [ -z "$KEY" ]; then

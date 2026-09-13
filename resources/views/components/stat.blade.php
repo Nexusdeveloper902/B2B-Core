@@ -6,4 +6,10 @@
         {{ $label }}
     </span>
     <span class="stat-value">{{ $slot }}</span>
+    {{-- Optional footer action (RUN-037 spacing pass: the student
+         hub's REWARDS link lived here instead of dangling alone below
+         the grid). --}}
+    @isset($footer)
+        <span class="stat-footer">{{ $footer }}</span>
+    @endisset
 </div>

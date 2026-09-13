@@ -65,7 +65,9 @@ en cualquier momento, ver ADR-011):
 3. Crea `.env` desde `.env.example` **solo si no existe** — tus ediciones
    nunca se sobrescriben.
 4. Genera `APP_KEY` solo si está vacía.
-5. Crea `database/database.sqlite` cuando la conexión es sqlite.
+5. Crea `database/database.sqlite` cuando la conexión es sqlite; si es
+   `mariadb`, verifica primero que el servidor sea accesible (falla con
+   remediación bilingüe en vez de un trace PDO — ver [DATABASE.es.md](DATABASE.es.md)).
 6. `php artisan migrate --force` + `php artisan db:seed --force` (se omite con
    `--ci`; el seeder es idempotente con firstOrCreate y **re-imprime todas las
    credenciales demo bilingüe** en cada ejecución).
@@ -163,10 +165,11 @@ app (`/up`) y del servidor de modelo. Informativo — siempre sale `0`.
 ./run reset --pilot        # dataset piloto rico de 10 días (demo humana)
 ```
 
-Borra **solo la BD sqlite de desarrollo** y la reconstruye con datos demo
-frescos (`migrate:fresh --seed`), reimprimiendo todas las credenciales. La BD
-desechable del e2e no se afecta. Se niega a operar si `DB_CONNECTION` no es
-sqlite.
+Borra **solo la BD de desarrollo** — `database/database.sqlite`, o la base
+MariaDB de `.env` (`migrate:fresh` en el servidor) — y la reconstruye con
+datos demo frescos (`migrate:fresh --seed`), reimprimiendo todas las
+credenciales. La BD desechable del e2e no se afecta. Se niega a operar si
+`DB_CONNECTION` no es sqlite ni mariadb.
 
 `--pilot` siembra `PilotSeeder` en vez del pequeño fixture `DemoSeeder`:
 tres cursos, 24 estudiantes con accesos y tarjetas, cinco lectores y diez
@@ -409,7 +412,8 @@ el mismo patrón de demostración que `arch-smoke` y `hermetic-smoke`.
 | `run.cmd` dice "Git Bash not found" | Git for Windows sin instalar / fuera de PATH | instala <https://git-scm.com/download/win>, terminal nueva, reintenta |
 | `vendor/ missing — run ./run setup` | dependencias sin instalar | `./run setup` |
 | `APP_KEY: EMPTY` | .env creado pero clave sin generar | `./run setup` (solo rellena vacíos) |
-| `database/database.sqlite missing` | no hay archivo de BD | `./run setup` |
+| `database/database.sqlite missing` | no hay archivo de BD (conexión sqlite) | `./run setup` |
+| `MariaDB unreachable at …` (setup/serve/reset/doctor/status) | servidor caído o credenciales `.env` incorrectas | arranca el servidor, corrige `DB_*` en `.env`, asegúrate de que la base y el usuario existan — ver [DATABASE.es.md](DATABASE.es.md) |
 | Composer "not usable" en doctor | no hay PHP por el cual correr el phar | arregla primero el PHP (ver arriba) |
 | `Model server failed to become healthy` | puerto ocupado / venv roto | `tail storage/logs/model-server.log`, `./run model stop` y luego `start` |
 | El servidor corre pero las páginas fallan | estado de setup parcial | `./run doctor` y luego `./run setup` |

@@ -61,14 +61,24 @@ check() { # check <description> <haystack> <needle>
 }
 
 # ---------------------------------------------------------------------------
-say "== E2E — Presence Platform / Plataforma de Presencia (real HTTP) =="
+say "== E2E — Pulse (real HTTP) =="
 say "== Preparando entorno / Preparing environment (throwaway DB) =="
 rm -f "$E2E_DB"; touch "$E2E_DB"
 
 export DB_DATABASE="$E2E_DB"
+# Hermetic driver: the e2e is a THROWAWAY-SQLITE contract suite. With the
+# app's .env now allowed to be mariadb (ADR-049), an unpinned
+# DB_CONNECTION would point "database/e2e.sqlite" at a MariaDB server and
+# explode. Pin the whole storage triple, not just the file.
+export DB_CONNECTION="sqlite"
 # Deterministic blocked-state for Phase E: run the e2e server WITHOUT a
 # DeepSeek key regardless of what the developer's .env contains.
 export DEEPSEEK_API_KEY=""
+# Hermetic classify phase for the same reason: a developer .env pointing
+# RECYCLING_CLASSIFIER_DRIVER at deepseek/local (no local model up) made
+# the "classify awards points" check depend on live credentials. The e2e
+# is a contract suite — the stub driver is its deterministic classifier.
+export RECYCLING_CLASSIFIER_DRIVER="stub"
 "$PHP_BIN" artisan migrate --seed --force >/dev/null
 
 # Extract demo credentials from the throwaway DB (seed printed them too).

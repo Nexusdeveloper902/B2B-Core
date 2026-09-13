@@ -233,6 +233,17 @@
         };
         var rejectionNote = stateBox.dataset.rejectionNote || null;
 
+        // Toast acknowledgments — the desk's status box keeps the detail;
+        // the toast is the one-glance acknowledgment. lastRejectionUid
+        // keeps a re-applied poll/WS payload from re-toasting an old
+        // rejection (applyStatus is idempotent; toasts must be too).
+        var TOAST_ARMED = {!! Js::from(__('app.toast_pairing_armed')) !!};
+        var TOAST_PAIRED = {!! Js::from(__('app.toast_card_paired')) !!};
+        var TOAST_REJECTED = {!! Js::from(__('app.toast_pairing_rejected')) !!};
+        var TOAST_UNPAIRED = {!! Js::from(__('app.toast_card_unpaired')) !!};
+        var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
+        var lastRejectionUid = (stateBox.dataset.rejectionUid || null);
+
         var ARMED_TPL = {!! Js::from(__('app.pairing_armed_for', ['name' => ':NAME:']) . ' — ' . __('app.pairing_seconds_left', ['s' => ':S:']) . ' ' . __('app.pairing_go_tap')) !!};
         var EXPIRED_TEXT = {!! Js::from(__('app.pairing_expired')) !!};
         var SUCCESS_TPL = {!! Js::from(__('app.pairing_success', ['uid' => ':UID:', 'name' => ':NAME:'])) !!};
@@ -383,12 +394,23 @@
         function applyStatus(data) {
             var pending = data.pending;
             if (pending && pending.seconds_left > 0) {
-                if (!armed) { setState(armedLine(), true); showCountdown(true); }  // armed elsewhere (other tab/phone)
+                if (!armed) {
+                    setState(armedLine(), true); showCountdown(true);  // armed elsewhere (other tab/phone)
+                    if (window.PulseToast) { PulseToast.info(TOAST_ARMED); }
+                }
                 armed = true;
                 secondsLeft = pending.seconds_left;
                 renderCountdown();
                 stateBox.dataset.studentName = pending.student_name || '';
                 rejectionNote = noteFromFeed(pending.last_rejection);
+                // A NEW rejection (uid we have not acknowledged yet) earns a
+                // warning toast; the same rejection re-sent by every poll
+                // during the window must stay silent.
+                if (pending.last_rejection && pending.last_rejection.card_uid &&
+                    pending.last_rejection.card_uid !== lastRejectionUid) {
+                    lastRejectionUid = pending.last_rejection.card_uid;
+                    if (window.PulseToast) { PulseToast.warning(TOAST_REJECTED); }
+                }
                 if (rejectionNote) { setState(armedLine(), true); }
                 setPollInterval(ACTIVE_MS);
                 return;
@@ -400,6 +422,7 @@
                 setState(SUCCESS_TPL
                     .replace(':UID:', last.card_uid)
                     .replace(':NAME:', last.student_name || ''), true);
+                if (window.PulseToast) { PulseToast.success(TOAST_PAIRED); }
                 renderRecent(data.recent_pairings);
                 renderStudentCard(last);
                 armed = false;
@@ -457,14 +480,17 @@
                             setState(armedLine(), true);
                             showCountdown(true);
                             setPollInterval(ACTIVE_MS);
+                            if (window.PulseToast) { PulseToast.info(TOAST_ARMED); }
                             poll();
                         } else {
                             setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
+                            if (window.PulseToast) { PulseToast.error((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}); }
                         }
                     })
                     .catch(function () {
                         armBtns.forEach(function (b) { b.disabled = false; b.classList.remove('is-loading'); });
                         setState({!! Js::from(__('app.error_generic')) !!}, false);
+                        if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
                     });
             });
         });
@@ -511,13 +537,16 @@
                             cell.textContent = NO_CARD_TEXT;
                         }
                         setState(UNPAIRED_TEXT, true);
+                        if (window.PulseToast) { PulseToast.success(TOAST_UNPAIRED); }
                     } else {
                         setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
+                        if (window.PulseToast) { PulseToast.error((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}); }
                     }
                 })
                 .catch(function () {
                     btn.disabled = false;
                     setState({!! Js::from(__('app.error_generic')) !!}, false);
+                    if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
                 });
         }
 

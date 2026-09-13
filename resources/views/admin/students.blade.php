@@ -29,7 +29,7 @@
 <section class="grid-2 grid-2-wide-left" data-reveal>
     {{-- Create + class + import --}}
     <x-panel :label="__('app.create_student')" rule>
-        <form id="student-create-form" class="tool-form">
+        <form id="student-create-form" class="tool-form" autocomplete="off">
             <input type="text" class="bare-input" id="student-name" autocomplete="off"
                    placeholder="{{ __('app.student_name') }}" required
                    aria-label="{{ __('app.student_name') }}">
@@ -59,7 +59,7 @@
 
         {{-- TASK-029 — class creation (the roster workflow's missing first
               step; the class select above was read-only before). --}}
-        <form id="class-create-form" class="tool-form">
+        <form id="class-create-form" class="tool-form" autocomplete="off">
             <input type="text" class="bare-input" id="class-name" autocomplete="off" maxlength="255"
                    placeholder="{{ __('app.class_name') }}" required
                    aria-label="{{ __('app.class_name') }}">
@@ -75,7 +75,7 @@
 
         <hr class="rule">
 
-        <form id="student-import-form">
+        <form id="student-import-form" autocomplete="off">
             <p class="panel-sub">{{ __('app.import_students') }} — {{ __('app.import_students_hint') }}</p>
             <div class="file-row">
                 <input type="file" id="student-import-file" accept=".csv,text/csv,text/plain"
@@ -90,7 +90,7 @@
     <x-panel :label="__('app.students')" rule>
         {{-- TASK-034 — the search filters live (debounced fetch-swap
               below); the GET form stays as the no-JS fallback. --}}
-        <form method="GET" action="{{ route('admin.students') }}" class="tool-form" id="roster-search-form">
+        <form method="GET" action="{{ route('admin.students') }}" class="tool-form" id="roster-search-form" autocomplete="off">
             <input type="search" class="bare-input" id="roster-search" name="q" value="{{ $search }}"
                    placeholder="{{ __('app.search_students') }}" aria-label="{{ __('app.search_students') }}" autocomplete="off">
             <button type="submit" class="btn btn-quiet">{{ __('app.search') }}</button>
@@ -171,6 +171,18 @@
         var NO_ACCOUNT = {!! Js::from(__('app.no_account')) !!};
         var PROVISION_ACCOUNT = {!! Js::from(__('app.provision_account')) !!};
         var ACCOUNT_LABEL = {!! Js::from(__('app.account')) !!};
+
+        // Toast acknowledgments (details stay in the inline result boxes).
+        var TOAST_STUDENT_CREATED = {!! Js::from(__('app.toast_student_created')) !!};
+        var TOAST_STUDENT_CREATE_FAILED = {!! Js::from(__('app.toast_student_create_failed')) !!};
+        var TOAST_CLASS_CREATED = {!! Js::from(__('app.toast_class_created')) !!};
+        var TOAST_CLASS_CREATE_FAILED = {!! Js::from(__('app.toast_class_create_failed')) !!};
+        var TOAST_ACCOUNT = {!! Js::from(__('app.toast_account_provisioned')) !!};
+        var TOAST_IMPORT_OK = {!! Js::from(__('app.toast_import_completed')) !!};
+        var TOAST_IMPORT_PARTIAL = {!! Js::from(__('app.toast_import_partial')) !!};
+        var TOAST_IMPORT_FAILED = {!! Js::from(__('app.toast_import_failed')) !!};
+        var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
+        var ERROR_GENERIC = {!! Js::from(__('app.error_generic')) !!};
 
         function busy(btn, on) {
             btn.disabled = on;
@@ -392,8 +404,14 @@
                     if (r.data && r.data.student) { applyStudent(r.data.student); }
                     createForm.reset();
                     syncClassesToGrade();
+                    if (window.PulseToast) { PulseToast.success(TOAST_STUDENT_CREATED); }
+                } else if (window.PulseToast) {
+                    PulseToast.error(TOAST_STUDENT_CREATE_FAILED, (r.data && r.data.message) || '');
                 }
-            }).catch(function () { busy(btn, false); });
+            }).catch(function () {
+                busy(btn, false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
+            });
         });
 
         // TASK-034 — live roster search: debounced fetch against the
@@ -415,6 +433,9 @@
             if (body && live) { live.innerHTML = body.innerHTML; }
             var pages = doc.getElementById('roster-pages');
             if (pages && rosterPages) { rosterPages.innerHTML = pages.innerHTML; }
+            // A successful server round-trip ends any client-side
+            // fallback state (pagination hidden by applyClientFilter).
+            if (rosterPages) { rosterPages.hidden = false; }
         }
         function fetchRoster(url, q) {
             fetch(url, {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
@@ -424,7 +445,27 @@
                     paintRoster(html);
                     history.replaceState(null, '', url);
                 })
-                .catch(function () { /* keep the rendered rows on failure */ });
+                .catch(function () {
+                    // Server unreachable (bench restarts, LAN hiccup): the
+                    // box must NEVER feel dead — degrade to client-side
+                    // filtering of the rows we already hold. The visible
+                    // page is one server page, so pagination hides while
+                    // a client filter is active (the counts belong to the
+                    // server's page set, not this fallback).
+                    applyClientFilter(q);
+                });
+        }
+        function applyClientFilter(q) {
+            var nq = q.trim().toLowerCase();
+            var visible = 0;
+            document.querySelectorAll('#roster-body tr[data-student-row]').forEach(function (row) {
+                var hide = nq !== '' && (row.dataset.search || '').indexOf(nq) === -1;
+                row.hidden = hide;
+                if (!hide) { visible++; }
+            });
+            if (rosterPages) { rosterPages.hidden = nq !== ''; }
+            var empty = document.getElementById('roster-empty');
+            if (empty) { empty.hidden = visible > 0 || nq === ''; }
         }
         if (rosterForm && rosterInput) {
             rosterInput.addEventListener('input', function () {
@@ -463,14 +504,22 @@
                     busy(btn, false);
                     var text = (r.data && r.data.message) || '{{ __('app.error_generic') }}';
                     show(box, text, r.ok);
-                    if (r.ok && r.data && r.data.account) {
-                        var row = btn.closest('tr[data-student-row]');
-                        if (row) {
-                            var cell = row.querySelector('[data-account-cell]');
-                            if (cell) { renderAccountCell(cell, {account_email: r.data.account.email}); }
+                    if (r.ok) {
+                        if (window.PulseToast) { PulseToast.success(TOAST_ACCOUNT); }
+                        if (r.data && r.data.account) {
+                            var row = btn.closest('tr[data-student-row]');
+                            if (row) {
+                                var cell = row.querySelector('[data-account-cell]');
+                                if (cell) { renderAccountCell(cell, {account_email: r.data.account.email}); }
+                            }
                         }
+                    } else if (window.PulseToast) {
+                        PulseToast.error(ERROR_GENERIC, (r.data && r.data.message) || '');
                     }
-                }).catch(function () { busy(btn, false); });
+                }).catch(function () {
+                    busy(btn, false);
+                    if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
+                });
         });
 
         // TASK-029 — create a class (name + optional homeroom teacher).
@@ -490,8 +539,14 @@
                 if (r.ok) {
                     if (r.data && r.data.class) { ensureClassOption(r.data.class); }
                     classForm.reset();
+                    if (window.PulseToast) { PulseToast.success(TOAST_CLASS_CREATED); }
+                } else if (window.PulseToast) {
+                    PulseToast.error(TOAST_CLASS_CREATE_FAILED, (r.data && r.data.message) || '');
                 }
-            }).catch(function () { busy(btn, false); });
+            }).catch(function () {
+                busy(btn, false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
+            });
         });
 
         // CSV bulk import (multipart — no Content-Type header, the browser
@@ -526,6 +581,15 @@
                 } else {
                     show(box, (r.data && r.data.message) || '{{ __('app.error_generic') }}', r.ok);
                 }
+                if (window.PulseToast) {
+                    if (!r.ok) {
+                        PulseToast.error(TOAST_IMPORT_FAILED, (r.data && r.data.message) || '');
+                    } else if (r.data && r.data.errors && r.data.errors.length) {
+                        PulseToast.warning(TOAST_IMPORT_PARTIAL);
+                    } else {
+                        PulseToast.success(TOAST_IMPORT_OK);
+                    }
+                }
                 if (r.ok && r.data && r.data.students && r.data.students.forEach) {
                     // Live roster, fetch-first (the WS frame replays no-op).
                     r.data.students.forEach(function (entry) {
@@ -539,7 +603,10 @@
                         });
                     });
                 }
-            }).catch(function () { busy(btn, false); });
+            }).catch(function () {
+                busy(btn, false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
+            });
         });
     })();
 </script>

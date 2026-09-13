@@ -1,4 +1,4 @@
-# Presence Platform — API Reference (English)
+# Pulse — API Reference (English)
 
 > Also available in: [Español](API.es.md) · Collection: [Postman](postman_collection.json)
 

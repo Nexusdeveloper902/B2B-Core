@@ -20,8 +20,11 @@ class DocumentationTest extends TestCase
         $en = file_get_contents(base_path('README.md'));
         $es = file_get_contents(base_path('README.es.md'));
 
-        $this->assertStringContainsString('# Presence Platform', $en);
-        $this->assertStringContainsString('Plataforma de Presencia', $es);
+        $this->assertStringContainsString('# Pulse', $en);
+        $this->assertStringContainsString('# Pulse', $es);
+        // The product name is Pulse everywhere; the legacy name must not
+        // return to the current-facing readmes (productization pass).
+        $this->assertStringNotContainsString('Presence Platform', $en);
         $this->assertStringContainsString('php artisan migrate', $en);
         $this->assertStringContainsString('php artisan migrate', $es);
     }

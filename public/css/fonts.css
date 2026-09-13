@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Presence Platform — Core dashboards
+   Pulse — Core dashboards
    Font stack (TASK-026, ADR-036) — 100% self-hosted, zero external
    requests at runtime. Google-hosted originals were downloaded ONCE at
    redesign time and subsetted to latin + latin-ext (ES accents live in

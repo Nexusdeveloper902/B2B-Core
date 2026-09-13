@@ -24,9 +24,12 @@ class TeacherDashboardController extends Controller
 
         // Teachers see their own assigned classes; an admin landing on
         // /teacher sees every class (school-wide overview).
-        $classes = $user->isTeacher()
-            ? $user->classes()->with('teacher')->orderBy('name')->get()
-            : SchoolClass::with('teacher')->orderBy('name')->get();
+        // Sorted grade DESC (11 → 1, numeric — plain name sort puts
+        // "10°" before "2°"), variant ASC (A before B).
+        $classes = ($user->isTeacher()
+            ? $user->classes()->with('teacher')->get()
+            : SchoolClass::with('teacher')->get())
+            ->sortBy(fn ($c) => [-(int) $c->name, $c->name])->values();
 
         $attendanceByClass = $classes->mapWithKeys(function ($class) {
             return [$class->id => $this->attendance->classAttendanceToday($class->id)];

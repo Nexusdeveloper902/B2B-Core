@@ -8,7 +8,7 @@
 
 return [
     // Common / nav
-    'app_name' => 'Presence Platform',
+    'app_name' => 'Pulse',
     'dashboard' => 'Dashboard',
     'teacher_dashboard' => 'Teacher Dashboard',
     'admin_dashboard' => 'Admin Dashboard',
@@ -31,7 +31,7 @@ return [
     'follow_us' => 'Follow the project',
 
     // Login
-    'login_title' => 'Sign in to the Presence Platform',
+    'login_title' => 'Sign in to Pulse',
     'login_subtitle' => 'Sign in with your school account.',
     'login_band_sub' => 'Attendance, meals and rewards — one school day at a time',
     'login_hint' => 'Demo users (from the seeder): admin@presence.test / teacher@presence.test — password "password".',
@@ -155,6 +155,35 @@ return [
     'saving' => 'Saving…',
     'error_generic' => 'Something went wrong, please retry.',
 
+    // Toasts (productization pass — one feedback system; views pass
+    // these to window.PulseToast. Details stay in the inline boxes.)
+    'toast_dismiss' => 'Dismiss',
+    'toast_notifications' => 'Notifications',
+    'toast_network_error' => 'Network error — the request did not complete.',
+    'toast_student_created' => 'Student created.',
+    'toast_student_create_failed' => 'Unable to create the student.',
+    'toast_class_created' => 'Class created.',
+    'toast_class_create_failed' => 'Unable to create the class.',
+    'toast_account_provisioned' => 'Login created.',
+    'toast_import_completed' => 'CSV import completed.',
+    'toast_import_failed' => 'Import failed.',
+    'toast_import_partial' => 'Some rows could not be imported.',
+    'toast_reader_created' => 'Reader registered.',
+    'toast_reader_saved' => 'Reader updated.',
+    'toast_reader_save_failed' => 'Unable to update the reader.',
+    'toast_key_rotated' => 'API key rotated.',
+    'toast_mode_updated' => 'Reader mode updated.',
+    'toast_mode_failed' => 'Unable to update the reader mode.',
+    'toast_pairing_armed' => 'Pairing armed — tap a fresh card.',
+    'toast_card_paired' => 'Card paired.',
+    'toast_pairing_rejected' => 'Card rejected — see the pairing desk.',
+    'toast_card_unpaired' => 'Card unpaired.',
+    'toast_redeem_ok' => 'Reward redeemed.',
+    'toast_redeem_failed' => 'Redemption failed.',
+    'toast_query_failed' => 'The query could not be answered.',
+    'toast_points_earned' => '+:points PTS — well recycled!',
+    'toast_deposit_classified' => 'Deposit classified — :material.',
+
     /* TASK-026 — mockup-driven redesign keys */
     'welcome_short' => 'Welcome',
     'yes' => 'Yes',
@@ -162,6 +191,10 @@ return [
     'modal_cancel' => 'Cancel',
     'enrolled' => 'Enrolled',
     'search_students' => 'Search students…',
+    'search_classes' => 'Search classes…',
+    'sort_classes_desc' => '11 → 1',
+    'sort_classes_asc' => '1 → 11',
+    'no_classes_match' => 'No classes match.',
 
     // Shell / standings
     'student_standings' => 'Standings',
@@ -341,6 +374,10 @@ return [
     'error_500_text' => 'An unexpected error occurred. It has been logged — try again in a moment.',
     'error_503_title' => 'Under maintenance',
     'error_503_text' => 'The platform is briefly unavailable for maintenance.',
+    'error_419_title' => 'Session expired',
+    'error_419_text' => 'The page sat idle too long — go back, refresh, and submit again.',
+    'error_429_title' => 'Too many requests',
+    'error_429_text' => 'Slow down for a moment, then try again.',
     'error_back' => 'Back to your dashboard',
     'error_home' => 'Go to sign in',
 ];

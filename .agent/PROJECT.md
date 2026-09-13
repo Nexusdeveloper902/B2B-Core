@@ -1022,3 +1022,137 @@ The owner's eight HTML mockups are now the design source of truth:
   removed artifacts, not reader names (feed contexts show them).
 - Suite 445/3, quality PASS. Records: FRONTEND.md + .es.md,
   .agent/TASKS/TASK-035-*, .agent/RUNS/RUN-2026-09-12-core-035.md.
+
+## RUN-036 — Productization pass: Pulse identity, brand palette, toasts (2026-09-12)
+
+- **The product is Pulse** (ADR-047): name in titles/lang/config/
+  READMEs/docs/scripts/Postman + firmware station page; the REAL brand
+  suite (`workspace B2B-Logo-Suite/`) now lives in `public/brand/`
+  (transparent mark, shell mark-96, cream variant for dark, favicon/
+  PWA tile set, lockup, og-image), manifest + og/twitter/theme-color
+  in the head; the 0-byte favicon.ico and placeholder favicon.svg are
+  gone; the `wordmark-tap` placeholder tile is deleted (test-pinned).
+- **Palette anchored** to the five brand values (#CFDBD5 #E8EDDF
+  #F5CB5C #242423 #333533): tokens.css carries them; gold-on-ink is
+  the button/active-nav grammar; error red independent; geometry/
+  type/spacing/motion untouched (ADR-036 keeps those). ADR-036's
+  "mockup hexes verbatim" palette clause is superseded.
+- **One toast system** (ADR-048): window.PulseToast (no deps) + one
+  CSS block; four tones, max-4 stack, per-type durations, pause on
+  hover, aria-live, reduced-motion skip; wired into every desk
+  INCLUDING the previously-silent network catches; inline boxes keep
+  details; ambient realtime never toasts; rejection toasts dedup by
+  UID; 23 bilingual toast_* keys.
+- **419/429** join the branded in-shell error pages. Blade trap found:
+  `@php` BEFORE `@extends` renders the view EMPTY — @extends must come
+  first (404's order was load-bearing).
+- **e2e is hermetic again**: scripts/e2e.sh pins
+  RECYCLING_CLASSIFIER_DRIVER=stub (the local .env's deepseek driver
+  without a key had made the classify check credential-dependent).
+- Marketplace rebranded in step (header/footer real mark + cream
+  variant, manifest/favicon/OG, lang EN+ES, READMEs, APP_NAME) — its
+  suite 20/20; Firmware station page/banners/READMEs/HARDWARE_SETUP
+  rebranded, internal `Presence` namespace kept by decision.
+- Deliberately NOT renamed: `@presence.test` demo domain, Presence*
+  internal identifiers, historical records (append-only).
+- Gates: suite 453/3-skip · quality PASS · e2e 33/33 · browser-proven
+  (login/dashboard/toasts EN+ES/mobile/404/marketplace, assets 200).
+  Uncommitted; push + CI observation pending owner PAT.
+
+## RUN-037 — Spacing audit: crammed spots fixed (2026-09-12)
+
+- Owner: "spacing still inconsistent, stuff should not be crammed."
+  Browser + computed-style audit across every page (desktop + mobile)
+  with an automated <7px stacked-sibling-gap detector.
+- Six fixes: (1) h1–h4 line-height 1.2 — headings had inherited the
+  body's 24px line box, so lede titles overflowed into their kickers
+  on EVERY page; (2) ES topbar wraps — logout + user name now
+  single-line (nowrap/truncate); (3) tool-form/file-row gaps 4→8px;
+  (4) readers action cells — full-width single-line stacked buttons
+  ("ROTAR CLAVE" no longer wraps); (5) reward-note one step below the
+  goal meter; (6) the student hub's orphaned REWARDS link moved into
+  the balance hero via a new optional `footer` slot on `x-stat`.
+- Designed tight pairs (lede h1→sub 4px, stat label→value 4px,
+  live-row hairlines, full-bleed ledger tables) verified as intentional
+  and consistent — untouched.
+- Gates: suite 453/3-skip · Pint clean · browser-proven (student hub,
+  rewards, readers, teacher/admin tops, ES topbar, mobile 390px).
+  Uncommitted on top of RUN-036.
+
+## RUN-038 — Storage migrated to MariaDB (2026-09-12)
+
+- Owner: "Migrate to mariadb please." ADR-049 (supersedes ADR-001's
+  storage choice): the product's dev/prod storage is **MariaDB**;
+  SQLite stays the engine of the test suite (:memory:), the hermetic
+  e2e (now pinned `DB_CONNECTION=sqlite`) and fresh clones.
+- Workstation reality: the system MariaDB 12.3 is root-only, so Pulse
+  runs on a user-level systemd instance (`pulse-mariadb.service`,
+  127.0.0.1:33060, linger on, admin `jperez` via socket). Databases
+  `pulse` + `pulse_test`; credentials in `.env` only.
+- The first full-suite run on MariaDB surfaced SIX engine truths (all
+  fixed): the real product bug — `roster_updates.payload` TEXT 64 KB
+  overflow on bulk-import broadcasts (new migration → json/LONGTEXT);
+  four positional-id test fixtures broken by InnoDB's persistent
+  auto-increment (RUN-033's named-fixture rule, now engine-proven);
+  one non-portable `Schema::drop` (now FK-suspends portably).
+- Run suite driver-aware: `mariadb_probe`/`mariadb_remediation` in
+  common.sh (secrets as process env, never argv); setup probes before
+  migrating; serve probes instead of the file check; reset runs the
+  guarded migrate:fresh on MariaDB; status/doctor report live
+  connectivity + pdo_mysql + schema depth. Two-tier PHP module
+  contract (PHP_RUNTIME_EXTRA_MODULES=pdo_mysql) keeps the ScriptSuite
+  drift guard and the hermetic toolchain both honest.
+- CI: new `mariadb` job runs the FULL suite against a MariaDB 12
+  service container — engine drift now fails the build.
+- Gates: MariaDB 453/3 · sqlite 453/3 · quality PASS · e2e 33/33 ·
+  live browser write verified in MariaDB (Bogota wall-clock
+  unchanged, ADR-025). Marketplace untouched (stateless, its ADR-013).
+- Docs: docs/DATABASE.md + .es.md (provisioning + engine contract).
+  Uncommitted; owner may move to the system server (3306) later by
+  provisioning there + changing DB_PORT (documented).
+
+## RUN-039 — Realtime event toasts (2026-09-12, ADR-050)
+
+- Owner (bench-testing the RC522 reader): "The toasts i asked for do
+  not appear." Root cause: ADR-048's "ambient realtime never toasts"
+  clause excluded tap/recycling frames — a mis-reading of spec §23,
+  which EXPLICITLY requires a toast on card taps and on the EcoStation
+  classify flow. A tap is an external event; the acknowledgment layer
+  exists precisely for it.
+- Now: admin dashboard toasts every tap ("student — event label");
+  teacher dashboard toasts class-attendance taps; EcoStation toasts
+  deposit-classified (info) + points-awarded (success) via
+  labels.pointsUnit; student hub toasts its own "+N PTS". Guards:
+  hidden tabs silent, 2 s per-student cooldown, stack cap. WS roster
+  replays still never toast (self-caused, already acknowledged on the
+  fetch path). The PTS unit-honesty pin caught my first draft — fixed
+  through the localized unit.
+- Proven live on the real stack (device endpoint tap → WS → feed row +
+  visible toast; synthetic dispatch through the page handler in the
+  same page-side script). Suite 453/3, quality PASS.
+- Records: ADR-050 (narrows ADR-048), RUN-2026-09-12-core-039 +
+  snapshot. Uncommitted.
+
+## RUN-040 — Marketplace panel/translations + Core search hardening (2026-09-13)
+
+- Owner: (1) translations incomplete in animations + marketplace; (2)
+  landing "Tap/Toque" panel's gate reader flush off the right edge;
+  (3) a search bar needing Enter.
+- (1) Two hardcoded landing strings translated (identify join, stamp
+  recorded — EN/ES keys); toast.js region aria-label localized via
+  PulseToastLabels. Everything else audited clean (realtime.js rides
+  the server-localized boot map; pipeline labels are event identifiers
+  by design).
+- (2) Geometry audit at 6 widths: no viewport overflow anywhere — the
+  reader was PINNED to the panel's right border by space-between (2px),
+  reading as cut off. `.tap-visual` now centers the card+reader pair
+  (bounded gap, 28px insets → reader 80px inside at 1366) and
+  `ledgerLoop.distance()` measures the real offsetLeft gap.
+- (3) All five Core searches verified LIVE by dispatching input events
+  (students/pairing/teacher×2/parent all filter). The "needs Enter"
+  experience = the students desk's silent fetch-failure path during
+  server restarts; it now degrades to client-side filtering of the
+  rendered page (pager hidden during fallback, restored on success).
+- Bonus: marketplace gained a branded localized 404 (had Laravel's
+  bare page). Locale route is /lang/{locale}.
+- Gates: Core 453/3 + quality PASS · Marketplace 20/20. Uncommitted.

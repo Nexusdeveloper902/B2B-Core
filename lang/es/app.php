@@ -8,7 +8,7 @@
 
 return [
     // Común / navegación
-    'app_name' => 'Plataforma de Presencia',
+    'app_name' => 'Pulse',
     'dashboard' => 'Panel',
     'teacher_dashboard' => 'Panel del Profesor',
     'admin_dashboard' => 'Panel del Administrador',
@@ -31,7 +31,7 @@ return [
     'follow_us' => 'Sigue el proyecto',
 
     // Login
-    'login_title' => 'Inicia sesión en la Plataforma de Presencia',
+    'login_title' => 'Inicia sesión en Pulse',
     'login_subtitle' => 'Inicia sesión con tu cuenta escolar.',
     'login_band_sub' => 'Asistencia, comidas y recompensas — un día de escuela a la vez',
     'login_hint' => 'Usuarios demo (del seeder): admin@presence.test / teacher@presence.test — contraseña "password".',
@@ -155,6 +155,36 @@ return [
     'saving' => 'Guardando…',
     'error_generic' => 'Algo salió mal, reintenta.',
 
+    // Toasts (pasada de productización — un solo sistema de feedback;
+    // las vistas pasan estas claves a window.PulseToast. El detalle
+    // queda en los cuadros en línea.)
+    'toast_dismiss' => 'Cerrar',
+    'toast_notifications' => 'Notificaciones',
+    'toast_network_error' => 'Error de red — la solicitud no se completó.',
+    'toast_student_created' => 'Estudiante creado.',
+    'toast_student_create_failed' => 'No se pudo crear el estudiante.',
+    'toast_class_created' => 'Curso creado.',
+    'toast_class_create_failed' => 'No se pudo crear el curso.',
+    'toast_account_provisioned' => 'Acceso creado.',
+    'toast_import_completed' => 'Importación CSV completada.',
+    'toast_import_failed' => 'La importación falló.',
+    'toast_import_partial' => 'Algunas filas no se pudieron importar.',
+    'toast_reader_created' => 'Lector registrado.',
+    'toast_reader_saved' => 'Lector actualizado.',
+    'toast_reader_save_failed' => 'No se pudo actualizar el lector.',
+    'toast_key_rotated' => 'Clave API rotada.',
+    'toast_mode_updated' => 'Modo del lector actualizado.',
+    'toast_mode_failed' => 'No se pudo actualizar el modo del lector.',
+    'toast_pairing_armed' => 'Emparejamiento armado — toca una tarjeta nueva.',
+    'toast_card_paired' => 'Tarjeta emparejada.',
+    'toast_pairing_rejected' => 'Tarjeta rechazada — mira el escritorio de emparejamiento.',
+    'toast_card_unpaired' => 'Tarjeta desvinculada.',
+    'toast_redeem_ok' => 'Recompensa canjeada.',
+    'toast_redeem_failed' => 'El canje falló.',
+    'toast_query_failed' => 'No se pudo responder la consulta.',
+    'toast_points_earned' => '+:points PTS — ¡bien reciclado!',
+    'toast_deposit_classified' => 'Depósito clasificado — :material.',
+
     /* TASK-026 — claves del rediseño según maquetas */
     'welcome_short' => 'Bienvenido',
     'yes' => 'Sí',
@@ -162,6 +192,10 @@ return [
     'modal_cancel' => 'Cancelar',
     'enrolled' => 'Matriculados',
     'search_students' => 'Buscar estudiantes…',
+    'search_classes' => 'Buscar clases…',
+    'sort_classes_desc' => '11 → 1',
+    'sort_classes_asc' => '1 → 11',
+    'no_classes_match' => 'Ningún curso coincide.',
 
     // Shell / clasificación
     'student_standings' => 'Clasificación',
@@ -342,6 +376,10 @@ return [
     'error_500_text' => 'Ocurrió un error inesperado. Quedó registrado — inténtalo de nuevo en un momento.',
     'error_503_title' => 'En mantenimiento',
     'error_503_text' => 'La plataforma no está disponible brevemente por mantenimiento.',
+    'error_419_title' => 'Sesión expirada',
+    'error_419_text' => 'La página estuvo inactiva demasiado tiempo — regresa, recarga y envía de nuevo.',
+    'error_429_title' => 'Demasiadas solicitudes',
+    'error_429_text' => 'Espera un momento e inténtalo de nuevo.',
     'error_back' => 'Volver a tu panel',
     'error_home' => 'Ir a iniciar sesión',
 ];

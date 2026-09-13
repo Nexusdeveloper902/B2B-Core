@@ -13,6 +13,7 @@
     changes happen there, not here.
 --}}
 @extends('layouts.app')
+@use('Illuminate\Support\Js', 'Js')
 
 @section('title', __('app.admin_dashboard'))
 
@@ -68,7 +69,7 @@
             <div class="notice notice-warn" role="alert">{{ __('app.nl_query_not_configured') }}</div>
         @endunless
 
-        <form id="nl-query-form" class="tool-form">
+        <form id="nl-query-form" class="tool-form" autocomplete="off">
             <input type="text" class="bare-input" id="nl-question"
                    placeholder="{{ __('app.nl_query_placeholder') }}" autocomplete="off"
                    aria-label="{{ __('app.nl_query') }}">
@@ -82,7 +83,7 @@
 <section class="grid-2" data-reveal>
     {{-- Redemption desk --}}
     <x-panel :label="__('app.redemption')" rule>
-        <form id="redeem-form" class="tool-form">
+        <form id="redeem-form" class="tool-form" autocomplete="off">
             <select id="redeem-student" class="bare-select" required aria-label="{{ __('app.student') }}">
                 @foreach($students as $student)
                     <option value="{{ $student->id }}">{{ $student->name }}</option>
@@ -162,6 +163,12 @@
             }
         }
 
+        // Toast acknowledgments (inline boxes keep the details).
+        var TOAST_REDEEM_OK = {!! Js::from(__('app.toast_redeem_ok')) !!};
+        var TOAST_REDEEM_FAILED = {!! Js::from(__('app.toast_redeem_failed')) !!};
+        var TOAST_QUERY_FAILED = {!! Js::from(__('app.toast_query_failed')) !!};
+        var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
+
         // NL query box (Phase E). TASK-027 — the pending state says what
         // is happening; the answer renders Markdown.
         var nlForm = document.getElementById('nl-query-form');
@@ -178,10 +185,12 @@
             postJson('/api/v1/nl-query', {question: question}).then(function (r) {
                 busy(btn, false);
                 show(box, r.data.answer || r.data.message || '{{ __('app.error_generic') }}', r.ok);
+                if (!r.ok && window.PulseToast) { PulseToast.error(TOAST_QUERY_FAILED, r.data.message || ''); }
             }).catch(function () {
                 busy(btn, false);
                 // Close the aria-live region on network failure too.
                 show(box, '{{ __('app.error_generic') }}', false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
             });
         });
 
@@ -200,14 +209,19 @@
                     if (r.ok) {
                         show(box,
                             '{{ __('app.ok') }} — {{ __('app.balance') }}: ' + r.data.new_balance, true);
+                        if (window.PulseToast) { PulseToast.success(TOAST_REDEEM_OK); }
                     } else {
                         show(box,
                             (r.data && r.data.message) || '{{ __('app.error_generic') }}', false);
+                        if (window.PulseToast) {
+                            PulseToast.error(TOAST_REDEEM_FAILED, (r.data && r.data.message) || '');
+                        }
                     }
                 }).catch(function () {
                 busy(btn, false);
                 // Close the aria-live region on network failure too.
                 show(box, '{{ __('app.error_generic') }}', false);
+                if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
             });
         });
 
@@ -227,9 +241,36 @@
 
         var seen = {attendance: {}, breakfast: {}, lunch: {}};
 
+        // Toast on taps (spec §23: "a relevant toast appears"). A tap is
+        // an EXTERNAL event — the person watching didn't cause it — so
+        // this is exactly what the acknowledgment layer is for. Guards:
+        // hidden tabs stay silent; a 2 s per-student+type cooldown
+        // collapses reader retry bursts; the live feed stays the
+        // durable record.
+        var TAP_LABELS = {!! Js::from([
+            'CLASS_ATTENDANCE' => __('app.event_type_CLASS_ATTENDANCE'),
+            'PAE_BREAKFAST' => __('app.event_type_PAE_BREAKFAST'),
+            'PAE_LUNCH' => __('app.event_type_PAE_LUNCH'),
+            'RECYCLING_DEPOSIT' => __('app.event_type_RECYCLING_DEPOSIT'),
+            'ENTRY' => __('app.event_type_ENTRY'),
+            'EXIT' => __('app.event_type_EXIT'),
+        ]) !!};
+        var POINTS_UNIT = {!! Js::from(__('app.points_unit')) !!};
+        var lastTapToast = {};
+        function toastTap(ev) {
+            if (document.hidden || !window.PulseToast) { return; }
+            var key = (ev.student_id || '') + ':' + (ev.type || '');
+            var now = Date.now();
+            if (lastTapToast[key] && now - lastTapToast[key] < 2000) { return; }
+            lastTapToast[key] = now;
+            var label = TAP_LABELS[ev.type] || ev.type || '';
+            PulseToast.info(((ev.student_name || '') + (label ? ' — ' + label : '')).trim());
+        }
+
         document.addEventListener('realtime:tap', function (e) {
             var ev = e.detail || {};
             if (ev.student_id === undefined) { return; }
+            toastTap(ev);
             var id = String(ev.student_id);
 
             if (ev.type === 'CLASS_ATTENDANCE' && !seen.attendance[id]) {
@@ -252,6 +293,9 @@
             if (update.type === 'validated') { bumpStat('recycling_items', 1); }
             if (update.type === 'points_awarded' && typeof payload.points === 'number') {
                 bumpStat('recycling_points', payload.points);
+                if (!document.hidden && window.PulseToast) {
+                    PulseToast.success('+' + payload.points + ' ' + POINTS_UNIT + ' — ' + (payload.student_name || ''));
+                }
             }
         });
 

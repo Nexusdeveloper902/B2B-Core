@@ -209,12 +209,26 @@
         // TASK-027 — live recycling updates, no reload: 'validated' frames
         // prepend the deposit row + refresh the latest-capture panel;
         // 'points_awarded' frames fill the points badge and bump metrics.
+        // Spec §23 — the station's result also SPEAKS (toast), guarded by
+        // tab visibility; the ledger stays the durable record.
         document.addEventListener('realtime:recycling', function (e) {
             var update = e.detail || {};
             var payload = update.payload || {};
 
-            if (update.type === 'validated') { onValidated(payload, update.at); }
-            if (update.type === 'points_awarded') { onPointsAwarded(payload); }
+            if (update.type === 'validated') {
+                onValidated(payload, update.at);
+                if (!document.hidden && window.PulseToast) {
+                    PulseToast.info('{!! Js::from(__('app.toast_deposit_classified', ['material' => ':material'])) !!}'
+                        .replace(':material', labels.material[payload.material_class] || payload.material_class || '')
+                        .trim(), payload.student_name || '');
+                }
+            }
+            if (update.type === 'points_awarded') {
+                onPointsAwarded(payload);
+                if (!document.hidden && window.PulseToast && typeof payload.points === 'number') {
+                    PulseToast.success('+' + payload.points + ' ' + labels.pointsUnit + ' — ' + (payload.student_name || ''));
+                }
+            }
         });
 
         function onValidated(payload, at) {

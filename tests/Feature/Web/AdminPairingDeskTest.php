@@ -293,7 +293,8 @@ class AdminPairingDeskTest extends TestCase
         // boot node carries the mints; realtime.js connects; the desk
         // script applies `realtime:pairing` frames through the same
         // applyStatus() the poll uses.
-        $html = $this->actingAs($this->admin())->get('/admin/pairing')->getContent();
+        $admin = $this->admin();
+        $html = $this->actingAs($admin)->get('/admin/pairing')->getContent();
 
         // The feed client + the boot node (token + port, SSR-first). The
         // bootstrap JSON lives in an HTML-ATTRIBUTE context, so Blade's
@@ -303,7 +304,13 @@ class AdminPairingDeskTest extends TestCase
         $this->assertStringContainsString('id="pairing-realtime"', $html);
         $this->assertStringContainsString('data-realtime="', $html);
         $this->assertStringContainsString('&quot;port&quot;:'.(int) config('realtime.port'), $html);
-        $this->assertMatchesRegularExpression('/&quot;token&quot;:&quot;1\.\d+\.[0-9a-f]{64}&quot;/', $html);
+        // The token must embed THIS admin's id (named-fixture rule —
+        // positional ids break on MariaDB once InnoDB auto-increment
+        // has advanced past rolled-back tests).
+        $this->assertMatchesRegularExpression(
+            '/&quot;token&quot;:&quot;'.$admin->id.'\.\d+\.[0-9a-f]{64}&quot;/',
+            $html
+        );
 
         // Badge honesty: the same live/connecting/offline grammar.
         $this->assertStringContainsString('id="live-badge"', $html);

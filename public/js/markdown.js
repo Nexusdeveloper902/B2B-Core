@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Presence Platform — minimal safe Markdown renderer (TASK-027).
+   Pulse — minimal safe Markdown renderer (TASK-027).
 
    The NL-query answers arrive as MODEL-GENERATED text. They may contain
    light Markdown (the system prompt asks for **bold**, "- " bullets and

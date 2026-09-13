@@ -188,6 +188,37 @@ repaint AND prepend live).
   `./run reset --pilot` is the one-command human demo; the small
   `DemoSeeder` fixture stays the automated-test default.
 
+## 3f. Productization pass (2026-09-12) — Pulse identity + toasts
+
+Full details in [BRAND.md](BRAND.md) / [BRAND.es.md](BRAND.es.md).
+Frontend-relevant facts:
+
+- **Identity**: the shell (topbar, footer, login + password-change
+  bands) carries the REAL Pulse mark (`public/brand/mark-96.png`,
+  derived from B2B-Logo-Suite) next to the typed name. Titles are
+  `<page> — Pulse`; the head ships favicon.ico + PNG icons +
+  `manifest.webmanifest` + theme-color + og/twitter metadata +
+  `brand/og-image.png`. The old `wordmark-tap` placeholder tile is
+  deleted — `PulseIdentityTest` pins its absence.
+- **Palette**: tokens.css is anchored to the five Pulse brand values
+  (cream `#E8EDDF` ground, ink `#242423` action, gold `#F5CB5C`
+  accent, sage `#CFDBD5`, graphite `#333533`); gold-on-ink is now the
+  button/active-nav grammar. Error red stays independent. DashboardTest
+  pins the anchors.
+- **Toasts**: `public/js/toast.js` (window.PulseToast) + the `.toast-*`
+  CSS block — one acknowledgment system, four tones, max-4 stack,
+  per-type auto-dismiss, pause-on-hover, aria-live, reduced-motion
+  skip. Wired: students/readers/pairing desks, admin dashboard
+  (NL fail + redemption), teacher NL network failure — INCLUDING the
+  previously-silent `.catch` paths. The inline `.nl-answer` boxes keep
+  the details; ambient realtime updates never toast.
+- **Error pages**: 419 and 429 join the branded in-shell set
+  (`resources/views/errors/`), localized with a way out.
+- **Server-message locale gap (discovered, open)**: desk fetches don't
+  send `Accept-Language`, so API messages inside inline boxes render
+  EN while the toast copy follows the session locale. Pre-existing
+  behavior; recorded as follow-up.
+
 ## 4. Mockup gap ledger — needs functionality that does NOT exist yet
 
 Everything below was **omitted or replaced honestly** (no fake data, no

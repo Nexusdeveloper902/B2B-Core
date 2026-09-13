@@ -197,6 +197,68 @@ jobs:
       - name: Run E2E tests
         run: ./run test e2e
 
+  mariadb:
+    # ADR-049 — the product's dev/prod storage is MariaDB; this job keeps
+    # the full suite honest against the real engine (the default suite
+    # stays on hermetic in-memory SQLite for speed). Mirrors the local
+    # verification: migrate:fresh + full suite on MariaDB.
+    name: Full suite on MariaDB
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mariadb:
+        image: mariadb:12
+        env:
+          MARIADB_ROOT_PASSWORD: root-ci-only
+          MARIADB_DATABASE: pulse_test
+          MARIADB_USER: pulse
+          MARIADB_PASSWORD: pulse-ci-only
+        ports:
+          - 33060:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      # node24 runtime (ADR-018): v4 targeted node20, which GitHub removes
+      # from hosted runners on 2026-09-16 — checkout is the first step of
+      # most jobs, so a stale pin would take the whole pipeline down.
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: sqlite3, pdo_sqlite, pdo_mysql, mbstring, curl, zip, fileinfo, iconv, gd
+          coverage: none
+
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache dependencies
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-8.4-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-8.4-
+
+      - name: Bootstrap via the run suite
+        run: ./run setup --ci
+
+      - name: Run the full suite on MariaDB
+        env:
+          DB_CONNECTION: mariadb
+          DB_HOST: 127.0.0.1
+          DB_PORT: '33060'
+          DB_DATABASE: pulse_test
+          DB_USERNAME: pulse
+          DB_PASSWORD: pulse-ci-only
+        run: php artisan test
+
   http-e2e:
     name: Real-HTTP E2E (serve + curl, via ./run e2e)
     runs-on: ubuntu-latest

@@ -7,6 +7,7 @@ use App\Models\PointsLedger;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\Reward;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Services\PointsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,9 +52,14 @@ class PointsServiceTest extends TestCase
         $student = Student::first();
         $event = $this->makeEvent($student);
 
+        // Named-fixture rule (RUN-033): never a positional id — InnoDB
+        // auto-increment survives rolled-back tests, so the seeded
+        // class is not id 1 on MariaDB.
+        $classId = SchoolClass::orderBy('id')->firstOrFail()->id;
+
         foreach (MaterialClass::cases() as $material) {
             $awarded = $this->points->awardRecyclingPoints(
-                Student::create(['name' => 'L '.$material->value, 'grade' => '5°', 'class_id' => 1]),
+                Student::create(['name' => 'L '.$material->value, 'grade' => '5°', 'class_id' => $classId]),
                 $event,
                 $material
             );
