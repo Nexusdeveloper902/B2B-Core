@@ -212,7 +212,8 @@ R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
     -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
 if [ "$DOW" -le 5 ]; then
     check "Meal auto-detected from the windows / Comida auto-detectada ($EXPECTED_MEAL)" "$R" "\"meal\":\"$EXPECTED_MEAL\""
-    check "Served meal returns the meal type / La comida servida devuelve el tipo" "$R" "\"event_type\":\"PAE_"$(echo "$EXPECTED_MEAL" | tr "[:lower:]" "[:upper:]")"\""
+    EXPECTED_TYPE="PAE_$(printf '%s' "$EXPECTED_MEAL" | tr '[:lower:]' '[:upper:]')"
+    check "Served meal returns the meal type / La comida servida devuelve el tipo" "$R" "\"event_type\":\"$EXPECTED_TYPE\""
 
     R2=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
         -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \

@@ -473,8 +473,13 @@ class PaeReportService
     {
         $counts = $this->servedMealRows($from, $to, $classIds)
             ->join('classes', 'classes.id', '=', 'students.class_id')
+            // GROUP BY the REAL columns (not the select aliases) —
+            // MariaDB's ONLY_FULL_GROUP_BY resolves aliases back to
+            // their source columns and then complains the source isn't
+            // grouped; SQLite accepts both, so this is the portable
+            // form (the RUN-038 engine-truth rule).
             ->selectRaw('classes.id as class_id, classes.name as class_name, events.type, count(distinct students.id) as students')
-            ->groupBy('class_id', 'class_name', 'events.type')
+            ->groupBy('classes.id', 'classes.name', 'events.type')
             ->get();
 
         $byClass = [];
