@@ -95,4 +95,14 @@ return [
     'student_email_domain' => env('STUDENT_EMAIL_DOMAIN', 'presence.test'),
     'student_initial_password' => env('STUDENT_INITIAL_PASSWORD', 'password'),
 
+    /*
+     | TASK-043 (ADR-062) — device authentication. Readers sign every
+     | request (Pulse-HMAC); the legacy static Bearer stays for bench
+     | tools (Postman/curl/e2e) and is killable for demo-day lockdown:
+     | DEVICE_AUTH_ALLOW_LEGACY_BEARER=false enforces signatures only.
+     */
+    'device_auth' => [
+        'allow_legacy_bearer' => env('DEVICE_AUTH_ALLOW_LEGACY_BEARER', true),
+    ],
+
 ];

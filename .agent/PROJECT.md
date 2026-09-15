@@ -1256,3 +1256,20 @@ The Android HCE phone is a first-class Pulse credential (ADR-060):
   Pint clean.
 - Phone app lives at workspace `B2B-App/pulse-credential`; canonical
   protocol spec is `B2B-Firmware/docs/HCE_PROTOCOL.md`.
+
+## TASK-044 additions (2026-09-15, RUN-2026-09-15-core-045)
+
+Multipart Pulse-HMAC canonical — the station classify-401 fix (ADR-063,
+amends ADR-062):
+
+- **Root cause**: firmware signed raw multipart bytes, backend hashed
+  `$request->getContent()` — empty for multipart (PHP never exposes it).
+  JSON taps passed, every classify/capture 401'd. Untested seam: HMAC
+  tests only tapped, multipart tests only bore Bearer.
+- **`DeviceRequestSigner`**: `multipartCanonical()` (classify =
+  `event_id + image.sha256`, capture = `image.sha256`) +
+  `canonicalBody()`; `verify()` uses it, JSON byte-identical.
+- **Tests**: `DeviceHmacAuthTest` +4 (canonical pin with the shared
+  `sha256('abc')` literal, signed classify 200, swapped-image 401,
+  signed capture 200). Targeted 30 green; quality green.
+- Firmware half: B2B-Firmware TASK-014 (`postMultipart`, build `hce.18`).

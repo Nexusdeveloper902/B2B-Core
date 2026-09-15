@@ -10,6 +10,7 @@ return [
     // Reader authentication
     'missing_bearer_token' => 'Missing bearer token',
     'invalid_bearer_token' => 'Invalid bearer token',
+    'invalid_device_signature' => 'Invalid device signature',
 
     // Tap endpoint
     'card_not_recognized' => 'Card not recognized',

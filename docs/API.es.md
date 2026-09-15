@@ -14,7 +14,7 @@ URL base (desarrollo local): `http://localhost:8000`
 
 | Endpoints | Auth | Notas |
 |---|---|---|
-| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Del lado del dispositivo. La clave ES la identidad del lector — nunca se confía en un reader ID enviado por el cliente. Las claves las imprime el seeder. |
+| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Pulse-HMAC <kid>:<nonce>:<sig>` (dispositivos) o `Bearer <reader.api_key>` (banco) | Del lado del dispositivo (TASK-043 / ADR-062). Los lectores FIRMAN cada petición (HMAC-SHA256 sobre método, ruta, nonce y hash del cuerpo, con la clave del lector) — la clave nunca viaja por la red, los nonces son de un solo uso, y el tráfico capturado no puede repetirse ni redirigirse. Para subidas de imagen multipart (classify/capture) el cuerpo firmado es el canónico `event_id + image.sha256`, no los bytes crudos (PHP nunca ve el multipart crudo). El Bearer heredado queda para Postman/curl/scripts e2e y se puede desactivar con `DEVICE_AUTH_ALLOW_LEGACY_BEARER=false`. Las claves las imprime el seeder. |
 | `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/staff`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. Rol admin aplicado por endpoint. |
 | `POST /api/v1/nl-query` | Sesión (usuario del panel) o token de acceso personal | Del lado del panel. **Admin Y docente** (TASK-027): las preguntas de un docente quedan cercadas en el servidor a sus propias clases (`StudentScope`); los estudiantes siguen en 403. |
 
@@ -44,15 +44,22 @@ Para fijar el acceso stateful a una lista explícita de hosts, define
 `SANCTUM_STATEFUL_DOMAINS` en `.env` (reemplaza el valor por defecto por
 completo — incluye el host del escritorio y el del teléfono) y reinicia
 el servidor. Los endpoints de dispositivos no cambian: los lectores
-nunca envían Referer/Origin, así que su flujo con clave Bearer sigue
+nunca envían Referer/Origin, así que su flujo firmado sigue
 siendo sin estado.
 
 ---
 
 ## POST /api/v1/events/tap — el bucle central de presencia (Fase B)
 
-Registra un tap de tarjeta. El lector se resuelve por la clave Bearer; el tipo
-de evento proviene del `active_event_type` actual del lector.
+Registra un tap de tarjeta. El lector se resuelve por la firma de la petición
+(o la clave Bearer del banco); el tipo de evento proviene del
+`active_event_type` actual del lector.
+
+**El primer tap cuenta (TASK-043):** un segundo tap de aula del mismo
+estudiante para el mismo tipo el mismo día devuelve el evento ORIGINAL con
+`"duplicate": true` en vez de escribir una fila nueva — tarjetas retenidas,
+reintentos manuales tras time-outs y peticiones repetidas no pueden inflar la
+asistencia. Los taps de reciclaje están exentos (cada tap es un depósito físico).
 
 **Petición** (JSON):
 
@@ -78,6 +85,7 @@ de evento proviene del `active_event_type` actual del lector.
   "event_id": 1042,
   "event_type": "CLASS_ATTENDANCE",
   "student_first_name": "Maria",
+  "duplicate": false,
   "next_step": null
 }
 ```
@@ -86,8 +94,8 @@ Para un lector de **reciclaje**, `next_step` es `"awaiting_classification"` y
 el `event_id` debe usarse en la llamada posterior de clasificación. **No se
 otorgan puntos en el momento del tap.**
 
-`401 Unauthorized` — clave Bearer faltante/inválida:
-`{"status":"error","message":"Token de portador (bearer) no válido"}`
+`401 Unauthorized` — firma faltante/inválida (o clave Bearer en la ruta del
+banco): `{"status":"error","message":"Firma de dispositivo no válida"}`
 
 `404 Not Found` — tarjeta desconocida (`Tarjeta no reconocida`) o no activa
 (`La tarjeta no está activa`).
@@ -176,7 +184,7 @@ nombre Y el modo activo.
 
 ## POST /api/v1/recycling/classify — clasificación + ganar puntos (Fase C)
 
-**Auth: clave Bearer del lector de reciclaje que posee el evento del tap.**
+**Aut: firma de petición del lector de reciclaje que posee el evento del tap (banco: clave Bearer). El cuerpo firmado es el canónico multipart `event_id + image.sha256` (ver modelos de autenticación).**
 La petición es `multipart/form-data`:
 
 | Campo | Tipo | Notas |
@@ -356,7 +364,7 @@ sigue siendo del lado del lector.
 ## POST /api/v1/admin/cards/pair — emparejar una tarjeta leída (TASK-010, lado del dispositivo)
 
 Segundo paso: el lector (cualquier lector — la ruta vive bajo `/admin/` por
-descubribilidad, pero la autenticación es la **clave Bearer del lector**,
+descubribilidad, pero la autenticación es la **firma de petición del lector**,
 exactamente como el endpoint de tap) envía el UID de una tarjeta recién
 leída. El emparejamiento pendiente más reciente no consumido y no caducado
 se consume y la tarjeta queda vinculada a su estudiante.
@@ -402,7 +410,7 @@ NUEVA; jamás se reasignan tarjetas existentes):
 pendiente **sigue armado** para que el operador pueda leer de inmediato
 otra tarjeta nueva.
 
-`401` — clave Bearer del lector faltante o inválida. El emparejamiento es
+`401` — firma del lector faltante o inválida (banco: clave Bearer). El emparejamiento es
 de un solo uso: tras un emparejamiento exitoso, la siguiente lectura
 recibe el 409. La tarjeta recién emparejada funciona de inmediato para los
 toques en el endpoint de tap.
@@ -441,7 +449,7 @@ Reglas que el backend impone:
   borra la fila y el id vuelve a ser emparejable.
 - **Alcance de seguridad**: el prototipo usa una sola clave precompartida
   de desarrollo (`HCE_SECRET`) verificada en el lector, que la clave
-  Bearer del lector luego avala ante el backend — la misma confianza que
+  firma del lector luego avala ante el backend — la misma confianza que
   un UID físico. Ningún secreto se registra ni se guarda en el servidor.
   Claves por credencial, protección anti-replay y autenticación mutua son
   trabajo futuro registrado en la especificación del firmware
@@ -726,7 +734,7 @@ de emparejamiento sobreviven con el enlace al lector en null; las
 filas del libro de puntos conservan su valor con `event_id` en null;
 las imágenes guardadas se borran del disco. Un frame de roster
 `reader_deleted` quita la fila del escritorio en vivo; la vieja
-clave Bearer responde 401 desde ese momento.
+clave responde 401 desde ese momento.
 
 **Respuesta `200`**:
 
@@ -1004,7 +1012,7 @@ directamente a las variables de la colección de Postman.
 
 ## POST /api/v1/recycling/capture — captura botella-primero (TASK-025)
 
-**Aut: clave Bearer de un lector de reciclaje (la estación de cámara).**
+**Aut: firma de petición de un lector de reciclaje (la estación de cámara; banco: clave Bearer). El cuerpo firmado es el canónico multipart `image.sha256` (ver modelos de autenticación).**
 La petición es `multipart/form-data`:
 
 | Campo | Tipo | Notas |
@@ -1035,7 +1043,7 @@ estudiante.
 
 ## POST /api/v1/recycling/captures/{capture}/associate — la tarjeta resuelve la captura (TASK-025)
 
-**Aut: clave Bearer del MISMO lector de reciclaje que guardó la captura.**
+**Aut: firma de petición del MISMO lector de reciclaje que guardó la captura (banco: clave Bearer).**
 La petición es JSON:
 
 ```json

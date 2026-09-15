@@ -14,7 +14,7 @@ Base URL (local dev): `http://localhost:8000`
 
 | Endpoints | Auth | Notes |
 |---|---|---|
-| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Bearer <reader.api_key>` | Device-side. The key IS the reader identity — a client-supplied reader ID is never trusted. Keys are printed by the seeder. |
+| `POST /api/v1/events/tap`, `POST /api/v1/recycling/classify`, `POST /api/v1/admin/cards/pair` | `Authorization: Pulse-HMAC <kid>:<nonce>:<sig>` (devices) or `Bearer <reader.api_key>` (bench) | Device-side (TASK-043 / ADR-062). Readers SIGN every request (HMAC-SHA256 over method, path, nonce and body hash, keyed by the reader secret) — the secret never rides the wire, nonces are single-use, and captured traffic cannot be replayed or retargeted. For multipart image posts (classify/capture) the signed body is the canonical `event_id + image.sha256`, not the raw bytes (PHP never sees raw multipart). The legacy Bearer stays for Postman/curl/e2e scripts and is killable via `DEVICE_AUTH_ALLOW_LEGACY_BEARER=false`. Keys are printed by the seeder. |
 | `POST /api/v1/admin/readers/{id}/mode`, `PUT /api/v1/admin/readers/{id}`, `POST /api/v1/admin/readers`, `POST /api/v1/admin/readers/{reader}/rotate-key`, `DELETE /api/v1/admin/readers/{reader}`, `POST /api/v1/admin/students`, `POST /api/v1/admin/students/import`, `POST /api/v1/admin/students/{student}/account`, `POST /api/v1/admin/classes`, `POST /api/v1/admin/staff`, `POST /api/v1/admin/students/{id}/arm-pairing`, `GET /api/v1/admin/pairing/status`, `DELETE /api/v1/admin/cards/{id}`, `POST /api/v1/students/{id}/redeem`, `GET /api/v1/admin/captures/{deposit}/image` | Session (dashboard user) or personal access token | Dashboard-side. Admin role enforced per endpoint. |
 | `POST /api/v1/nl-query` | Session (dashboard user) or personal access token | Dashboard-side. **Admin AND teacher** (TASK-027): a teacher's questions are server-side fenced to their own classes (`StudentScope`); students stay 403. |
 
@@ -42,15 +42,22 @@ even though the web login itself had succeeded. To pin stateful access
 to an explicit host list instead, set `SANCTUM_STATEFUL_DOMAINS` in
 `.env` (this replaces the default entirely — include your desktop and
 phone hosts) and restart the server. Device endpoints are unaffected:
-readers never send a Referer/Origin, so their Bearer-key flows stay
+readers never send a Referer/Origin, so their signed flows stay
 stateless.
 
 ---
 
 ## POST /api/v1/events/tap — the core presence loop (Phase B)
 
-Register a card tap. The reader is resolved from the Bearer key; the event
-type comes from the reader's current `active_event_type`.
+Register a card tap. The reader is resolved from the request signature (or
+the bench Bearer key); the event type comes from the reader's current
+`active_event_type`.
+
+**First tap counts (TASK-043):** a second classroom tap by the same student
+for the same type on the same day returns the ORIGINAL event with
+`"duplicate": true` instead of writing a new row — held cards,
+hand-retries after timeouts, and replayed requests cannot inflate
+attendance. Recycling taps are exempt (every tap is a physical deposit).
 
 **Request** (JSON):
 
@@ -76,6 +83,7 @@ type comes from the reader's current `active_event_type`.
   "event_id": 1042,
   "event_type": "CLASS_ATTENDANCE",
   "student_first_name": "Maria",
+  "duplicate": false,
   "next_step": null
 }
 ```
@@ -84,8 +92,8 @@ For a **recycling** reader, `next_step` is `"awaiting_classification"` and
 `event_id` must be used in the follow-up classify call. **No points are
 awarded at tap time.**
 
-`401 Unauthorized` — missing/invalid Bearer key:
-`{"status":"error","message":"Invalid bearer token"}`
+`401 Unauthorized` — missing/invalid signature (or Bearer key on the bench
+path): `{"status":"error","message":"Invalid device signature"}`
 
 `404 Not Found` — unknown card (`Card not recognized`) or non-active card
 (`Card is not active`).
@@ -170,7 +178,7 @@ the active mode.
 
 ## POST /api/v1/recycling/classify — classification + points earn (Phase C)
 
-**Auth: Bearer key of the recycling reader that owns the tap event.**
+**Auth: request signature of the recycling reader that owns the tap event (bench: Bearer key). Signed body is the multipart canonical `event_id + image.sha256` (see auth models).**
 Request is `multipart/form-data`:
 
 | Field | Type | Notes |
@@ -344,7 +352,7 @@ stays reader-side.
 ## POST /api/v1/admin/cards/pair — pair a scanned card (TASK-010, device-side)
 
 Second step: the reader (any reader — the path lives under `/admin/` for
-discoverability, but authentication is the **reader Bearer key**, exactly
+discoverability, but authentication is the **reader request signature**, exactly
 like the tap endpoint) submits a freshly scanned card UID. The most
 recent unconsumed, unexpired pending pairing is consumed and the card is
 linked to its student.
@@ -387,7 +395,7 @@ reassigned): `{"status":"error","message":"Card already paired"}`. The
 pending pairing **stays armed** so the operator can immediately scan a
 different fresh card.
 
-`401` — missing/invalid reader Bearer key. A pairing is one-shot: after a
+`401` — missing/invalid reader signature (bench: Bearer key). A pairing is one-shot: after a
 successful pair, the next scan gets the 409. The newly paired card works
 immediately for taps on the tap endpoint.
 
@@ -421,8 +429,8 @@ Rules the backend enforces:
   revoked phone credential taps `404` like a revoked card; unpairing
   deletes the row and the credential id becomes pairable again.
 - **Security scope**: the prototype uses one development pre-shared key
-  (`HCE_SECRET`) verified on the reader, which the reader's Bearer key
-  then vouches for to the backend — same trust as a physical UID. No
+  (`HCE_SECRET`) verified on the reader, which the reader's request
+  signature then vouches for to the backend — same trust as a physical UID. No
   secrets are logged or stored server-side. Per-credential keys,
   replay protection and mutual authentication are recorded future work
   in the firmware spec (`B2B-Firmware/docs/HCE_PROTOCOL.md`, the
@@ -698,7 +706,7 @@ pragma is off). Pairing history rows survive with the reader link
 cleared; points ledger rows keep their value with `event_id`
 cleared; stored capture images are deleted from disk. A
 `reader_deleted` roster frame drops the desk row live; the old
-Bearer key 401s from that moment.
+secret 401s from that moment.
 
 **Response `200`**:
 
@@ -967,7 +975,7 @@ Postman collection variables.
 
 ## POST /api/v1/recycling/capture — bottle-first image intake (TASK-025)
 
-**Auth: Bearer key of a recycling reader (the camera station).**
+**Auth: request signature of a recycling reader (the camera station; bench: Bearer key). Signed body is the multipart canonical `image.sha256` (see auth models).**
 Request is `multipart/form-data`:
 
 | Field | Type | Notes |
@@ -997,7 +1005,7 @@ any vision-API call before a student is associated.
 
 ## POST /api/v1/recycling/captures/{capture}/associate — card resolves the capture (TASK-025)
 
-**Auth: Bearer key of the SAME recycling reader that stored the capture.**
+**Auth: request signature of the SAME recycling reader that stored the capture (bench: Bearer key).**
 Request is JSON:
 
 ```json

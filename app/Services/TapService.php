@@ -6,7 +6,9 @@ use App\Enums\ReaderType;
 use App\Models\Card;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
+use App\Models\Student;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The core presence loop (Phase B): tap -> identify -> timestamp -> labeled event.
@@ -28,8 +30,16 @@ class TapService
     }
 
     /**
-     * @return array{ok: true, event: PresenceEvent} on success
-     *                                               array{ok: false, reason: 'not_found'|'inactive'|'no_student'|'not_enrolled'|'no_attendance'|'out_of_window'|'weekend'|'window_overlap'|'duplicate', message: string, event?: PresenceEvent, meal?: ?string} on rejection
+     * TASK-043 — first tap counts: a second classroom tap by the same
+     * student for the same type on the same school-local day is a
+     * duplicate, not a new event. The original row is returned with
+     * duplicate:true (the classify idempotency shape) so a held card,
+     * a hand-retry after a timeout, or a replayed request can never
+     * inflate attendance. Recycling taps are exempt — every tap there
+     * is a separate physical deposit awaiting classification.
+     *
+     * @return array{ok: true, event: PresenceEvent, duplicate?: bool} on success
+     *                                                                 array{ok: false, reason: 'not_found'|'inactive'|'no_student'|'not_enrolled'|'no_attendance'|'out_of_window'|'weekend'|'window_overlap'|'duplicate', message: string, event?: PresenceEvent, meal?: ?string} on rejection
      */
     public function registerTap(Reader $reader, string $credentialUid, ?string $clientTimestamp = null): array
     {
@@ -51,18 +61,41 @@ class TapService
         }
 
         $occurredAt = $this->resolveOccurredAt($clientTimestamp);
+        $type = $this->eventTypeFor($reader);
 
-        $event = PresenceEvent::create([
-            'card_id' => $card->id,
-            'reader_id' => $reader->id,
-            'type' => $this->eventTypeFor($reader),
-            'occurred_at' => $occurredAt,
-            'metadata' => $clientTimestamp !== null ? ['client_timestamp' => $clientTimestamp] : null,
-            'served' => true,
-            'reason' => null,
-        ]);
+        return DB::transaction(function () use ($reader, $card, $clientTimestamp, $occurredAt, $type) {
+            // Serialize same-student taps (same convention as the meal
+            // engine's card lock and the redemption row-lock): two
+            // simultaneous first taps converge — the loser answers as
+            // the honest duplicate instead of writing a second row.
+            if (! $reader->isRecycling() && $card->student_id !== null) {
+                Student::whereKey($card->student_id)->lockForUpdate()->first();
 
-        return ['ok' => true, 'event' => $event];
+                $first = PresenceEvent::query()
+                    ->where('served', true)
+                    ->where('type', $type)
+                    ->whereIn('card_id', Card::where('student_id', $card->student_id)->pluck('id'))
+                    ->whereDate('occurred_at', $occurredAt->toDateString())
+                    ->orderBy('id')
+                    ->first();
+
+                if ($first !== null) {
+                    return ['ok' => true, 'duplicate' => true, 'event' => $first];
+                }
+            }
+
+            $event = PresenceEvent::create([
+                'card_id' => $card->id,
+                'reader_id' => $reader->id,
+                'type' => $type,
+                'occurred_at' => $occurredAt,
+                'metadata' => $clientTimestamp !== null ? ['client_timestamp' => $clientTimestamp] : null,
+                'served' => true,
+                'reason' => null,
+            ]);
+
+            return ['ok' => true, 'event' => $event];
+        });
     }
 
     /**

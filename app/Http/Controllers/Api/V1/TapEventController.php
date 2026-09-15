@@ -73,11 +73,15 @@ class TapEventController extends Controller
 
         // Device feedback: what would drive an LED/buzzer/display later.
         // A recycling tap signals the device to proceed to classification.
+        // TASK-043 — duplicate:true means "already counted today": the
+        // device answers success (green, not red — the student IS present)
+        // without the backend writing a second row.
         $payload = [
             'status' => 'ok',
             'event_id' => $event->id,
             'event_type' => $event->type,
             'student_first_name' => $student->firstName(),
+            'duplicate' => (bool) ($result['duplicate'] ?? false),
             'next_step' => $reader->isRecycling() ? 'awaiting_classification' : null,
         ];
         if (array_key_exists('meal', $result)) {
