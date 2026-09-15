@@ -105,9 +105,15 @@ $card = $pdo->query("SELECT c.credential_uid, c.student_id FROM cards c JOIN stu
 // TASK-037 — the Ana card: the meal-specific not-enrolled message check
 // (Ana is lunch-only, so a breakfast-window tap gets the breakfast message).
 $ana = $pdo->query("SELECT c.credential_uid FROM cards c JOIN students s ON s.id = c.student_id WHERE s.name LIKE \"Ana%\" ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDENT_ID=%s\nANA_UID=%s\n",
+// TASK-044 — the meal-phase card: first-tap-counts dedup is per
+// student/type/day, and Fase B already tapped CARD_UID today — so the
+// relabel phase needs a DIFFERENT both-enrolled student whose
+// backdated attendance tap actually creates its row (else the meal
+// prerequisite sees only the later Fase B tap and flags no_attendance).
+$meal = $pdo->query("SELECT c.credential_uid FROM cards c JOIN students s ON s.id = c.student_id WHERE s.pae_lunch_enrolled = 1 AND s.pae_breakfast_enrolled = 1 AND c.student_id != ".(int) $card["student_id"]." ORDER BY c.id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+printf("CLASSROOM_KEY=%s\nCLASSROOM_ID=%s\nRECYCLING_KEY=%s\nCARD_UID=%s\nSTUDENT_ID=%s\nANA_UID=%s\nMEAL_UID=%s\n",
     escapeshellarg($classroom["api_key"]), $classroom["id"], $recycling["api_key"],
-    $card["credential_uid"], $card["student_id"], $ana["credential_uid"]);
+    $card["credential_uid"], $card["student_id"], $ana["credential_uid"], $meal["credential_uid"]);
 ')"
 
 # A test image (valid PNG) — created project-relative so BOTH Linux curl and
@@ -185,6 +191,9 @@ PAT=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.
 # Deterministic at any wall-clock time: attendance is tapped with a
 # day-safe client_timestamp 10 minutes before the meal tap — BEFORE the
 # relabel, while the classroom reader still records CLASS_ATTENDANCE.
+# TASK-044 — MEAL_UID (not CARD_UID): Fase B already tapped CARD_UID
+# today and first-tap-counts dedup would collapse the backdated
+# attendance tap into it.
 eval "$("$PHP_BIN" -r '
 $now = new DateTime("now", new DateTimeZone("America/Bogota"));
 $att = (clone $now)->modify("-10 minutes");
@@ -198,7 +207,7 @@ printf("ATT_TS=%s\nMEAL_TS=%s\nDOW=%s\nEXPECTED_MEAL=%s\n",
 if [ "$DOW" -le 5 ]; then
     R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
         -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$ATT_TS\"}")
+        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$MEAL_UID\", \"client_timestamp\": \"$ATT_TS\"}")
     check "Attendance tap for the meal prerequisite / Tap de asistencia previo" "$R" '"event_type":"CLASS_ATTENDANCE"'
 fi
 
@@ -209,15 +218,16 @@ check "Admin relabels the reader / Admin reetiqueta el lector" "$R" '"active_eve
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
     -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$MEAL_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
 if [ "$DOW" -le 5 ]; then
+    check "Meal tap succeeds (not flagged) / El toque de comida es servido" "$R" '"status":"ok"'
     check "Meal auto-detected from the windows / Comida auto-detectada ($EXPECTED_MEAL)" "$R" "\"meal\":\"$EXPECTED_MEAL\""
     EXPECTED_TYPE="PAE_$(printf '%s' "$EXPECTED_MEAL" | tr '[:lower:]' '[:upper:]')"
     check "Served meal returns the meal type / La comida servida devuelve el tipo" "$R" "\"event_type\":\"$EXPECTED_TYPE\""
 
     R2=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
         -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$CARD_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
+        -H "Content-Type: application/json" -d "{\"credential_uid\": \"$MEAL_UID\", \"client_timestamp\": \"$MEAL_TS\"}")
     check "Duplicate meal is flagged 422 / Comida duplicada queda marcada 422" "$R2" '"reason":"duplicate"'
 else
     check "Weekend taps are flagged / Toques de fin de semana marcados" "$R" '"reason":"weekend"'
