@@ -218,7 +218,7 @@
             if (update.type === 'validated') {
                 onValidated(payload, update.at);
                 if (!document.hidden && window.PulseToast) {
-                    PulseToast.info('{!! Js::from(__('app.toast_deposit_classified', ['material' => ':material'])) !!}'
+                    PulseToast.info({!! Js::from(__('app.toast_deposit_classified', ['material' => ':material'])) !!}
                         .replace(':material', labels.material[payload.material_class] || payload.material_class || '')
                         .trim(), payload.student_name || '');
                 }
