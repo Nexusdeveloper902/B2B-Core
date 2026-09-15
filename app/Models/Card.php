@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CardKind;
 use App\Enums\CardStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,11 +13,12 @@ class Card extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['credential_uid', 'student_id', 'status'];
+    protected $fillable = ['credential_uid', 'kind', 'student_id', 'status'];
 
     protected function casts(): array
     {
         return [
+            'kind' => CardKind::class,
             'status' => CardStatus::class,
         ];
     }

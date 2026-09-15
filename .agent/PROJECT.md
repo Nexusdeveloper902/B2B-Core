@@ -1233,3 +1233,26 @@ The PAE subsystem is now a complete operational school-feeding program:
 - Everything bilingual EN/ES; DemoSeeder ships the full scenario
   matrix on one past school day (today stays clean); the e2e gained a
   meal phase with weekday/weekend branching; 530 tests / 33 e2e checks.
+
+## TASK-042 additions (2026-09-14, RUN-2026-09-14-core-043)
+
+The Android HCE phone is a first-class Pulse credential (ADR-060):
+
+- **`cards.kind`** (`physical` | `hce`, default `physical`, migration
+  2026_09_14_000003, reversible): HOW a credential was captured —
+  display/audit metadata only. Tap lookup stays `credential_uid`-only;
+  no `rf_uid` anywhere (Android randomizes it per tap; HCE ids are
+  non-hex by construction).
+- **Pair endpoint** takes optional `credential_kind` (omitted =
+  `physical` — old firmware byte-identical). Status feed + WS pairing
+  frames carry additive `card_kind` (no WS contract change).
+- **Desk badges** (“Phone” / “Teléfono”, new `card_kind_*` lang keys):
+  roster chips, recent history (SSR + live JS rows), students desk.
+- **Docs**: API.md/.es.md §Android HCE credentials (AID
+  `F0010203040506`), DATABASE.md/.es.md §6, Postman pair body; doc-test
+  needles `credential_kind` + AID.
+- **Tests**: `HceCredentialTest` (7) incl. the UID-independence pin;
+  e2e Fase B-HCE (+7 → 40/40). Suite 560 (557 pass, 3 by-design skips);
+  Pint clean.
+- Phone app lives at workspace `B2B-App/pulse-credential`; canonical
+  protocol spec is `B2B-Firmware/docs/HCE_PROTOCOL.md`.

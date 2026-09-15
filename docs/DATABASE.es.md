@@ -90,7 +90,20 @@ de MariaDB guardan las mismas marcas locales ingenuas que guardaba
 SQLite. Las cadenas ISO `-05:00` de la API vienen de la capa de la
 aplicación, no del motor.
 
-## 6. Adiciones de esquema — TASK-037 (programa PAE completo)
+## 6. Adiciones de esquema — credenciales HCE (teléfono como credencial)
+
+- **`cards.kind`** (`physical` | `hce`, por defecto `physical`): CÓMO se
+  capturó la credencial — un UID MIFARE de la capa RF vs un id de
+  credencial HCE de Android a nivel de aplicación del intercambio SELECT
+  AID (`F0010203040506`) + CHALLENGE. Solo metadato de
+  visualización/auditoría: la búsqueda del tap sigue siendo solo por
+  `credential_uid` (el UID RF del teléfono lo aleatoriza Android en cada
+  toque y jamás se guarda), las filas existentes quedan como `physical`
+  y emparejar usa `physical` cuando el lector omite `credential_kind`.
+  Segura y reversible (down borra la columna). El escritorio de
+  emparejamiento marca las filas `hce` (“Phone” / “Teléfono”).
+
+## 7. Adiciones de esquema — TASK-037 (programa PAE completo)
 
 - **`students`**: la bandera única `pae_enrolled` se convirtió en dos
   columnas independientes — `pae_breakfast_enrolled` y

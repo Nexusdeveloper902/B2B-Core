@@ -112,6 +112,9 @@ return [
     'pairing_reason_already_paired' => 'that card is already paired',
     'current_card' => 'Current card',
     'no_card' => 'no card',
+    // HCE integration: HOW a credential was captured (cards.kind).
+    'card_kind_physical' => 'Card',
+    'card_kind_hce' => 'Phone',
 
     // Live activity feed (TASK-016 + TASK-017 relative time)
     'live_activity' => 'Live activity',

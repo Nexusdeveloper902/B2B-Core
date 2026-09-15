@@ -112,6 +112,9 @@ return [
     'pairing_reason_already_paired' => 'esa tarjeta ya está emparejada',
     'current_card' => 'Tarjeta actual',
     'no_card' => 'sin tarjeta',
+    // Integración HCE: CÓMO se capturó una credencial (cards.kind).
+    'card_kind_physical' => 'Tarjeta',
+    'card_kind_hce' => 'Teléfono',
 
     // Actividad en vivo (TASK-016 + TASK-017 tiempo relativo)
     'live_activity' => 'Actividad en vivo',

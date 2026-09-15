@@ -31,6 +31,7 @@ class CardPairingController extends Controller
         $result = $this->pairings->pair(
             $reader,
             (string) $request->validated('credential_uid'),
+            (string) ($request->validated('credential_kind') ?? 'physical'),
         );
 
         if (! $result['ok']) {

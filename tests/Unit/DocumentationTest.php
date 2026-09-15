@@ -110,6 +110,10 @@ class DocumentationTest extends TestCase
             'reader_updated',
             // TASK-031 (ADR-046) — the canonical model ID, both languages.
             'deepseek-flash',
+            // HCE integration — the pair endpoint's credential-kind field
+            // and the phone-as-credential section (AID included).
+            'credential_kind',
+            'F0010203040506',
         ] as $needle) {
             $this->assertStringContainsString($needle, $en, "EN API docs must document [{$needle}]");
             $this->assertStringContainsString($needle, $es, "ES API docs must document [{$needle}]");

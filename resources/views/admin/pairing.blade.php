@@ -63,7 +63,9 @@
                                       chip per credential, each with its own
                                       server-backed Unpair action (D1). --}}
                                 <span class="card-chip" data-card-chip="{{ $card->id }}">
-                                    <code>{{ $card->credential_uid }}</code>
+                                    <code title="{{ $card->credential_uid }}">{{ $card->credential_uid }}</code>
+                                    {{-- HCE integration: phone credentials ride the same chip, badged --}}
+                                    @if($card->kind === \App\Enums\CardKind::Hce)<span class="muted small">· {{ __('app.card_kind_hce') }}</span>@endif
                                     <button type="button" class="btn btn-quiet btn-small unpair-btn"
                                             data-unpair="{{ $card->id }}"
                                             data-uid="{{ $card->credential_uid }}"
@@ -171,7 +173,7 @@
                 <tbody id="recent-body">
                 @forelse($recentPairings as $pairing)
                     <tr>
-                        <td data-label="{{ __('app.pairing_uid') }}"><code>{{ $pairing->card?->credential_uid }}</code></td>
+                        <td data-label="{{ __('app.pairing_uid') }}"><code title="{{ $pairing->card?->credential_uid }}">{{ $pairing->card?->credential_uid }}</code>@if($pairing->card?->kind === \App\Enums\CardKind::Hce)<span class="muted small"> · {{ __('app.card_kind_hce') }}</span>@endif</td>
                         <td data-label="{{ __('app.student') }}">{{ $pairing->student?->name }}</td>
                         <td class="num" data-label="{{ __('app.pairing_paired_at') }}">{{ $pairing->consumed_at?->format('Y-m-d H:i') }}</td>
                         <td data-label="{{ __('app.reader_label') }}">{{ $pairing->reader?->label ?? '—' }}</td>
@@ -251,6 +253,8 @@
         var TOAST_PAIRED = {!! Js::from(__('app.toast_card_paired')) !!};
         var TOAST_REJECTED = {!! Js::from(__('app.toast_pairing_rejected')) !!};
         var TOAST_UNPAIRED = {!! Js::from(__('app.toast_card_unpaired')) !!};
+        // HCE integration: live-paired phone rows badge like the SSR ones.
+        var KIND_HCE = {!! Js::from(__('app.card_kind_hce')) !!};
         var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
         var lastRejectionUid = (stateBox.dataset.rejectionUid || null);
 
@@ -336,7 +340,7 @@
                     .forEach(function (value, i) {
                         var td = document.createElement('td');
                         td.textContent = value === null || value === undefined ? '—' : value;
-                        if (i === 0) { var code = document.createElement('code'); code.textContent = td.textContent; td.textContent = ''; td.appendChild(code); }
+                        if (i === 0) { var code = document.createElement('code'); code.textContent = td.textContent; td.textContent = ''; td.appendChild(code); if (p.card_kind === 'hce') { var kind = document.createElement('span'); kind.className = 'muted small'; kind.textContent = ' · ' + KIND_HCE; td.appendChild(kind); } }
                         tr.appendChild(td);
                     });
                 recentBody.appendChild(tr);

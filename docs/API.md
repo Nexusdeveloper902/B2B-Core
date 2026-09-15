@@ -355,6 +355,19 @@ linked to its student.
 { "credential_uid": "A1B2C3D4E5" }
 ```
 
+Optional `credential_kind` (`physical` | `hce`, default `physical`):
+HOW the credential was captured — a physical MIFARE UID read off the
+RF layer, or an application-level Android HCE credential id obtained
+through the SELECT AID + CHALLENGE APDU exchange (AID
+`F0010203040506`). Stored on the `cards` row (`cards.kind`) as
+display/audit metadata; the tap lookup stays `credential_uid`-only, so
+old readers that omit the kind pair exactly as before. See
+“Android HCE credentials” below.
+
+```json
+{ "credential_uid": "TEST-ANDROID-001", "credential_kind": "hce" }
+```
+
 **Response `200`**:
 
 ```json
@@ -377,6 +390,47 @@ different fresh card.
 `401` — missing/invalid reader Bearer key. A pairing is one-shot: after a
 successful pair, the next scan gets the 409. The newly paired card works
 immediately for taps on the tap endpoint.
+
+---
+
+## Android HCE credentials — phone-as-credential (HCE integration)
+
+An Android phone running the Pulse HCE app (`B2B-App/pulse-credential`)
+is a first-class Pulse credential: it pairs, taps, revokes and unpairs
+exactly like a physical card, through the SAME endpoints above. The
+reader detects the phone as an ISO-DEP target (SAK bit 6), SELECTs the
+Pulse AID `F0010203040506`, issues a random 8-byte CHALLENGE, and
+verifies the phone's `HMAC-SHA256(HCE_SECRET, credId || nonce)` response
+before submitting the application-level credential id as
+`credential_uid` with `credential_kind: "hce"`.
+
+Rules the backend enforces:
+
+- **The NFC UID is NEVER the identity.** Android randomizes the RF UID
+  per tap; the reader logs only its length and the backend never sees
+  it. Identity is the application-level credential id carried inside
+  the APDU exchange.
+- **Pairing is explicit and human-authorized** — arm for the student on
+  the Pair cards desk, then tap the phone within the window. A tap with
+  no armed window answers `409`; an already-paired credential id answers
+  `422` without reassignment — identical to physical cards.
+- **The rest of Pulse cannot tell the difference**: taps resolve
+  `credential → student → attendance / PAE / recycling` through the
+  unchanged tap endpoint and event spine, regardless of `cards.kind`.
+- **Revocation is status-based** (`active` | `lost` | `revoked`): a
+  revoked phone credential taps `404` like a revoked card; unpairing
+  deletes the row and the credential id becomes pairable again.
+- **Security scope**: the prototype uses one development pre-shared key
+  (`HCE_SECRET`) verified on the reader, which the reader's Bearer key
+  then vouches for to the backend — same trust as a physical UID. No
+  secrets are logged or stored server-side. Per-credential keys,
+  replay protection and mutual authentication are recorded future work
+  in the firmware spec (`B2B-Firmware/docs/HCE_PROTOCOL.md`, the
+  canonical byte-level protocol reference).
+
+The pairing desk badges phone credentials (“Phone” / “Teléfono”) next to
+the credential id, in the roster chips, the recent-pairings history
+(both server-rendered and live WebSocket rows) and the students desk.
 
 ---
 

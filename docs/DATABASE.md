@@ -86,7 +86,19 @@ wall-clock (`America/Bogota`); MariaDB DATETIME columns store the same
 naive local timestamps SQLite stored. The `-05:00` ISO API strings come
 from the app layer, not the engine.
 
-## 6. Schema additions — TASK-037 (PAE full program)
+## 6. Schema additions — HCE credentials (phone-as-credential)
+
+- **`cards.kind`** (`physical` | `hce`, default `physical`): HOW the
+  credential was captured — an RF-layer MIFARE UID vs an
+  application-level Android HCE credential id from the SELECT AID
+  (`F0010203040506`) + CHALLENGE exchange. Display/audit metadata only:
+  tap lookup stays `credential_uid`-only (the phone's RF UID is
+  randomized per tap by Android and never stored), existing rows
+  backfill as `physical`, and pairing defaults to `physical` when the
+  reader omits `credential_kind`. Safe and reversible (drop-column
+  down). The pairing desk badges `hce` rows (“Phone” / “Teléfono”).
+
+## 7. Schema additions — TASK-037 (PAE full program)
 
 - **`students`**: the single `pae_enrolled` flag became two independent
   columns — `pae_breakfast_enrolled` and `pae_lunch_enrolled` (both

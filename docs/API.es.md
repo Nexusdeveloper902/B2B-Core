@@ -367,6 +367,20 @@ se consume y la tarjeta queda vinculada a su estudiante.
 { "credential_uid": "A1B2C3D4E5" }
 ```
 
+`credential_kind` opcional (`physical` | `hce`, por defecto `physical`):
+CÓMO se capturó la credencial — un UID MIFARE físico leído de la capa
+RF, o un id de credencial HCE de Android a nivel de aplicación obtenido
+mediante el intercambio APDU SELECT AID + CHALLENGE (AID
+`F0010203040506`). Se guarda en la fila de `cards` (`cards.kind`) como
+metadato de visualización/auditoría; la búsqueda del tap sigue siendo
+solo por `credential_uid`, así que los lectores viejos que omiten el
+kind emparejan exactamente igual que antes. Ver “Credenciales HCE de
+Android” abajo.
+
+```json
+{ "credential_uid": "TEST-ANDROID-001", "credential_kind": "hce" }
+```
+
 **Respuesta `200`**:
 
 ```json
@@ -392,6 +406,52 @@ otra tarjeta nueva.
 de un solo uso: tras un emparejamiento exitoso, la siguiente lectura
 recibe el 409. La tarjeta recién emparejada funciona de inmediato para los
 toques en el endpoint de tap.
+
+---
+
+## Credenciales HCE de Android — el teléfono como credencial (integración HCE)
+
+Un teléfono Android con la app HCE de Pulse (`B2B-App/pulse-credential`)
+es una credencial Pulse de primera clase: se empareja, toca, revoca y
+desvincula exactamente igual que una tarjeta física, por los MISMOS
+endpoints de arriba. El lector detecta el teléfono como objetivo ISO-DEP
+(bit 6 del SAK), selecciona el AID de Pulse `F0010203040506`, emite un
+CHALLENGE aleatorio de 8 bytes y verifica la respuesta
+`HMAC-SHA256(HCE_SECRET, credId || nonce)` del teléfono antes de enviar
+el id de credencial a nivel de aplicación como `credential_uid` con
+`credential_kind: "hce"`.
+
+Reglas que el backend impone:
+
+- **El UID NFC NUNCA es la identidad.** Android aleatoriza el UID RF en
+  cada toque; el lector solo registra su longitud y el backend jamás lo
+  ve. La identidad es el id de credencial a nivel de aplicación dentro
+  del intercambio APDU.
+- **El emparejamiento es explícito y autorizado por un humano** — arma
+  para el estudiante en el escritorio de emparejamiento y luego toca el
+  teléfono dentro de la ventana. Un toque sin ventana armada responde
+  `409`; un id ya emparejado responde `422` sin reasignación — idéntico
+  a las tarjetas físicas.
+- **El resto de Pulse no distingue la diferencia**: los toques resuelven
+  `credencial → estudiante → asistencia / PAE / reciclaje` por el
+  endpoint de tap sin cambios y la misma espina de eventos, sin importar
+  `cards.kind`.
+- **La revocación es por estado** (`active` | `lost` | `revoked`): un
+  teléfono revocado toca `404` como una tarjeta revocada; desvincular
+  borra la fila y el id vuelve a ser emparejable.
+- **Alcance de seguridad**: el prototipo usa una sola clave precompartida
+  de desarrollo (`HCE_SECRET`) verificada en el lector, que la clave
+  Bearer del lector luego avala ante el backend — la misma confianza que
+  un UID físico. Ningún secreto se registra ni se guarda en el servidor.
+  Claves por credencial, protección anti-replay y autenticación mutua son
+  trabajo futuro registrado en la especificación del firmware
+  (`B2B-Firmware/docs/HCE_PROTOCOL.md`, la referencia canónica del
+  protocolo a nivel de bytes).
+
+El escritorio de emparejamiento marca las credenciales de teléfono
+(“Phone” / “Teléfono”) junto al id, en los chips del roster, el historial
+reciente (filas renderizadas y en vivo por WebSocket) y el escritorio de
+estudiantes.
 
 ---
 

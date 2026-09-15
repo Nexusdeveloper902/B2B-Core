@@ -239,6 +239,51 @@ R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/readers/$CLASSRO
 check "Guest cannot relabel (401) / Invitado no puede reetiquetar" "$R" '401'
 
 # ---------------------------------------------------------------------------
+say "== Fase B-HCE — el teléfono como credencial / phone-as-credential =="
+# The Android HCE path over real HTTP: arm (admin PAT) → pair the
+# application-level credential id with credential_kind=hce (reader key)
+# → tap resolves the student. No hardware needed — the reader's APDU
+# exchange is proven by the firmware native suite + bench checklist §10;
+# here the backend half is proven against the live server.
+HCE_STUDENT_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $c=App\Models\SchoolClass::first(); $s=App\Models\Student::create(["name"=>"E2E HCE Student","grade"=>"5°","class_id"=>$c->id,"pae_breakfast_enrolled"=>false,"pae_lunch_enrolled"=>false]); echo $s->id;')
+HCE_CRED="E2E-HCE-PHONE-01"
+
+# The relabel phase above left the classroom reader in PAE_LUNCH mode (its
+# taps now run the meal engine — and on weekends they flag 422). Phone taps
+# must prove the PLAIN tap path, so relabel back first.
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/readers/$CLASSROOM_ID/mode" \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d '{"active_event_type":"CLASS_ATTENDANCE"}')
+check "Reader back to classroom mode / Lector de vuelta a modo aula" "$R" '"active_event_type":"CLASS_ATTENDANCE"'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/students/$HCE_STUDENT_ID/arm-pairing" \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d '{}')
+check "Arm pairing for the phone student / Armar emparejamiento" "$R" '"status":"ok"'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/pair" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\", \"credential_kind\": \"hce\"}")
+check "Pair the HCE credential id / Emparejar la credencial HCE" "$R" "\"student_id\":$HCE_STUDENT_ID"
+
+HCE_KIND=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\Card::where("credential_uid", $argv[1])->first()->kind->value;' "$HCE_CRED")
+check "Backend stores kind=hce / El backend guarda kind=hce" "$HCE_KIND" 'hce'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\"}")
+check "Phone tap resolves the student / El toque del teléfono resuelve" "$R" '"status":"ok"'
+check "Phone tap names the student / El toque nombra al estudiante" "$R" '"student_first_name":"E2E"'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/students/$HCE_STUDENT_ID/arm-pairing" \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d '{}')
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/pair" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\", \"credential_kind\": \"hce\"}")
+check "Re-pairing the phone is rejected 422 / Reemparejar se rechaza 422" "$R" '422'
+
+# ---------------------------------------------------------------------------
 say "== Fase D — canje / redemption =="
 # Give the demo student exactly 25 points for deterministic assertions.
 "$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); App\Models\PointsLedger::create(["student_id"=>$argv[1],"delta"=>25,"reason"=>"e2e_seed"]);' "$STUDENT_ID"

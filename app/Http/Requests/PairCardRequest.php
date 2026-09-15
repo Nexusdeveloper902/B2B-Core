@@ -25,6 +25,12 @@ class PairCardRequest extends FormRequest
         return [
             // Same shape the tap endpoint accepts: the card UID.
             'credential_uid' => ['required', 'string', 'max:255'],
+            // HCE integration: HOW the credential was captured (physical
+            // MIFARE UID vs application-level Android HCE credential id).
+            // Optional — omitted means 'physical' (old firmware keeps
+            // working byte-for-byte); stored on the cards row as audit
+            // metadata, never part of the tap lookup.
+            'credential_kind' => ['nullable', 'string', 'in:physical,hce'],
         ];
     }
 }

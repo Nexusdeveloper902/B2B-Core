@@ -123,6 +123,11 @@ class PairingService
             ] : null,
             'last_pairing' => $recent->isNotEmpty() ? [
                 'card_uid' => $recent->first()->card?->credential_uid,
+                // HCE integration: HOW the credential was captured
+                // (physical | hce) — the pairing desk badges phone
+                // credentials; the realtime pairing channel carries the
+                // same payload, so no WS contract change was needed.
+                'card_kind' => $recent->first()->card?->kind?->value ?? 'physical',
                 'student_id' => $recent->first()->student_id,
                 'student_name' => $recent->first()->student?->name,
                 'paired_at' => $recent->first()->consumed_at?->toIso8601String(),
@@ -130,6 +135,7 @@ class PairingService
             ] : null,
             'recent_pairings' => $recent->map(fn ($p) => [
                 'card_uid' => $p->card?->credential_uid,
+                'card_kind' => $p->card?->kind?->value ?? 'physical',
                 'student_id' => $p->student_id,
                 'student_name' => $p->student?->name,
                 'paired_at' => $p->consumed_at?->toIso8601String(),
@@ -142,12 +148,22 @@ class PairingService
      * Pair a scanned credential with the most recent active pending
      * pairing.
      *
+     * $kind records HOW the credential was captured ('physical' for an
+     * RF-layer MIFARE UID, 'hce' for an application-level Android HCE
+     * credential id from the SELECT AID + CHALLENGE exchange). It is
+     * display/audit metadata only: the tap lookup stays
+     * credential_uid-only, so a kind mismatch can never break
+     * identification — and old readers that omit the kind pair exactly
+     * as before.
+     *
      * @return array{ok: true, card: Card, student: Student, pairing: PendingPairing}
      *                                                                                | array{ok: false, reason: 'no_session'|'already_paired'}
      */
-    public function pair(Reader $reader, string $credentialUid): array
+    public function pair(Reader $reader, string $credentialUid, string $kind = 'physical'): array
     {
-        return DB::transaction(function () use ($reader, $credentialUid) {
+        $kind = $kind === 'hce' ? 'hce' : 'physical';
+
+        return DB::transaction(function () use ($reader, $credentialUid, $kind) {
             // Lock the candidate row so two simultaneous pair taps cannot
             // both consume the same pending session (same convention as
             // the redemption row-lock in PointsService).
@@ -184,6 +200,7 @@ class PairingService
 
             $card = Card::create([
                 'credential_uid' => $credentialUid,
+                'kind' => $kind,
                 'student_id' => $pairing->student_id,
             ]);
 

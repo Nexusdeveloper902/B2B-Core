@@ -127,7 +127,7 @@
                         <td data-label="{{ __('app.pae_lunch') }}">{{ $student->pae_lunch_enrolled ? '✓' : '—' }}</td>
                         <td data-label="{{ __('app.card') }}">
                             @forelse($student->cards as $card)
-                                <code>{{ \Illuminate\Support\Str::limit($card->credential_uid, 10) }}</code>
+                                <code title="{{ $card->credential_uid }}">{{ \Illuminate\Support\Str::limit($card->credential_uid, 10) }}</code>@if($card->kind === \App\Enums\CardKind::Hce)<span class="muted small"> · {{ __('app.card_kind_hce') }}</span>@endif
                             @empty
                                 <span class="muted">{{ __('app.no_card') }}</span>
                             @endforelse
