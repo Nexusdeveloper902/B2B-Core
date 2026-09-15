@@ -9,12 +9,19 @@
 # Env:    B2B_SERVE_PORT, B2B_SERVE_HOST (defaults: 8000, 127.0.0.1)
 #         B2B_REALTIME_PORT  realtime feed port (default: 8081)
 #         B2B_REALTIME=0     start WITHOUT the realtime feed server
+#         B2B_MDNS=0         start WITHOUT the _pulse._tcp advertisement
 #
 # TASK-016 — the realtime WebSocket server (php artisan realtime:serve)
 # starts in the background next to `artisan serve`: the dashboards'
 # live-activity panels go LIVE instead of needing F5. Ctrl+C tears both
 # down. If the realtime port is busy the web server still starts and the
 # dashboard honestly shows the offline badge (graceful degrade).
+#
+# TASK-043 (mDNS discovery) — `serve` also publishes the backend on the
+# LAN as _pulse._tcp via avahi-publish-service (TXT version=1 protocol=1
+# api=/api, this web $PORT), so ESP32 devices discover it with no
+# hard-coded IP. Ctrl+C withdraws the advertisement. Missing CLI or a
+# down avahi-daemon only warns (devices keep their compiled fallback).
 #
 # Fails BEFORE binding (not at request time) when setup is incomplete, and
 # prints exactly which ./run command fixes it (ADR-011).
@@ -57,6 +64,8 @@ WS_PORT="${B2B_REALTIME_PORT:-8081}"
 WS_ENABLED="${B2B_REALTIME:-1}"
 WS_PID=""
 WEB_PID=""
+MDNS_ENABLED="${B2B_MDNS:-1}"
+MDNS_PID=""
 
 # port_open <port> — exit 0 when something is already listening on 127.0.0.1:<port>.
 # Uses the resolved PHP (portable: no /dev/tcp, no ss, works on Git Bash too).
@@ -67,6 +76,7 @@ port_open() {
 cleanup() {
     [ -n "$WEB_PID" ] && kill "$WEB_PID" 2>/dev/null || true
     [ -n "$WS_PID" ]  && kill "$WS_PID" 2>/dev/null || true
+    [ -n "$MDNS_PID" ] && kill "$MDNS_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -98,6 +108,28 @@ start_realtime() {
     return 1
 }
 
+start_mdns() {
+    [ "$MDNS_ENABLED" = "1" ] || { warn "mDNS advertisement disabled (B2B_MDNS=0) — ESP32 devices use their compiled API_BASE_URL fallback / Anuncio mDNS desactivado — los ESP32 usan su reserva compilada"; return 1; }
+    command -v avahi-publish-service >/dev/null 2>&1 || { warn "avahi-publish-service not found — skipping _pulse._tcp advertisement (install avahi / avahi-publish-service no encontrado — se omite el anuncio; instala avahi)"; return 1; }
+    case "$HOST" in
+        127.*|::1|localhost)
+            warn "Publishing _pulse._tcp while bound to ${HOST} — LAN devices cannot reach a loopback server; use --host=0.0.0.0 for hardware / Anunciando con bind a loopback — los equipos LAN no llegan; usa --host=0.0.0.0 para hardware"
+            ;;
+    esac
+
+    avahi-publish-service Pulse _pulse._tcp "$PORT" version=1 protocol=1 api=/api \
+        >>"$B2B_ROOT/storage/logs/mdns.log" 2>&1 &
+    MDNS_PID=$!
+
+    sleep 0.5
+    if kill -0 "$MDNS_PID" 2>/dev/null; then
+        return 0
+    fi
+    MDNS_PID=""
+    warn "mDNS advertisement failed (is avahi-daemon running?) — ESP32 devices use their compiled fallback; see storage/logs/mdns.log / Falló el anuncio mDNS (¿corre avahi-daemon?) — los ESP32 usan su reserva; ver storage/logs/mdns.log"
+    return 1
+}
+
 URL="http://${HOST}:${PORT}"
 printf '%b\n' ""
 printf '%b\n' "${C_BOLD}Pulse${C_RESET}  ${C_DIM}$(php_version_string "$PHP_BIN") · ${PHP_BIN_SOURCE}${C_RESET}"
@@ -107,6 +139,10 @@ printf '%b\n' "  ${C_GREEN}➜${C_RESET} Login:  ${URL}/login ${C_DIM}admin@pres
 
 if start_realtime; then
     printf '%b\n' "  ${C_GREEN}➜${C_RESET} Live:   ws://${HOST}:${WS_PORT}  ${C_DIM}(realtime feed — dashboards update without F5 / el panel se actualiza sin F5)${C_RESET}"
+fi
+
+if start_mdns; then
+    printf '%b\n' "  ${C_GREEN}➜${C_RESET} Found:  _pulse._tcp.local → :${PORT}  ${C_DIM}(ESP32 service discovery — no hard-coded IP / descubrimiento ESP32 — sin IP fija)${C_RESET}"
 fi
 
 printf '%b\n' "  ${C_DIM}Stop: Ctrl+C · Docs: docs/SCRIPTS.md (EN/ES) · Diagnóstico: ./run doctor${C_RESET}"

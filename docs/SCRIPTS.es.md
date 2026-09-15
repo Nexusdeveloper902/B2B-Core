@@ -97,6 +97,13 @@ estado «Desconectado». Variables: `B2B_REALTIME_PORT` (puerto) y
 salud del canal; el contrato del protocolo vive en
 `.agent/ARCHITECTURE/realtime-feed.md`.
 
+Desde TASK-043 `serve` también anuncia el backend en la LAN como
+`_pulse._tcp` (TXT `version=1 protocol=1 api=/api`, este puerto web)
+vía `avahi-publish-service`, para que los ESP32 lo descubran sin IP
+fija — se retira con Ctrl+C, `B2B_MDNS=0` arranca sin él. Las demos con
+hardware necesitan `--host=0.0.0.0` (loopback avisa). Contrato y prueba
+de banco: `docs/MDNS.es.md`.
+
 ## `test`
 
 ```bash

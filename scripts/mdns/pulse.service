@@ -1,0 +1,26 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!--
+  pulse.service — static Avahi advertisement for the Pulse backend.
+  Records the SAME contract `./run serve` publishes dynamically:
+    service _pulse._tcp.local, TXT version=1 protocol=1 api=/api.
+
+  Install (persistent bench machine, fixed web port only):
+    sudo cp scripts/mdns/pulse.service /etc/avahi/services/
+    # then edit <port> below to match the artisan serve port (default 8000)
+    # and restart avahi-daemon.
+
+  Prefer `./run serve` (dynamic, tracks --port/B2B_SERVE_PORT, dies with
+  Ctrl+C) — this file is the fallback for machines where serve.sh cannot
+  run avahi-publish-service. Contract details: docs/MDNS.md (+.es.md).
+-->
+<service-group>
+  <name replace-wildcards="yes">Pulse on %h</name>
+  <service>
+    <type>_pulse._tcp</type>
+    <port>8000</port>
+    <txt-record>version=1</txt-record>
+    <txt-record>protocol=1</txt-record>
+    <txt-record>api=/api</txt-record>
+  </service>
+</service-group>

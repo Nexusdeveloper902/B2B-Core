@@ -96,6 +96,13 @@ dashboards honestly show an offline badge. Env overrides:
 feed). `./run status` reports the feed's health; the protocol contract
 lives in `.agent/ARCHITECTURE/realtime-feed.md`.
 
+Since TASK-043 `serve` also advertises the backend on the LAN as
+`_pulse._tcp` (TXT `version=1 protocol=1 api=/api`, this web port) via
+`avahi-publish-service`, so ESP32 devices discover it with no
+hard-coded IP — withdrawn on Ctrl+C, `B2B_MDNS=0` starts without it.
+Hardware demos need `--host=0.0.0.0` (loopback warns). Contract and
+bench test: `docs/MDNS.md`.
+
 ## `test`
 
 ```bash
