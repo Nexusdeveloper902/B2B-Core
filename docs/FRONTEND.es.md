@@ -37,6 +37,43 @@ oscuro / ausente=error), insignias de puntos, tarjetas de recompensa con
 medidores de progreso, podio + filas del tablero, arte de pulso NFC,
 barra de cuenta regresiva, tarjeta de login, chips demo, estados vacíos.
 
+### 1b. Contrato responsive (TASK-046)
+
+La interfaz se verifica en un navegador real a **15 anchos de viewport,
+320px → 1600px, en los 17 paneles**: sin scroll horizontal de página y
+sin elementos que se escapen del viewport (excluyendo las tiras
+legítimas con `overflow-x: auto`). Los breakpoints no cambian — 1160 /
+940 / 620 — pero cuatro reglas estructurales hacen que de verdad se
+cumplan:
+
+| Regla | Por qué existe |
+|---|---|
+| `min-width: 0` en los hijos de cada contenedor de layout (`.grid-2`, `.bento`, `.report-cols`, `.stat-*`, `.filterbar`, `.tool-form`, `.settings-row`) | Los items flex/grid usan `min-width: auto` por defecto — "nunca más angosto que mi contenido". Eso anula cualquier scroller `overflow-x: auto` anidado: la tira no puede encogerse y quien scrollea es la PÁGINA. Fue la causa raíz del scroll horizontal en el escritorio de emparejamiento, la línea de tiempo del acudiente y el reporte PAE por debajo de ~520px. |
+| `.filterbar` recibe `flex-wrap: nowrap` al volverse columna | Un contenedor flex en columna que además envuelve es un contenedor multi-COLUMNA: su línea toma el tamaño cruzado del item más ancho, así que la fila de píldoras dimensionaba la página entera en vez de scrollear dentro de la barra. |
+| `.filterbar .searchbox` pierde su `flex-basis` en el layout de columna | `flex-basis` dimensiona el eje PRINCIPAL. Con la barra vertical, el `flex: 1 1 320px` de escritorio deja de significar "320px de ancho" y pasa a significar "320px de **alto**" — el escritorio de emparejamiento tenía un buscador de 320px de alto con un vacío enorme encima. |
+| `.topnav` es el elemento que se encoge (`min-width: 0` + `overflow-x: auto`, herramientas con `flex-shrink: 0`) | Las navegaciones cortas scrollean su propia tira en vez de empujar **salir y EN/ES fuera de pantalla**. |
+
+Una navegación con ocho o más enlaces (la de admin, con nueve) se salta la tira de píldoras en todos los anchos y usa el menú hamburguesa (`.topbar-in:has(.topnav a:nth-child(8))`): medido en navegador real, la tira necesita ~950px en EN y ~1150px en ES, lo que nunca cabe en el shell de 1360px junto a la marca y las herramientas — los últimos enlaces quedaban recortados tras la tira sin ningún indicador de scroll. Las navegaciones cortas conservan la tira hasta el breakpoint de 940px.
+
+Dos hechos de layout también estaban mal con independencia del ancho:
+
+- **`.stat-row` no tenía ninguna regla CSS**, así que los indicadores de
+  los escritorios PAE se apilaban a ancho completo en *cualquier*
+  viewport. Ahora es una grilla `auto-fit` intrínsecamente responsive
+  (mínimo 160px; la variante compacta 120px), así que esos escritorios no
+  necesitan breakpoint propio.
+- **El sangrado de `.ledger-wrap` ahora está acotado a `.panel`.** El
+  margen negativo existe para cancelar el padding del panel; la única
+  tabla que vive fuera de un panel (el reporte PAE por estudiante) se
+  salía del canal del shell y scrolleaba la página entre 621px y 699px.
+
+Por debajo de 620px un `.btn` sigue ocupando el ancho completo —
+correcto para una acción de formulario, incorrecto para una barra de
+herramientas — así que `.report-exports .btn` y `.btn-small` conservan su
+ancho intrínseco y envuelven.
+
+Fijado por `tests/Feature/Web/ResponsiveLayoutTest.php`.
+
 ## 2. Mapa de páginas (maqueta → ruta)
 
 | Maqueta | Ruta | Vista |

@@ -35,6 +35,40 @@ chips (CSS-owned tone map via `[data-event-type]`), stamps
 cards with goal meters, podium + board rows, NFC pulse art, countdown
 drain bar, login auth card, demo chips, empty states.
 
+### 1b. Responsive contract (TASK-046)
+
+The shell is verified in a real browser at **15 viewport widths, 320px →
+1600px, across all 17 panels**: no horizontal page scroll, and no element
+escaping the viewport (legitimate `overflow-x: auto` strips excluded).
+The breakpoints themselves are unchanged — 1160 / 940 / 620 — but four
+structural rules now make them actually hold:
+
+| Rule | Why it exists |
+|---|---|
+| `min-width: 0` on every layout container's items (`.grid-2`, `.bento`, `.report-cols`, `.stat-*`, `.filterbar`, `.tool-form`, `.settings-row`) | Flex/grid items default to `min-width: auto` — "never narrower than my content". That defeats every nested `overflow-x: auto` scroller: the strip can't shrink, so the PAGE scrolls sideways instead. This was the root cause of the pairing desk, parent timeline and PAE report all scrolling horizontally below ~520px. |
+| `.filterbar` gets `flex-wrap: nowrap` when it turns into a column | A column flex container that still wraps is a multi-COLUMN container: its line takes the cross size of the widest item, so the pill row sized the whole page instead of scrolling inside the bar. |
+| `.filterbar .searchbox` drops its `flex-basis` in the column layout | `flex-basis` sizes the MAIN axis. Once the bar is vertical, the desktop `flex: 1 1 320px` stops meaning "320px wide" and starts meaning "320px **tall**" — the pairing desk grew a 320px-tall search field with a canyon of white space above it. |
+| `.topnav` is the shrinking element (`min-width: 0` + `overflow-x: auto`, tools `flex-shrink: 0`) | Short navs scroll their own strip instead of pushing **logout and EN/ES off-screen**. |
+
+A nav with eight or more links (the nine-link admin nav) skips the pill strip at every width and uses the hamburger menu instead (`.topbar-in:has(.topnav a:nth-child(8))`): measured in a real browser, the strip needs ~950px in EN and ~1150px in ES, which never fits the 1360px shell beside the wordmark and the tools — trailing links sat clipped past the strip with no scroll affordance. Short navs keep the strip down to the 940px hamburger breakpoint.
+
+Two layout facts were also wrong independently of width:
+
+- **`.stat-row` had no CSS rule at all**, so the PAE desks' KPI tiles
+  stacked full-width at *every* viewport. It is now an intrinsically
+  responsive `auto-fit` grid (160px min; the compact variant 120px), so
+  the report desks need no breakpoint of their own.
+- **The `.ledger-wrap` edge bleed is now scoped to `.panel`.** The
+  negative margin exists to cancel a panel's padding; the one table that
+  sits outside a panel (the per-student PAE report) was pushed past the
+  shell gutter, scrolling the page between 621px and 699px.
+
+Below 620px a `.btn` still goes full-width — right for a form action,
+wrong for a toolbar — so `.report-exports .btn` and `.btn-small` keep
+their intrinsic width and wrap.
+
+Pinned by `tests/Feature/Web/ResponsiveLayoutTest.php`.
+
 ## 2. Page map (mockup → route)
 
 | Mockup | Route | View |

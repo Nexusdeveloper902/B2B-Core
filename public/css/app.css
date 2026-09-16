@@ -211,6 +211,7 @@ img { max-width: 100%; }
     justify-content: space-between;
     gap: var(--sp-md);
     min-height: var(--topbar-h);
+    min-width: 0;
 }
 
 .wordmark {
@@ -224,7 +225,12 @@ img { max-width: 100%; }
 /* The real Pulse mark (brand suite knockout) in the topbar, footer
    and login band. Height-locked; width follows the asset ratio. */
 .wordmark-mark {
-    height: 30px;
+    /* Height-locked, width from the asset ratio (the width/height
+       attributes reserve the box, so swapping a school crest in for the
+       Pulse lockup never shifts the topbar). The height itself is a
+       brand token: a square crest needs a little more room than the
+       wide Pulse lockup to read at the same optical size. */
+    height: var(--brand-mark-height, 30px);
     width: auto;
     display: inline-block;
     flex-shrink: 0;
@@ -239,6 +245,46 @@ img { max-width: 100%; }
 }
 .wordmark:hover .wordmark-name { color: var(--primary); }
 
+/* TASK-045 (ADR-065) — "Pulse, branded for <school>". A quiet tag beside
+   the product name, never a replacement for it. It is the first thing
+   dropped when the row gets tight, so a long institution name can never
+   push the nav into a wrap. */
+.wordmark-school {
+    display: inline-flex;
+    align-items: center;
+    max-width: 30ch;
+    padding-left: var(--sp-xs);
+    margin-left: var(--sp-2xs);
+    border-left: 1px solid var(--border);
+    font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label);
+    letter-spacing: var(--ls-label-sm);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+@media (max-width: 1400px) { .wordmark-school { display: none; } }
+
+.footer-school {
+    margin: var(--sp-2xs) 0 0;
+    font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label);
+    letter-spacing: var(--ls-label-sm);
+    text-transform: uppercase;
+    color: var(--text-meta);
+}
+
+/* The admin nav carries nine destinations (eight desks + teacher),
+   needing ~950px as a strip in EN and ~1150px in ES — beside the
+   wordmark and the tools that never fits the 1360px shell, so up to
+   four links sat clipped past the strip with no scroll affordance
+   (the strip hides its scrollbar). A nav with eight or more links
+   therefore skips the pill strip entirely and uses the hamburger menu
+   at every width: nothing is ever unreachable, in either locale.
+   Short navs (students, kitchen, teacher) keep the strip to 940px;
+   the strip below stays scrollable as a safety net for them. */
+.topbar-in:has(.topnav a:nth-child(8)) .topnav { display: none; }
+.topbar-in:has(.topnav a:nth-child(8)) .mobilenav { display: block; }
 .topnav {
     display: flex;
     align-items: center;
@@ -246,8 +292,14 @@ img { max-width: 100%; }
     background: var(--surface-container-high);
     border-radius: var(--radius-md);
     padding: var(--sp-2xs);
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
+.topnav::-webkit-scrollbar { display: none; }
+.topbar-tools { flex-shrink: 0; }
 .topnav a {
+    flex-shrink: 0;
     padding: 6px var(--sp-sm);
     border-radius: var(--radius-sm);
     text-decoration: none;
@@ -260,7 +312,7 @@ img { max-width: 100%; }
 .topnav a:hover { color: var(--text); }
 .topnav a.is-active {
     background: var(--primary);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     font-weight: 600;
 }
 
@@ -278,7 +330,7 @@ img { max-width: 100%; }
     height: 34px;
     border-radius: var(--radius-pill);
     background: var(--primary-container);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -646,6 +698,11 @@ img { max-width: 100%; }
     margin: 0 0 var(--sp-md);
 }
 .stat-strip-2 { grid-template-columns: repeat(2, 1fr); }
+/* The PAE report desks use .stat-row, which had no rule at all — their KPI
+   tiles stacked full-width at EVERY viewport. Same tile system as
+   .stat-strip, but intrinsically responsive (auto-fit): the strip reflows
+   from five-up to one-up on its own, no breakpoint of its own needed. */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--sp-md); margin: 0 0 var(--sp-md); }
 .stat {
     background: var(--surface-container-lowest);
     border-radius: var(--radius-sm);
@@ -722,7 +779,13 @@ img { max-width: 100%; }
 .stack { display: flex; flex-direction: column; gap: var(--sp-md); }
 .stack > * { margin: 0; }
 /* ---------- Ledger tables (mockup "Official School Day Record") ---------- */
-.ledger-wrap { overflow-x: auto; margin-inline: calc(var(--sp-lg) * -1); }
+/* The edge bleed exists to CANCEL a panel's own padding, so a wide table
+   can run full-bleed inside it. Outside a panel there is nothing to cancel
+   and the same -24px simply pushed the table past the shell gutter — which
+   is how the per-student PAE report grew a horizontal page scrollbar
+   between 621px and 699px, where that gutter is 20px. */
+.ledger-wrap { overflow-x: auto; }
+.panel .ledger-wrap { margin-inline: calc(var(--sp-lg) * -1); }
 .panel > .ledger-wrap { margin-block: 0; }
 .ledger-table { width: 100%; text-align: left; border-collapse: collapse; }
 .ledger-table thead tr {
@@ -844,7 +907,7 @@ img { max-width: 100%; }
 .live-chip::before { content: ""; width: 6px; height: 6px; border-radius: var(--radius-pill); background: currentColor; flex-shrink: 0; }
 .live-chip[data-event-type^="CLASS_"]      { background: var(--surface-container-high); color: var(--primary); }
 .live-chip[data-event-type^="PAE_"]        { background: var(--surface-variant); color: var(--on-surface-variant); }
-.live-chip[data-event-type^="RECYCLING_"]  { background: var(--primary); color: var(--tertiary-fixed); }
+.live-chip[data-event-type^="RECYCLING_"]  { background: var(--primary); color: var(--on-primary); }
 .live-chip[data-event-type^="REDEMPTION"],
 .live-chip[data-event-type^="REWARD"]      { background: var(--secondary-fixed); color: var(--on-secondary-fixed); }
 .live-chip[data-event-type^="CARD_"]       { background: var(--tertiary-fixed); color: var(--on-tertiary-fixed); }
@@ -906,8 +969,8 @@ img { max-width: 100%; }
     color: var(--text-muted);
 }
 .live-dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--text-meta); }
-.live-badge[data-state="live"]       { background: var(--primary); color: var(--tertiary-fixed); }
-.live-badge[data-state="live"] .live-dot       { background: var(--tertiary-fixed); animation: dot-pulse 1.6s ease-in-out infinite; }
+.live-badge[data-state="live"]       { background: var(--primary); color: var(--on-primary); }
+.live-badge[data-state="live"] .live-dot       { background: var(--on-primary); animation: dot-pulse 1.6s ease-in-out infinite; }
 .live-badge[data-state="connecting"] { background: var(--tertiary-fixed); color: var(--on-tertiary-fixed); }
 .live-badge[data-state="connecting"] .live-dot { background: var(--on-tertiary-fixed); animation: dot-pulse 0.9s ease-in-out infinite; }
 .live-badge[data-state="offline"]    { background: var(--error-container); color: var(--on-error-container); }
@@ -1235,8 +1298,23 @@ select::-ms-expand { display: none; }
     font-size: var(--fs-body-sm);
 }
 
+/* ---------- Shrinkable layout items (responsive pass) ----------
+   Flex and grid items default to `min-width: auto` — "never narrower than
+   my content". That default silently defeats every `overflow-x: auto`
+   scroller nested inside one: the scroller can never shrink, so the PAGE
+   scrolls sideways instead of the strip. It is why the pairing desk's
+   grade pills, the parent timeline's filter bar and the PAE report
+   columns pushed a horizontal scrollbar onto the whole document below
+   ~520px while their own scroll rules looked correct. Declared once for
+   every layout container in the system. */
+.grid-2 > *, .grid-2-wide-left > *, .grid-2-wide-right > *,
+.bento > *, .report-cols > *, .stat-row > *,
+.stat-strip > *, .stat-strip-2 > *, .reward-grid > *,
+.filterbar > *, .tool-form > *, .settings-row > * { min-width: 0; }
+
 /* Filter pills (mockup "Interactive Filters and Search Tooling") */
 .filterbar {
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1248,7 +1326,10 @@ select::-ms-expand { display: none; }
     padding: var(--sp-md);
     margin-bottom: var(--sp-md);
 }
-.pills { display: flex; align-items: center; gap: var(--sp-2xs); flex-wrap: wrap; }
+/* min-width:0 — below 940px this becomes a nowrap scroll strip (see the
+   responsive block), which only works if it may be narrower than its own
+   row of pills. */
+.pills { display: flex; align-items: center; gap: var(--sp-2xs); flex-wrap: wrap; min-width: 0; }
 .pill {
     display: inline-flex;
     align-items: center;
@@ -1266,7 +1347,7 @@ select::-ms-expand { display: none; }
     transition: background var(--dur), color var(--dur), border-color var(--dur);
 }
 .pill:hover { color: var(--text); border-color: var(--border-strong); }
-.pill.is-active { background: var(--primary); border-color: var(--primary); color: var(--tertiary-fixed); }
+.pill.is-active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 
 /* ---------- Pairing countdown (draining window; JS contract) ----------
    TASK-021 grammar kept: edge-to-edge meter (margin 0, radius 0). */
@@ -1321,7 +1402,7 @@ select::-ms-expand { display: none; }
     height: 44px;
     border-radius: var(--radius-md);
     background: var(--primary);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1372,6 +1453,17 @@ select::-ms-expand { display: none; }
     padding: var(--sp-sm) var(--sp-lg);
 }
 .auth-band .wordmark-mark { height: 26px; width: auto; }
+/* A branded login card names the institution under the product name;
+   the mark gets a touch more room there for the same optical weight. */
+.auth-band.is-branded .wordmark-mark { height: 34px; }
+.auth-band-school {
+    margin: 2px 0 0;
+    font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label);
+    letter-spacing: var(--ls-label-sm);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
 .auth-band-title { margin: 0; font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-label); letter-spacing: var(--ls-label-sm); text-transform: uppercase; color: var(--on-surface-variant); }
 .auth-band-sub { margin: 0; font-size: 12px; color: var(--text-muted); }
 .auth-card .auth-body { padding: var(--sp-xl); }
@@ -1427,7 +1519,7 @@ select::-ms-expand { display: none; }
     height: 36px;
     border-radius: var(--radius-md);
     background: var(--primary);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1560,7 +1652,7 @@ select::-ms-expand { display: none; }
     padding: 4px var(--sp-sm);
     border-radius: var(--radius-sm);
     background: var(--primary);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     font: 600 15px/1 var(--font-label);
     white-space: nowrap;
 }
@@ -1580,7 +1672,7 @@ select::-ms-expand { display: none; }
     height: 36px;
     border-radius: var(--radius-sm);
     background: var(--primary-container);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1612,7 +1704,7 @@ select::-ms-expand { display: none; }
     letter-spacing: var(--ls-label-sm);
     text-transform: uppercase;
 }
-.reward-note.is-yes { background: var(--primary); color: var(--tertiary-fixed); }
+.reward-note.is-yes { background: var(--primary); color: var(--on-primary); }
 
 /* ---------- Leaderboard (mockup 05) ---------- */
 .tabs { display: inline-flex; align-items: center; gap: var(--sp-2xs); background: var(--surface-container-high); border: 1px solid var(--surface-variant); border-radius: var(--radius-sm); padding: var(--sp-2xs); flex-wrap: wrap; }
@@ -1628,7 +1720,7 @@ select::-ms-expand { display: none; }
     color: var(--text-muted);
 }
 .tab-btn:hover { color: var(--text); }
-.tab-btn.is-active { background: var(--primary); color: var(--tertiary-fixed); }
+.tab-btn.is-active { background: var(--primary); color: var(--on-primary); }
 
 .podium { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-md); margin-bottom: var(--sp-md); }
 .podium-card {
@@ -1642,7 +1734,7 @@ select::-ms-expand { display: none; }
 }
 .podium-card.is-first { background: var(--primary); color: var(--on-primary); }
 .podium-rank { font-family: var(--font-display); font-size: var(--fs-headline-md); font-weight: 600; line-height: 1; }
-.podium-card.is-first .podium-rank { color: var(--tertiary-fixed); }
+.podium-card.is-first .podium-rank { color: var(--on-primary); }
 .podium-name { font: 600 var(--fs-label-md)/var(--lh-label-md) var(--font-body); overflow-wrap: anywhere; }
 .podium-card.is-first .podium-name { color: var(--on-primary); }
 .podium-points { font: 600 var(--fs-label-sm)/var(--lh-label-sm) var(--font-mono); color: var(--text-muted); }
@@ -1752,11 +1844,23 @@ select::-ms-expand { display: none; }
     .footer-in { flex-direction: column; align-items: flex-start; }
     .timeline-head { grid-template-columns: 1fr; }
     .timeline-stat + .timeline-stat { border-left: none; border-top: 1px solid var(--surface-container-high); padding-left: var(--sp-lg); }
-    .filterbar { flex-direction: column; align-items: stretch; }
+    /* A COLUMN flex container that still wraps is a multi-COLUMN
+       container: its flex line takes the cross size of the widest item, so
+       the pills row sized the whole bar (and the page) to its own
+       max-content instead of scrolling inside it. One axis, one line. */
+    .filterbar { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
     .searchbox { flex: 1 1 auto; }
+    /* `flex-basis` sizes the MAIN axis. Once the bar is a column, the
+       desktop `flex: 1 1 320px` stops meaning "320px wide" and starts
+       meaning "320px TALL" — which is how the pairing desk grew a
+       320px-tall search field with a canyon of white space above it. Both
+       selectors carry the desktop basis, so both must be neutralized. */
+    .filterbar .searchbox,
+    .filterbar--flush .searchbox { flex: 0 0 auto; }
     .profile-card { flex-direction: column; align-items: flex-start; }
     .podium { grid-template-columns: 1fr; }
-    .filterbar .pills { overflow-x: auto; flex-wrap: nowrap; padding-bottom: var(--sp-2xs); }
+    .filterbar .pills { overflow-x: auto; flex-wrap: nowrap; padding-bottom: var(--sp-2xs); scrollbar-width: thin; }
+    .filterbar .pills > * { flex-shrink: 0; }
 }
 
 @media (max-width: 620px) {
@@ -1774,6 +1878,13 @@ select::-ms-expand { display: none; }
     .tool-form { flex-direction: column; align-items: stretch; }
     .tool-form .bare-input { width: 100%; flex: 1 1 auto; min-width: 0; }
     .btn, .linklike { width: 100%; }
+    /* ...but a TOOLBAR of buttons is not a stack of form actions. The PAE
+       desks' export row is five short links; full-width there spends most
+       of a phone screen scrolling past them. They keep their intrinsic
+       width and wrap, and .btn's min-height keeps the tap target honest.
+       Same for small in-row actions (card chips, roster rows), which
+       belong beside their content, not under it. */
+    .report-exports .btn, .btn-small { width: auto; }
     .linklike { min-height: var(--tap); }
     .stat-value { font-size: 28px; }
     .stat-strip .stat:first-child .stat-value { font-size: 36px; }
@@ -1813,7 +1924,10 @@ select::-ms-expand { display: none; }
         color: var(--text-muted);
         flex-shrink: 0;
     }
-    .ledger-wrap { margin-inline: 0; }
+    /* Matches the scoped bleed above (a bare `.ledger-wrap` selector here
+       would lose to it on specificity and the bleed would survive into the
+       stacked-card layout). */
+    .panel .ledger-wrap { margin-inline: 0; }
 
     .live-row { grid-template-columns: 36px 1fr; }
     .live-side { grid-column: 2; flex-direction: row; justify-content: flex-start; gap: 10px; }
@@ -1890,7 +2004,7 @@ select::-ms-expand { display: none; }
 .pagination li.active span, .pagination li.active a {
     background: var(--primary);
     border-color: var(--primary);
-    color: var(--tertiary-fixed);
+    color: var(--on-primary);
 }
 .pagination li.disabled span { opacity: 0.4; }
 
@@ -2129,7 +2243,9 @@ select::-ms-expand { display: none; }
 }
 .report-reasons strong { font-family: var(--font-mono); }
 
-.stat-row-compact { grid-template-columns: repeat(3, 1fr); }
+/* Narrower tiles (three totals, no icons) — still auto-fitting, so the
+   monthly panel collapses cleanly inside the report columns. */
+.stat-row-compact { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
 
 .report-student-badges {
     display: flex; align-items: center; gap: var(--sp-sm); flex-wrap: wrap;
