@@ -255,7 +255,9 @@ say "== Fase B-HCE — el teléfono como credencial / phone-as-credential =="
 # → tap resolves the student. No hardware needed — the reader's APDU
 # exchange is proven by the firmware native suite + bench checklist §10;
 # here the backend half is proven against the live server.
-HCE_STUDENT_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $c=App\Models\SchoolClass::first(); $s=App\Models\Student::create(["name"=>"E2E HCE Student","grade"=>"5°","class_id"=>$c->id,"pae_breakfast_enrolled"=>false,"pae_lunch_enrolled"=>false]); echo $s->id;')
+# TASK-048 — the demo seed now owns a school (ADR-064): the student joins
+# its class's school, or the school-scoped admin could not see it to arm.
+HCE_STUDENT_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $c=App\Models\SchoolClass::first(); $s=App\Models\Student::create(["name"=>"E2E HCE Student","grade"=>"5°","class_id"=>$c->id,"school_id"=>$c->school_id,"pae_breakfast_enrolled"=>false,"pae_lunch_enrolled"=>false]); echo $s->id;')
 HCE_CRED="E2E-HCE-PHONE-01"
 
 # The relabel phase above left the classroom reader in PAE_LUNCH mode (its
