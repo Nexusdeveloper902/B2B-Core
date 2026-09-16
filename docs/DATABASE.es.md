@@ -102,6 +102,17 @@ aplicación, no del motor.
   y emparejar usa `physical` cuando el lector omite `credential_kind`.
   Segura y reversible (down borra la columna). El escritorio de
   emparejamiento marca las filas `hce` (“Phone” / “Teléfono”).
+- **`hce_credential_keys`** (TASK-049, ADR-068): una fila por credencial
+  de teléfono — `card_id` (FK única, en cascada al desvincular), `secret`
+  (la llave HMAC de 32 bytes en hex, cast `encrypted` de Laravel con
+  `APP_KEY`, oculta en la serialización), `fingerprint` (el público
+  `sha256(llave)[0:16]`, para soporte), `provisioned_by_reader_id` (FK
+  anulable), `provisioned_at`. Solo la escribe un emparejamiento `hce`
+  con prueba de posesión verificada; la borra la revocación. Sin columna
+  de colegio: las filas solo se alcanzan a través de una tarjeta que ya
+  tiene alcance de colegio. Rotar `APP_KEY` vuelve ilegibles las llaves
+  guardadas, y entonces hay que re-vincular cada teléfono. Reversible (down
+  borra la tabla).
 
 ## 7. Adiciones de esquema — TASK-037 (programa PAE completo)
 

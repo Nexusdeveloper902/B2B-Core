@@ -126,4 +126,8 @@ return [
     'settings_saved' => 'Settings saved — they are live immediately',
     'settings_unknown_key' => 'Unknown setting key: :key',
     'settings_windows_overlap' => 'The breakfast and lunch windows must not overlap',
+
+    // TASK-049 (ADR-068) — per-credential HCE keys + revocation
+    'hce_credential_unverified' => 'Phone credential could not be verified',
+    'card_revoked' => 'Credential of :student revoked — it no longer authenticates',
 ];

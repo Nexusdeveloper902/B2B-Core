@@ -1,6 +1,8 @@
 # ADR-060: Android HCE phones are cards with a kind, not a new identity system
 
 ## Status
+**§4 (trust model) superseded by ADR-068 (2026-09-16):** per-credential keys, verified here; no shared HCE secret anywhere. The rest stands.
+
 Accepted (2026-09-14, TASK-042)
 
 ## Context

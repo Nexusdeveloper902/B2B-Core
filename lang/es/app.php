@@ -117,6 +117,7 @@ return [
     'pairing_none_yet' => 'Aún no hay tarjetas emparejadas.',
     'pairing_rejected' => 'La tarjeta :uid fue rechazada — :reason. Toca una tarjeta DISTINTA, o ejecuta ./run unpair en el servidor para que toda tarjeta vuelva a ser emparejable.',
     'pairing_reason_already_paired' => 'esa tarjeta ya está emparejada',
+    'pairing_reason_hce_proof_invalid' => 'el teléfono no pudo probar su llave (abre “Vincular este teléfono” en él y vuelve a acercarlo)',
     'current_card' => 'Tarjeta actual',
     'no_card' => 'sin tarjeta',
     // Integración HCE: CÓMO se capturó una credencial (cards.kind).
@@ -345,6 +346,12 @@ return [
     'unpair' => 'Desvincular',
     'unpair_confirm' => '¿Desvincular la tarjeta :uid de :student? El historial de toques de esta tarjeta se borra y la tarjeta vuelve a ser vinculable.',
     'unpaired' => 'Tarjeta desvinculada — la credencial vuelve a estar fresca.',
+    // TASK-049 — revocar (credencial perdida/robada; se conserva el historial)
+    'revoke' => 'Revocar',
+    'revoke_confirm' => '¿Revocar la credencial :uid de :student? Deja de funcionar al instante (se destruye la llave del teléfono). El historial se conserva; desvincúlala después para reutilizar el id.',
+    'revoked' => 'Credencial revocada — ya no se autentica.',
+    'card_status_revoked' => 'Revocada',
+    'toast_card_revoked' => 'Credencial revocada.',
 
     // Consulta en lenguaje natural (superficie docente + respuestas markdown)
     'nl_query_teacher_hint' => 'Las respuestas se limitan a las clases que dictas.',

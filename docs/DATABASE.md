@@ -97,6 +97,16 @@ from the app layer, not the engine.
   backfill as `physical`, and pairing defaults to `physical` when the
   reader omits `credential_kind`. Safe and reversible (drop-column
   down). The pairing desk badges `hce` rows (“Phone” / “Teléfono”).
+- **`hce_credential_keys`** (TASK-049, ADR-068): one row per phone
+  credential — `card_id` (unique FK, cascade on unpair), `secret` (the
+  32-byte HMAC key as hex, Laravel `encrypted` cast with `APP_KEY`, hidden
+  from serialization), `fingerprint` (public `sha256(key)[0:16]` for
+  support), `provisioned_by_reader_id` (nullable FK), `provisioned_at`.
+  Written only by an `hce` pairing with a verified proof of possession;
+  deleted by revocation. No school column: rows are reached only through
+  an already school-scoped card. Rotating `APP_KEY` makes stored keys
+  unreadable, and every phone must then be re-linked. Reversible
+  (drop-table down).
 
 ## 7. Schema additions — TASK-037 (PAE full program)
 

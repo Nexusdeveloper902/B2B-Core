@@ -1384,3 +1384,24 @@ Bluetooth-speaker bridge (B2B-App TASK-002).
   (`admin.colegio@presence.test`) beside the system operator.
 - **Test fixtures:** create rows the demo admin must see through
   `TestCase::schoolStudent/schoolClass/schoolReader`.
+
+## TASK-049 additions (2026-09-16, RUN-2026-09-16-core-050)
+
+- **No shared HCE secret any more (ADR-068).** Each phone credential
+  has its own key in `hce_credential_keys` (encrypted with `APP_KEY`,
+  hidden, never logged).
+- **This backend verifies every phone tap.** It checks `hce_nonce` and
+  `hce_mac` relayed by the reader, with single-use nonces, on
+  `/events/tap` and `/recycling/captures/{id}/associate`. A reader key
+  alone can no longer forge a phone tap (`403 hce_auth_failed`).
+- **Pairing an `hce` card is the key hand-off.** The reader wraps the
+  key under its api_key, and proof of possession is mandatory.
+  Re-keying is allowed only for an active phone of the armed student
+  (reinstall); nothing else is ever overwritten.
+- **Revocation:** `POST /api/v1/admin/cards/{card}/revoke` plus the
+  desk **Revoke** button. History is kept and the key is destroyed.
+- **Migration:** phone cards paired before this have no key and fail
+  closed until they are re-linked at the desk.
+- **Test fixtures:** `tests/Support/FakeHcePhone` builds phone
+  tap/pair bodies. `scripts/e2e.sh` has the bash equivalent
+  (`hce_body`).

@@ -74,6 +74,18 @@
                                             aria-label="{{ __('app.unpair') }} {{ $card->credential_uid }}">
                                         {{ __('app.unpair') }}
                                     </button>
+                                    {{-- TASK-049 — revoke keeps history, kills the credential (lost phone) --}}
+                                    @if($card->isActive())
+                                        <button type="button" class="btn btn-quiet btn-small revoke-btn"
+                                                data-revoke="{{ $card->id }}"
+                                                data-uid="{{ $card->credential_uid }}"
+                                                data-name="{{ $student->name }}"
+                                                aria-label="{{ __('app.revoke') }} {{ $card->credential_uid }}">
+                                            {{ __('app.revoke') }}
+                                        </button>
+                                    @else
+                                        <span class="muted small" data-card-status>· {{ __('app.card_status_revoked') }}</span>
+                                    @endif
                                 </span>
                             @empty
                                 <span class="muted">{{ __('app.no_card') }}</span>
@@ -217,6 +229,12 @@
         var UNPAIRED_TEXT = {!! Js::from(__('app.unpaired')) !!};
         var UNPAIR_LABEL = {!! Js::from(__('app.unpair')) !!};
         var NO_CARD_TEXT = {!! Js::from(__('app.no_card')) !!};
+        // TASK-049 — per-card revoke (lost/stolen credential).
+        var revokeBtns = Array.prototype.slice.call(document.querySelectorAll('.revoke-btn'));
+        var REVOKE_LABEL = {!! Js::from(__('app.revoke')) !!};
+        var REVOKED_TEXT = {!! Js::from(__('app.revoked')) !!};
+        var REVOKED_BADGE = {!! Js::from('· '.__('app.card_status_revoked')) !!};
+        var TOAST_REVOKED = {!! Js::from(__('app.toast_card_revoked')) !!};
 
         // TASK-017 — the armed window as a draining progress bar.
         var countdown = document.getElementById('pairing-countdown');
@@ -241,7 +259,8 @@
         // locale, same convention as every other desk string).
         var REJECTED_TPL = {!! Js::from(__('app.pairing_rejected', ['uid' => ':UID:', 'reason' => ':REASON:'])) !!};
         var REASON_TEXT = {
-            'already_paired': {!! Js::from(__('app.pairing_reason_already_paired')) !!}
+            'already_paired': {!! Js::from(__('app.pairing_reason_already_paired')) !!},
+            'hce_proof_invalid': {!! Js::from(__('app.pairing_reason_hce_proof_invalid')) !!}
         };
         var rejectionNote = stateBox.dataset.rejectionNote || null;
 
@@ -553,6 +572,45 @@
                         setState(UNPAIRED_TEXT, true);
                         if (window.PulseToast) { PulseToast.success(TOAST_UNPAIRED); }
                     } else {
+                        setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
+                        if (window.PulseToast) { PulseToast.error((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}); }
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    setState({!! Js::from(__('app.error_generic')) !!}, false);
+                    if (window.PulseToast) { PulseToast.error(TOAST_NETWORK); }
+                });
+        }
+
+        // TASK-049 — revoke: confirm, POST, then swap the button for the
+        // badge from the confirmed server answer only (textContent).
+        revokeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var confirmTpl = {!! Js::from(__('app.revoke_confirm', ['uid' => ':UID:', 'student' => ':NAME:'])) !!};
+                window.DatumConfirm.open('unpair-confirm', {
+                    title: REVOKE_LABEL,
+                    message: confirmTpl.replace(':UID:', btn.dataset.uid || '').replace(':NAME:', btn.dataset.name || ''),
+                    confirmLabel: REVOKE_LABEL,
+                    onConfirm: function () { doRevoke(btn); }
+                });
+            });
+        });
+
+        function doRevoke(btn) {
+            btn.disabled = true;
+            postJson('/api/v1/admin/cards/' + btn.dataset.revoke + '/revoke')
+                .then(function (r) {
+                    if (r.ok) {
+                        var badge = document.createElement('span');
+                        badge.className = 'muted small';
+                        badge.setAttribute('data-card-status', '');
+                        badge.textContent = REVOKED_BADGE;
+                        btn.replaceWith(badge);
+                        setState(REVOKED_TEXT, true);
+                        if (window.PulseToast) { PulseToast.success(TOAST_REVOKED); }
+                    } else {
+                        btn.disabled = false;
                         setState((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}, false);
                         if (window.PulseToast) { PulseToast.error((r.data && r.data.message) || {!! Js::from(__('app.error_generic')) !!}); }
                     }

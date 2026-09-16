@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\Student;
+use App\Services\Hce\HceCredentialAuth;
 use App\Services\Realtime\TapFeedback;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -25,9 +26,12 @@ class TapService
 {
     private MealServingService $meals;
 
-    public function __construct(MealServingService $meals)
+    private HceCredentialAuth $hce;
+
+    public function __construct(MealServingService $meals, HceCredentialAuth $hce)
     {
         $this->meals = $meals;
+        $this->hce = $hce;
     }
 
     /**
@@ -40,10 +44,15 @@ class TapService
      * is a separate physical deposit awaiting classification.
      *
      * @return array{ok: true, event: PresenceEvent, duplicate?: bool} on success
-     *                                                                 array{ok: false, reason: 'not_found'|'inactive'|'no_student'|'not_enrolled'|'no_attendance'|'out_of_window'|'weekend'|'window_overlap'|'duplicate', message: string, event?: PresenceEvent, meal?: ?string} on rejection
+     *                                                                 array{ok: false, reason: 'not_found'|'inactive'|'hce_auth_failed'|'no_student'|'not_enrolled'|'no_attendance'|'out_of_window'|'weekend'|'window_overlap'|'duplicate', message: string, event?: PresenceEvent, meal?: ?string} on rejection
      */
-    public function registerTap(Reader $reader, string $credentialUid, ?string $clientTimestamp = null): array
-    {
+    public function registerTap(
+        Reader $reader,
+        string $credentialUid,
+        ?string $clientTimestamp = null,
+        ?string $hceNonce = null,
+        ?string $hceMac = null,
+    ): array {
         $card = Card::where('credential_uid', $credentialUid)->first();
 
         if ($card === null) {
@@ -56,6 +65,17 @@ class TapService
             TapFeedback::record($reader, 'rejected', 'inactive');
 
             return ['ok' => false, 'reason' => 'inactive', 'message' => __('api.card_not_active')];
+        }
+
+        // TASK-049 (ADR-068) — a phone credential is only as good as its
+        // proof: the reader relays the CHALLENGE transcript and THIS is
+        // where it is checked, with this credential's own key. Revocation
+        // above already won; no proof, no key, wrong key or a replayed
+        // nonce all fail closed, before any event or meal logic runs.
+        if ($card->isHce() && $this->hce->verifyTap($card, $hceNonce, $hceMac) !== null) {
+            TapFeedback::record($reader, 'rejected', 'hce_auth_failed');
+
+            return ['ok' => false, 'reason' => 'hce_auth_failed', 'message' => __('api.hce_credential_unverified')];
         }
 
         // TASK-037 — cafeteria taps go through the serving engine (auto

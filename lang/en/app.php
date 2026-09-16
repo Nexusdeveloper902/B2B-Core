@@ -117,6 +117,7 @@ return [
     'pairing_none_yet' => 'No cards paired yet.',
     'pairing_rejected' => 'Card :uid was rejected — :reason. Tap a DIFFERENT card, or run ./run unpair on the server to make every card pairable again.',
     'pairing_reason_already_paired' => 'that card is already paired',
+    'pairing_reason_hce_proof_invalid' => 'the phone could not prove its key (open “Link this phone” on it and tap again)',
     'current_card' => 'Current card',
     'no_card' => 'no card',
     // HCE integration: HOW a credential was captured (cards.kind).
@@ -344,6 +345,12 @@ return [
     'unpair' => 'Unpair',
     'unpair_confirm' => 'Unpair card :uid from :student? This card\'s tap history is deleted and the card becomes pairable again.',
     'unpaired' => 'Card unpaired — the credential is fresh again.',
+    // TASK-049 — revoke (lost/stolen credential; history kept)
+    'revoke' => 'Revoke',
+    'revoke_confirm' => 'Revoke credential :uid of :student? It stops working at once (a phone\'s key is destroyed). Tap history is kept; unpair later to reuse the id.',
+    'revoked' => 'Credential revoked — it no longer authenticates.',
+    'card_status_revoked' => 'Revoked',
+    'toast_card_revoked' => 'Credential revoked.',
 
     // NL query (teacher surface + markdown answers)
     'nl_query_teacher_hint' => 'Answers are scoped to the classes you teach.',

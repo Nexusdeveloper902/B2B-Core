@@ -72,6 +72,12 @@ attendance. Recycling taps are exempt (every tap is a physical deposit).
 - `client_timestamp` (optional, ISO 8601) — future device clocks; absent →
   server time. Malformed values degrade gracefully to server time (a broken
   device clock never loses the tap).
+- `hce_nonce` (16 hex) + `hce_mac` (64 hex) — **required for phone
+  credentials** (`cards.kind = hce`, TASK-049 / ADR-068): the reader's
+  CHALLENGE nonce and the phone's `HMAC-SHA256(K_cred, credId || nonce)`,
+  relayed unverified. Checked here against that credential's own key;
+  each nonce is accepted once. Ignored for physical cards. See
+  “Android HCE credentials”.
 
 **Responses**
 
@@ -96,7 +102,12 @@ awarded at tap time.**
 path): `{"status":"error","message":"Invalid device signature"}`
 
 `404 Not Found` — unknown card (`Card not recognized`) or non-active card
-(`Card is not active`).
+(`Card is not active`). Revocation wins before any proof is checked.
+
+`403 Forbidden` — `{"status":"error","reason":"hce_auth_failed","message":"Phone credential could not be verified"}`:
+an active phone credential whose proof is missing, malformed, made with
+another key or for another id, replayed, or whose key is missing. No
+event (and no flagged meal row) is written.
 
 `422 Unprocessable Entity` — **meal-serving engine** (TASK-037): a valid,
 active card tapped a meal reader (`type: "pae"`, or any reader relabeled
@@ -372,9 +383,29 @@ display/audit metadata; the tap lookup stays `credential_uid`-only, so
 old readers that omit the kind pair exactly as before. See
 “Android HCE credentials” below.
 
+**`hce` pairings carry the phone's own key (TASK-049, ADR-068)** — all
+four fields are required with `credential_kind: "hce"` (else `422`):
+
 ```json
-{ "credential_uid": "TEST-ANDROID-001", "credential_kind": "hce" }
+{
+  "credential_uid": "PLS-K3Y7V3CT0R5Z",
+  "credential_kind": "hce",
+  "hce_nonce": "0123456789abcdef",
+  "hce_mac": "ba6d0fbf5106f79257727819d19a17b7e15abc4b8a0d1bfe71cd76090488a295",
+  "hce_key_nonce": "000102030405060708090a0b0c0d0e0f",
+  "hce_key_wrapped": "c5bb9fe15dff66a8636366dd4e73e0a3146601e3b3c36472961de142a9a914c2"
+}
 ```
+
+(The published shared test vector: key `00..1f`, reader key
+`test-secret-000000000000000001`.) `hce_key_wrapped` =
+`K XOR HMAC-SHA256(reader api_key, "pulse-hce-key-wrap/v1\n" || credential_uid || "\n" || hce_key_nonce)`;
+the key is accepted only if `hce_mac` verifies under it. `403
+hce_proof_invalid` otherwise (window stays armed, the desk shows why).
+If the id already belongs to an **active phone of the same student**
+this window was armed for, the key is replaced (`"rekeyed": true` — the
+reinstall path, history kept); any other existing row stays `422`, so
+provisioning can never overwrite another credential's key.
 
 **Response `200`**:
 
@@ -382,7 +413,8 @@ old readers that omit the kind pair exactly as before. See
 {
   "status": "ok",
   "paired_student_name": "Maria González",
-  "student_id": 3
+  "student_id": 3,
+  "rekeyed": false
 }
 ```
 
@@ -401,44 +433,55 @@ immediately for taps on the tap endpoint.
 
 ---
 
-## Android HCE credentials — phone-as-credential (HCE integration)
+## Android HCE credentials — phone-as-credential (per-credential keys, TASK-049 / ADR-068)
 
 An Android phone running the Pulse HCE app (`B2B-App/pulse-credential`)
 is a first-class Pulse credential: it pairs, taps, revokes and unpairs
-exactly like a physical card, through the SAME endpoints above. The
-reader detects the phone as an ISO-DEP target (SAK bit 6), SELECTs the
-Pulse AID `F0010203040506`, issues a random 8-byte CHALLENGE, and
-verifies the phone's `HMAC-SHA256(HCE_SECRET, credId || nonce)` response
-before submitting the application-level credential id as
-`credential_uid` with `credential_kind: "hce"`.
+through the SAME endpoints above. The reader detects the phone as an
+ISO-DEP target (SAK bit 6), SELECTs the Pulse AID `F0010203040506`,
+sends a random 8-byte CHALLENGE, and **relays** the answer — it holds no
+HCE key. **This backend verifies** `HMAC-SHA256(K_cred, credId || nonce)`
+with the key of that one credential (`App\Services\Hce\HceCredentialAuth`).
+Byte-level spec: `B2B-Firmware/docs/HCE_PROTOCOL.md`.
 
 Rules the backend enforces:
 
+- **No shared secret.** Each phone credential has its own 256-bit key
+  (`hce_credential_keys`, encrypted with `APP_KEY`, hidden from every
+  serialization, never logged, never returned by any endpoint). There is
+  no global HCE verifier secret anywhere in the config.
+- **Pairing is the key hand-off, and it is human-authorized** — an admin
+  arms the student, the holder opens "Link this phone" (a single-use, 60 s
+  window on the phone), and a reader in PAIRING mode relays the proof
+  plus the key wrapped under its own `api_key` inside a signed request.
+  Proof of possession is mandatory. No unauthenticated endpoint accepts a
+  key.
+- **Every phone tap must prove itself** (`hce_nonce` + `hce_mac`), on
+  `/events/tap` and `/recycling/captures/{id}/associate`. A reader key
+  alone can no longer forge a phone tap. Wrong key, wrong id, wrong nonce,
+  a replayed nonce (7-day memory per credential) or a missing key → `403
+  hce_auth_failed`.
+- **Revocation** — `POST /api/v1/admin/cards/{id}/revoke` (below) sets
+  `revoked` and destroys the key in the same transaction. Revocation is
+  checked before any proof (`404`), and a revoked phone cannot be
+  re-keyed. Unpairing deletes the row and the id becomes pairable again.
+- **Re-keying** is limited to an active phone of the student whose window
+  the admin armed (a reinstall wipes the phone's Keystore; the id is
+  stable). Existing rows of anyone else stay `422`.
 - **The NFC UID is NEVER the identity.** Android randomizes the RF UID
-  per tap; the reader logs only its length and the backend never sees
-  it. Identity is the application-level credential id carried inside
-  the APDU exchange.
-- **Pairing is explicit and human-authorized** — arm for the student on
-  the Pair cards desk, then tap the phone within the window. A tap with
-  no armed window answers `409`; an already-paired credential id answers
-  `422` without reassignment — identical to physical cards.
-- **The rest of Pulse cannot tell the difference**: taps resolve
-  `credential → student → attendance / PAE / recycling` through the
-  unchanged tap endpoint and event spine, regardless of `cards.kind`.
-- **Revocation is status-based** (`active` | `lost` | `revoked`): a
-  revoked phone credential taps `404` like a revoked card; unpairing
-  deletes the row and the credential id becomes pairable again.
-- **Security scope**: the prototype uses one development pre-shared key
-  (`HCE_SECRET`) verified on the reader, which the reader's request
-  signature then vouches for to the backend — same trust as a physical UID. No
-  secrets are logged or stored server-side. Per-credential keys,
-  replay protection and mutual authentication are recorded future work
-  in the firmware spec (`B2B-Firmware/docs/HCE_PROTOCOL.md`, the
-  canonical byte-level protocol reference).
+  per tap; the backend never sees it.
+- **Migration:** phone cards paired before TASK-049 have no key, and
+  their taps fail closed (`403`) until they are re-linked. That means
+  arming the same student and pairing again with "Link this phone"; the
+  history is kept.
+- **Known limits** (see the firmware spec §Security boundaries): the
+  authentication is one-way and the reader chooses the nonce, so a
+  reader-key holder who skims a phone can use that transcript once. The
+  key crosses NFC once, at enrollment. The symmetric keys make this
+  database plus `APP_KEY` the trust root.
 
-The pairing desk badges phone credentials (“Phone” / “Teléfono”) next to
-the credential id, in the roster chips, the recent-pairings history
-(both server-rendered and live WebSocket rows) and the students desk.
+The pairing desk badges phone credentials (“Phone” / “Teléfono”) and
+offers **Revoke** next to **Unpair** for every active credential.
 
 ---
 
@@ -959,6 +1002,29 @@ transaction, so the outcome is deterministic.
 
 After a successful unpair the SAME credential can be paired again
 immediately (the bench loop: pair → unpair → re-pair).
+
+---
+
+## POST /api/v1/admin/cards/{id}/revoke — revoke a credential (TASK-049, admin-only)
+
+For a lost or stolen phone (or card). **Admin role required**;
+school-scoped by route binding (another school's card → `404`;
+teacher/kitchen → `403`; no session → `401`). Unlike unpair, the history
+is **kept**: the row stays with `status = revoked` (taps → `404`
+inactive; re-pairing or re-keying the id → `422`). A phone credential's
+per-credential key is **destroyed** in the same transaction, so even a
+hand-edited status cannot make that key authenticate again. The pairing
+desk's **Revoke** button calls this.
+
+**Response `200`**:
+
+```json
+{
+  "status": "ok",
+  "revoked": { "card_id": 12, "credential_uid": "PLS-K3Y7V3CT0R5Z", "kind": "hce", "key_destroyed": true },
+  "message": "Credential of Maria González revoked — it no longer authenticates"
+}
+```
 
 ---
 

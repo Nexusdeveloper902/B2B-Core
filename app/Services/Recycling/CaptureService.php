@@ -9,6 +9,7 @@ use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\RecyclingDeposit;
 use App\Models\RecyclingUpdate;
+use App\Services\Hce\HceCredentialAuth;
 use App\Services\Realtime\RecyclingUpdateLog;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -88,8 +89,13 @@ class CaptureService
      * @return array{ok: true, capture: PendingCapture, result: array{duplicate: bool, deposit: RecyclingDeposit, new_balance: int}}
      *                                                                                                                               |array{ok: false, reason: string, message: string, state?: string}
      */
-    public function associate(Reader $reader, int $captureId, string $credentialUid): array
-    {
+    public function associate(
+        Reader $reader,
+        int $captureId,
+        string $credentialUid,
+        ?string $hceNonce = null,
+        ?string $hceMac = null,
+    ): array {
         $this->sweep();
 
         $capture = PendingCapture::find($captureId);
@@ -116,6 +122,13 @@ class CaptureService
 
         if (! $card->isActive()) {
             return ['ok' => false, 'reason' => 'card_inactive', 'message' => __('api.card_not_active')];
+        }
+
+        // TASK-049 (ADR-068) — same rule as the tap endpoint: a phone
+        // credential must prove itself with its own key. Card-level, so
+        // the capture window stays open for a proper retry.
+        if ($card->isHce() && app(HceCredentialAuth::class)->verifyTap($card, $hceNonce, $hceMac) !== null) {
+            return ['ok' => false, 'reason' => 'hce_auth_failed', 'message' => __('api.hce_credential_unverified')];
         }
 
         if (! $capture->isUsable()) {

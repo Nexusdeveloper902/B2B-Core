@@ -38,6 +38,8 @@ class TapEventController extends Controller
             $reader,
             (string) $request->validated('credential_uid'),
             $request->validated('client_timestamp'),
+            $request->validated('hce_nonce'),
+            $request->validated('hce_mac'),
         );
 
         if (! $result['ok']) {
@@ -47,8 +49,13 @@ class TapEventController extends Controller
             // weekend / duplicate / overlap) and the no-student case are
             // 422 — the card is valid, the request is just not
             // acceptable for the meal program.
-            $mealEngineRejection = $result['reason'] !== 'not_found' && $result['reason'] !== 'inactive';
-            $status = $mealEngineRejection ? 422 : 404;
+            // TASK-049 — an HCE proof failure is 403: the card exists and
+            // is active, but this tap did not prove it (ADR-068).
+            $status = match ($result['reason']) {
+                'not_found', 'inactive' => 404,
+                'hce_auth_failed' => 403,
+                default => 422,
+            };
 
             $payload = [
                 'status' => 'error',

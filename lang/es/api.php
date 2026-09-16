@@ -127,4 +127,8 @@ return [
     'settings_saved' => 'Configuración guardada — aplica de inmediato',
     'settings_unknown_key' => 'Clave de configuración desconocida: :key',
     'settings_windows_overlap' => 'Las ventanas de desayuno y almuerzo no deben solaparse',
+
+    // TASK-049 (ADR-068) — llaves HCE por credencial + revocación
+    'hce_credential_unverified' => 'No se pudo verificar la credencial del teléfono',
+    'card_revoked' => 'Credencial de :student revocada — ya no se autentica',
 ];

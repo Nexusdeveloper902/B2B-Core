@@ -74,6 +74,12 @@ asistencia. Los taps de reciclaje están exentos (cada tap es un depósito físi
 - `client_timestamp` (opcional, ISO 8601) — relojes de dispositivos futuros;
   ausente → hora del servidor. Un valor malformado degrada con elegancia a la
   hora del servidor (un reloj roto nunca pierde el tap).
+- `hce_nonce` (16 hex) + `hce_mac` (64 hex) — **obligatorios para
+  credenciales de teléfono** (`cards.kind = hce`, TASK-049 / ADR-068): el
+  nonce CHALLENGE del lector y el `HMAC-SHA256(K_cred, credId || nonce)`
+  del teléfono, retransmitidos sin verificar. Se comprueban aquí con la
+  llave propia de esa credencial; cada nonce se acepta una sola vez. Se
+  ignoran en tarjetas físicas. Ver “Credenciales HCE de Android”.
 
 **Respuestas**
 
@@ -98,7 +104,12 @@ otorgan puntos en el momento del tap.**
 banco): `{"status":"error","message":"Firma de dispositivo no válida"}`
 
 `404 Not Found` — tarjeta desconocida (`Tarjeta no reconocida`) o no activa
-(`La tarjeta no está activa`).
+(`La tarjeta no está activa`). La revocación gana antes de revisar cualquier prueba.
+
+`403 Forbidden` — `{"status":"error","reason":"hce_auth_failed","message":"No se pudo verificar la credencial del teléfono"}`:
+una credencial de teléfono activa cuya prueba falta, está malformada, se
+hizo con otra llave o para otro id, se repitió, o cuya llave no existe.
+No se escribe ningún evento (ni fila de comida marcada).
 
 `422 Unprocessable Entity` — **motor de servicio de comidas** (TASK-037):
 una tarjeta válida y activa tocó un lector de comidas (`type: "pae"`, o
@@ -385,9 +396,31 @@ solo por `credential_uid`, así que los lectores viejos que omiten el
 kind emparejan exactamente igual que antes. Ver “Credenciales HCE de
 Android” abajo.
 
+**Los emparejamientos `hce` llevan la llave propia del teléfono
+(TASK-049, ADR-068)** — los cuatro campos son obligatorios con
+`credential_kind: "hce"` (si no, `422`):
+
 ```json
-{ "credential_uid": "TEST-ANDROID-001", "credential_kind": "hce" }
+{
+  "credential_uid": "PLS-K3Y7V3CT0R5Z",
+  "credential_kind": "hce",
+  "hce_nonce": "0123456789abcdef",
+  "hce_mac": "ba6d0fbf5106f79257727819d19a17b7e15abc4b8a0d1bfe71cd76090488a295",
+  "hce_key_nonce": "000102030405060708090a0b0c0d0e0f",
+  "hce_key_wrapped": "c5bb9fe15dff66a8636366dd4e73e0a3146601e3b3c36472961de142a9a914c2"
+}
 ```
+
+(El vector de prueba compartido publicado: llave `00..1f`, clave de
+lector `test-secret-000000000000000001`.) `hce_key_wrapped` =
+`K XOR HMAC-SHA256(api_key del lector, "pulse-hce-key-wrap/v1\n" || credential_uid || "\n" || hce_key_nonce)`;
+la llave se acepta solo si `hce_mac` verifica con ella. Si no, `403
+hce_proof_invalid` (la ventana sigue armada y el escritorio muestra por
+qué). Si el id ya pertenece a un **teléfono activo del mismo estudiante**
+para el que se armó la ventana, la llave se reemplaza (`"rekeyed": true`
+— la ruta de reinstalación, el historial se conserva); cualquier otra
+fila existente sigue en `422`, así que el provisionamiento jamás
+sobrescribe la llave de otra credencial.
 
 **Respuesta `200`**:
 
@@ -395,7 +428,8 @@ Android” abajo.
 {
   "status": "ok",
   "paired_student_name": "Maria González",
-  "student_id": 3
+  "student_id": 3,
+  "rekeyed": false
 }
 ```
 
@@ -417,49 +451,61 @@ toques en el endpoint de tap.
 
 ---
 
-## Credenciales HCE de Android — el teléfono como credencial (integración HCE)
+## Credenciales HCE de Android — el teléfono como credencial (llaves por credencial, TASK-049 / ADR-068)
 
 Un teléfono Android con la app HCE de Pulse (`B2B-App/pulse-credential`)
 es una credencial Pulse de primera clase: se empareja, toca, revoca y
-desvincula exactamente igual que una tarjeta física, por los MISMOS
-endpoints de arriba. El lector detecta el teléfono como objetivo ISO-DEP
-(bit 6 del SAK), selecciona el AID de Pulse `F0010203040506`, emite un
-CHALLENGE aleatorio de 8 bytes y verifica la respuesta
-`HMAC-SHA256(HCE_SECRET, credId || nonce)` del teléfono antes de enviar
-el id de credencial a nivel de aplicación como `credential_uid` con
-`credential_kind: "hce"`.
+desvincula por los MISMOS endpoints de arriba. El lector detecta el
+teléfono como objetivo ISO-DEP (bit 6 del SAK), selecciona el AID de
+Pulse `F0010203040506`, envía un CHALLENGE aleatorio de 8 bytes y
+**retransmite** la respuesta — no tiene llave HCE. **Este backend
+verifica** `HMAC-SHA256(K_cred, credId || nonce)` con la llave de esa
+única credencial (`App\Services\Hce\HceCredentialAuth`). Especificación
+a nivel de bytes: `B2B-Firmware/docs/HCE_PROTOCOL.es.md`.
 
 Reglas que el backend impone:
 
+- **Sin secreto compartido.** Cada credencial de teléfono tiene su propia
+  llave de 256 bits (`hce_credential_keys`, cifrada con `APP_KEY`, oculta
+  en toda serialización, jamás registrada ni devuelta por ningún
+  endpoint). No existe ningún secreto verificador HCE global en la
+  configuración.
+- **Emparejar es la entrega de la llave, y lo autoriza un humano**: un
+  admin arma al estudiante, el titular abre «Vincular este teléfono»
+  (ventana de un solo uso, 60 s, en el teléfono) y un lector en modo
+  EMPAREJAR retransmite la prueba más la llave envuelta con su propia
+  `api_key`, dentro de una petición firmada. La prueba de posesión es
+  obligatoria. Ningún endpoint sin autenticar acepta una llave.
+- **Cada toque de teléfono debe probarse** (`hce_nonce` + `hce_mac`), en
+  `/events/tap` y en `/recycling/captures/{id}/associate`. Una clave de
+  lector sola ya no puede falsificar un toque de teléfono. Llave, id o
+  nonce erróneos, un nonce repetido (memoria de 7 días por credencial) o
+  una llave inexistente → `403 hce_auth_failed`.
+- **Revocación**: `POST /api/v1/admin/cards/{id}/revoke` (abajo) marca
+  `revoked` y destruye la llave en la misma transacción. La revocación se
+  revisa antes que cualquier prueba (`404`), y un teléfono revocado no
+  puede recibir llave nueva. Desvincular borra la fila y el id vuelve a
+  ser emparejable.
+- **Renovar la llave** solo aplica a un teléfono activo del estudiante
+  cuya ventana armó el admin (reinstalar borra el Keystore del teléfono;
+  el id es estable). Las filas existentes de cualquier otro siguen en
+  `422`.
 - **El UID NFC NUNCA es la identidad.** Android aleatoriza el UID RF en
-  cada toque; el lector solo registra su longitud y el backend jamás lo
-  ve. La identidad es el id de credencial a nivel de aplicación dentro
-  del intercambio APDU.
-- **El emparejamiento es explícito y autorizado por un humano** — arma
-  para el estudiante en el escritorio de emparejamiento y luego toca el
-  teléfono dentro de la ventana. Un toque sin ventana armada responde
-  `409`; un id ya emparejado responde `422` sin reasignación — idéntico
-  a las tarjetas físicas.
-- **El resto de Pulse no distingue la diferencia**: los toques resuelven
-  `credencial → estudiante → asistencia / PAE / reciclaje` por el
-  endpoint de tap sin cambios y la misma espina de eventos, sin importar
-  `cards.kind`.
-- **La revocación es por estado** (`active` | `lost` | `revoked`): un
-  teléfono revocado toca `404` como una tarjeta revocada; desvincular
-  borra la fila y el id vuelve a ser emparejable.
-- **Alcance de seguridad**: el prototipo usa una sola clave precompartida
-  de desarrollo (`HCE_SECRET`) verificada en el lector, que la clave
-  firma del lector luego avala ante el backend — la misma confianza que
-  un UID físico. Ningún secreto se registra ni se guarda en el servidor.
-  Claves por credencial, protección anti-replay y autenticación mutua son
-  trabajo futuro registrado en la especificación del firmware
-  (`B2B-Firmware/docs/HCE_PROTOCOL.md`, la referencia canónica del
-  protocolo a nivel de bytes).
+  cada toque; el backend jamás lo ve.
+- **Migración:** las tarjetas de teléfono emparejadas antes de TASK-049 no
+  tienen llave y sus toques fallan cerrado (`403`) hasta que se
+  re-vinculen: se arma al mismo estudiante y se vuelve a emparejar con
+  «Vincular este teléfono». El historial se conserva.
+- **Límites conocidos** (ver §Límites de seguridad en la especificación
+  del firmware): la autenticación es unilateral y el nonce lo elige el
+  lector, así que quien tenga una clave de lector y lea un teléfono a
+  escondidas puede usar esa transcripción una vez. La llave cruza NFC una
+  vez, al vincular. Con llaves simétricas, esta base de datos más
+  `APP_KEY` son la raíz de confianza.
 
 El escritorio de emparejamiento marca las credenciales de teléfono
-(“Phone” / “Teléfono”) junto al id, en los chips del roster, el historial
-reciente (filas renderizadas y en vivo por WebSocket) y el escritorio de
-estudiantes.
+(“Phone” / “Teléfono”) y ofrece **Revocar** junto a **Desvincular** en
+toda credencial activa.
 
 ---
 
@@ -998,6 +1044,30 @@ determinista.
 Tras una desvinculación exitosa la MISMA credencial puede volver a
 emparejarse de inmediato (el bucle de banco: emparejar → desvincular →
 re-emparejar).
+
+---
+
+## POST /api/v1/admin/cards/{id}/revoke — revocar una credencial (TASK-049, solo admin)
+
+Para un teléfono (o tarjeta) perdido o robado. **Requiere rol admin**;
+con alcance de colegio por el enlace de ruta (tarjeta de otro colegio →
+`404`; docente/cocina → `403`; sin sesión → `401`). A diferencia de
+desvincular, el historial **se conserva**: la fila queda con
+`status = revoked` (toques → `404` inactiva; re-emparejar o renovar la
+llave de ese id → `422`). La llave propia de una credencial de teléfono se
+**destruye** en la misma transacción, así que ni un estado editado a mano
+puede hacer que esa llave vuelva a autenticar. El botón **Revocar** del
+escritorio de emparejamiento llama a este endpoint.
+
+**Respuesta `200`**:
+
+```json
+{
+  "status": "ok",
+  "revoked": { "card_id": 12, "credential_uid": "PLS-K3Y7V3CT0R5Z", "kind": "hce", "key_destroyed": true },
+  "message": "Credencial de Maria González revocada — ya no se autentica"
+}
+```
 
 ---
 

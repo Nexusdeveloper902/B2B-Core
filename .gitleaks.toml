@@ -1,7 +1,7 @@
 # gitleaks configuration — B2B-Core
 #
 # Extends the default ruleset (nothing weakened) and allowlists exactly
-# five literals — all deliberate NON-credentials:
+# seven literals — all deliberate NON-credentials:
 #
 #   1. "nope-invalid-key"          — the deliberately-invalid bearer token
 #      the bilingual e2e suite (scripts/e2e.sh) sends to prove the 401
@@ -25,6 +25,12 @@
 #      the generic `generic-api-key` rule false-positives on it
 #      (blocked CI on the TASK-045 push). The fixture now uses
 #      Str::random(32); this entry covers the historic commit.
+#   6. "ba6d0fbf…a295" / 7. "c5bb9fe1…14c2" — the PUBLISHED shared HCE
+#      test vector (TASK-049, ADR-068): the CHALLENGE MAC and the
+#      reader-wrapped value for the all-public key 00..1f, pinned in
+#      tests/Unit/HceCredentialAuthTest.php, the firmware native suite,
+#      the Android unit suite and docs/API.md. Test vectors, not
+#      credentials (the key they derive from is bytes 0..31).
 #
 # Entries 2 and 3 matter only on FULL-HISTORY scans: push-event gitleaks
 # runs scan just the pushed commit range, but workflow_dispatch runs
@@ -38,11 +44,13 @@ title = "gitleaks config — B2B-Core"
 useDefault = true
 
 [allowlist]
-  description = "Deliberately-invalid / documented-example literals, not credentials: the e2e 401-path token, the HandshakeTest fixture WS token, the RFC 6455 example Sec-WebSocket-Key, the HceCredentialTest fixture card UID, and the SchoolAssociationTest fixture reader key"
+  description = "Deliberately-invalid / documented-example literals, not credentials: the e2e 401-path token, the HandshakeTest fixture WS token, the RFC 6455 example Sec-WebSocket-Key, the HceCredentialTest fixture card UID, the SchoolAssociationTest fixture reader key, and the published shared HCE test vector (MAC + wrapped value)"
   regexes = [
     '''nope-invalid-key''',
     '''7\.1893457207\.abcdef''',
     '''dGhlIHNhbXBsZSBub25jZQ==''',
     '''PLAINUID12345''',
     '''k-relaciones-1''',
+    '''ba6d0fbf5106f79257727819d19a17b7e15abc4b8a0d1bfe71cd76090488a295''',
+    '''c5bb9fe15dff66a8636366dd4e73e0a3146601e3b3c36472961de142a9a914c2''',
   ]

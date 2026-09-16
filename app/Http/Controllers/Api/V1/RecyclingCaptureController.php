@@ -62,6 +62,8 @@ class RecyclingCaptureController extends Controller
                 $reader,
                 $captureId,
                 (string) $request->validated('credential_uid'),
+                $request->validated('hce_nonce'),
+                $request->validated('hce_mac'),
             );
         } catch (ClassificationException $e) {
             // Driver-level failure (e.g. DeepSeek down): the capture is
@@ -80,7 +82,7 @@ class RecyclingCaptureController extends Controller
             // endpoint uses (the window stays open — retry with the
             // right card).
             $status = match ($result['reason']) {
-                'not_owned' => 403,
+                'not_owned', 'hce_auth_failed' => 403,
                 'no_pending_capture' => 404,
                 default => 404,
             };

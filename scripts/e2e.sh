@@ -250,15 +250,33 @@ check "Guest cannot relabel (401) / Invitado no puede reetiquetar" "$R" '401'
 
 # ---------------------------------------------------------------------------
 say "== Fase B-HCE — el teléfono como credencial / phone-as-credential =="
-# The Android HCE path over real HTTP: arm (admin PAT) → pair the
-# application-level credential id with credential_kind=hce (reader key)
-# → tap resolves the student. No hardware needed — the reader's APDU
-# exchange is proven by the firmware native suite + bench checklist §10;
-# here the backend half is proven against the live server.
+# The Android HCE path over real HTTP with a PER-CREDENTIAL key (TASK-049,
+# ADR-068): arm (admin PAT) → pair = key hand-off (reader-wrapped key +
+# proof of possession) → proven taps resolve the student; an unproven or
+# replayed tap is refused; revoke destroys the key. No hardware needed —
+# the APDU exchange is proven by the firmware native suite + bench
+# checklist §10; this PHP stand-in computes exactly what the reader relays.
 # TASK-048 — the demo seed now owns a school (ADR-064): the student joins
 # its class's school, or the school-scoped admin could not see it to arm.
 HCE_STUDENT_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $c=App\Models\SchoolClass::first(); $s=App\Models\Student::create(["name"=>"E2E HCE Student","grade"=>"5°","class_id"=>$c->id,"school_id"=>$c->school_id,"pae_breakfast_enrolled"=>false,"pae_lunch_enrolled"=>false]); echo $s->id;')
 HCE_CRED="E2E-HCE-PHONE-01"
+# The phone's own key (test-only, generated per run — never a constant).
+HCE_KEY=$("$PHP_BIN" -r 'echo bin2hex(random_bytes(32));')
+
+# hce_body <tap|pair> — the JSON a reader relays for this phone.
+hce_body() {
+    "$PHP_BIN" -r 'require "vendor/autoload.php";
+        [, $mode, $cred, $keyHex, $readerKey] = $argv;
+        $key = hex2bin($keyHex); $nonce = random_bytes(8);
+        $b = ["credential_uid" => $cred, "hce_nonce" => bin2hex($nonce),
+              "hce_mac" => bin2hex(App\Services\Hce\HceCredentialAuth::challengeMac($key, $cred, $nonce))];
+        if ($mode === "pair") {
+            $wn = bin2hex(random_bytes(16));
+            $b += ["credential_kind" => "hce", "hce_key_nonce" => $wn,
+                   "hce_key_wrapped" => App\Services\Hce\HceCredentialAuth::wrapKey($readerKey, $cred, $wn, $key)];
+        }
+        echo json_encode($b);' "$1" "$HCE_CRED" "$HCE_KEY" "$CLASSROOM_KEY"
+}
 
 # The relabel phase above left the classroom reader in PAE_LUNCH mode (its
 # taps now run the meal engine — and on weekends they flag 422). Phone taps
@@ -275,25 +293,52 @@ check "Arm pairing for the phone student / Armar emparejamiento" "$R" '"status":
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/pair" \
     -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\", \"credential_kind\": \"hce\"}")
-check "Pair the HCE credential id / Emparejar la credencial HCE" "$R" "\"student_id\":$HCE_STUDENT_ID"
+    -H "Content-Type: application/json" -d '{"credential_uid": "'"$HCE_CRED"'", "credential_kind": "hce"}')
+check "Keyless phone pairing is refused 422 / Emparejar sin llave se rechaza" "$R" '422'
 
-HCE_KIND=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\Card::where("credential_uid", $argv[1])->first()->kind->value;' "$HCE_CRED")
-check "Backend stores kind=hce / El backend guarda kind=hce" "$HCE_KIND" 'hce'
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/pair" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "$(hce_body pair)")
+check "Pair the phone with its own key / Emparejar con su propia llave" "$R" "\"student_id\":$HCE_STUDENT_ID"
+
+HCE_STORED=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); $c=App\Models\Card::where("credential_uid", $argv[1])->first(); echo $c->kind->value, ":", App\Models\HceCredentialKey::where("card_id", $c->id)->value("fingerprint") === App\Services\Hce\HceCredentialAuth::fingerprint(hex2bin($argv[2])) ? "key-ok" : "key-bad";' "$HCE_CRED" "$HCE_KEY")
+check "Backend stores kind=hce + that key / El backend guarda kind=hce + la llave" "$HCE_STORED" 'hce:key-ok'
+
+HCE_TAP=$(hce_body tap)
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "$HCE_TAP")
+check "Proven phone tap resolves the student / El toque probado resuelve" "$R" '"status":"ok"'
+check "Phone tap names the student / El toque nombra al estudiante" "$R" '"student_first_name":"E2E"'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "$HCE_TAP")
+check "Replayed phone proof is refused 403 / Prueba repetida se rechaza 403" "$R" '403'
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
     -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
     -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\"}")
-check "Phone tap resolves the student / El toque del teléfono resuelve" "$R" '"status":"ok"'
-check "Phone tap names the student / El toque nombra al estudiante" "$R" '"student_first_name":"E2E"'
+check "Unproven phone tap is refused 403 / Toque sin prueba se rechaza 403" "$R" '"reason":"hce_auth_failed"'
+
+HCE_CARD_ID=$("$PHP_BIN" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo App\Models\Card::where("credential_uid", $argv[1])->value("id");' "$HCE_CRED")
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/$HCE_CARD_ID/revoke" \
+    -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d '{}')
+check "Revoke the lost phone / Revocar el teléfono perdido" "$R" '"key_destroyed":true'
+
+R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/events/tap" \
+    -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
+    -H "Content-Type: application/json" -d "$(hce_body tap)")
+check "Revoked phone tap is refused 404 / Teléfono revocado se rechaza" "$R" '404'
 
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/students/$HCE_STUDENT_ID/arm-pairing" \
     -H "Authorization: Bearer $PAT" -H "Accept: application/json" \
     -H "Content-Type: application/json" -d '{}')
 R=$(curl -s -w '\n%{http_code}' -X POST "$BASE_URL/api/v1/admin/cards/pair" \
     -H "Authorization: Bearer $CLASSROOM_KEY" -H "Accept: application/json" \
-    -H "Content-Type: application/json" -d "{\"credential_uid\": \"$HCE_CRED\", \"credential_kind\": \"hce\"}")
-check "Re-pairing the phone is rejected 422 / Reemparejar se rechaza 422" "$R" '422'
+    -H "Content-Type: application/json" -d "$(hce_body pair)")
+check "Revoked phone cannot be re-keyed 422 / No se re-emite llave a un revocado" "$R" '422'
 
 # ---------------------------------------------------------------------------
 say "== Fase D — canje / redemption =="

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\ArmPairingController;
 use App\Http\Controllers\Api\V1\CaptureImageController;
 use App\Http\Controllers\Api\V1\CardPairingController;
+use App\Http\Controllers\Api\V1\CardRevokeController;
 use App\Http\Controllers\Api\V1\CardUnpairController;
 use App\Http\Controllers\Api\V1\ClassController;
 use App\Http\Controllers\Api\V1\LeaderboardController;
@@ -136,6 +137,13 @@ Route::prefix('v1')->group(function () {
     Route::delete('/admin/cards/{card}', [CardUnpairController::class, 'destroy'])
         ->middleware(['auth:sanctum', 'role:admin'])
         ->name('api.v1.cards.unpair');
+
+    // TASK-049 (ADR-068) — revoke a lost/stolen credential (admin-only):
+    // status → revoked, history kept, a phone's per-credential key
+    // destroyed. Taps fail from the next request on.
+    Route::post('/admin/cards/{card}/revoke', [CardRevokeController::class, 'store'])
+        ->middleware(['auth:sanctum', 'role:admin'])
+        ->name('api.v1.cards.revoke');
 
     // TASK-027 (gap E1) — authorized streaming of a stored capture
     // image (admin-only; images may contain students, so the private

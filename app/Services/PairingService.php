@@ -6,6 +6,7 @@ use App\Models\Card;
 use App\Models\PendingPairing;
 use App\Models\Reader;
 use App\Models\Student;
+use App\Services\Hce\HceCredentialAuth;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -156,14 +157,25 @@ class PairingService
      * identification — and old readers that omit the kind pair exactly
      * as before.
      *
-     * @return array{ok: true, card: Card, student: Student, pairing: PendingPairing}
-     *                                                                                | array{ok: false, reason: 'no_session'|'already_paired'}
+     * TASK-049 (ADR-068) — an `hce` pairing is also the key hand-off:
+     * $hce carries the relayed CHALLENGE proof (hce_nonce/hce_mac) and the
+     * reader-wrapped key (hce_key_wrapped/hce_key_nonce). The key is
+     * accepted only if the proof verifies under it. A credential id that
+     * is already paired may be RE-KEYED only when it is an active phone
+     * credential of the very student this window was armed for (a
+     * reinstall wipes the Keystore; history survives) — any other
+     * existing row stays `already_paired`, so provisioning can never
+     * overwrite another credential's key.
+     *
+     * @param  array<string, mixed>  $hce
+     * @return array{ok: true, card: Card, student: Student, pairing: PendingPairing, rekeyed: bool}
+     *                                                                                               | array{ok: false, reason: 'no_session'|'already_paired'|'hce_proof_invalid'}
      */
-    public function pair(Reader $reader, string $credentialUid, string $kind = 'physical'): array
+    public function pair(Reader $reader, string $credentialUid, string $kind = 'physical', array $hce = []): array
     {
         $kind = $kind === 'hce' ? 'hce' : 'physical';
 
-        return DB::transaction(function () use ($reader, $credentialUid, $kind) {
+        return DB::transaction(function () use ($reader, $credentialUid, $kind, $hce) {
             // Lock the candidate row so two simultaneous pair taps cannot
             // both consume the same pending session (same convention as
             // the redemption row-lock in PointsService).
@@ -183,6 +195,34 @@ class PairingService
             $existing = Card::where('credential_uid', $credentialUid)
                 ->lockForUpdate()
                 ->first();
+
+            $key = null;
+            if ($kind === 'hce') {
+                $accepted = app(HceCredentialAuth::class)->acceptProvisioning($reader, $credentialUid, $hce);
+
+                if (! $accepted['ok']) {
+                    $pairing->update([
+                        'last_rejected_uid' => $credentialUid,
+                        'last_rejected_reason' => 'hce_proof_invalid',
+                        'last_rejected_at' => now(),
+                    ]);
+
+                    return ['ok' => false, 'reason' => 'hce_proof_invalid'];
+                }
+
+                $key = $accepted['key'];
+
+                $rekey = $existing !== null
+                    && $existing->isHce()
+                    && $existing->isActive()
+                    && (int) $existing->student_id === (int) $pairing->student_id;
+
+                if ($rekey) {
+                    app(HceCredentialAuth::class)->storeKey($existing, $key, $reader);
+
+                    return $this->consume($pairing, $reader, $existing, rekeyed: true);
+                }
+            }
 
             if ($existing !== null) {
                 // TASK-014 — the rejection must be VISIBLE at the desk:
@@ -204,26 +244,41 @@ class PairingService
                 'student_id' => $pairing->student_id,
             ]);
 
-            // TASK-020 — a consumed window closes the whole loop: any
-            // older still-active row (pre-invariant data) is retired here
-            // too, so a success can never be shadowed by a stale window.
-            PendingPairing::whereNull('consumed_at')
-                ->where('id', '!=', $pairing->id)
-                ->where('expires_at', '>', now())
-                ->update(['expires_at' => now()]);
+            if ($key !== null) {
+                app(HceCredentialAuth::class)->storeKey($card, $key, $reader);
+            }
 
-            $pairing->update([
-                'consumed_at' => now(),
-                'reader_id' => $reader->id,
-                'card_id' => $card->id, // TASK-011: audit trail for the pairing desk
-            ]);
-
-            return [
-                'ok' => true,
-                'card' => $card,
-                'student' => $pairing->student,
-                'pairing' => $pairing,
-            ];
+            return $this->consume($pairing, $reader, $card, rekeyed: false);
         });
+    }
+
+    /**
+     * Close the armed window on a successful pair (or re-key).
+     *
+     * @return array{ok: true, card: Card, student: Student, pairing: PendingPairing, rekeyed: bool}
+     */
+    private function consume(PendingPairing $pairing, Reader $reader, Card $card, bool $rekeyed): array
+    {
+        // TASK-020 — a consumed window closes the whole loop: any
+        // older still-active row (pre-invariant data) is retired here
+        // too, so a success can never be shadowed by a stale window.
+        PendingPairing::whereNull('consumed_at')
+            ->where('id', '!=', $pairing->id)
+            ->where('expires_at', '>', now())
+            ->update(['expires_at' => now()]);
+
+        $pairing->update([
+            'consumed_at' => now(),
+            'reader_id' => $reader->id,
+            'card_id' => $card->id, // TASK-011: audit trail for the pairing desk
+        ]);
+
+        return [
+            'ok' => true,
+            'card' => $card,
+            'student' => $pairing->student,
+            'pairing' => $pairing,
+            'rekeyed' => $rekeyed,
+        ];
     }
 }

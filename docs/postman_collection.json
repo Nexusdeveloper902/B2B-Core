@@ -511,7 +511,7 @@
             "pair"
           ]
         },
-        "description": "TASK-010 — step 2 of card pairing: submit a freshly scanned card UID. Auth is the READER Bearer key (same as the tap endpoint), not a user token.\n\nOptional credential_kind (physical | hce, default physical): HOW the credential was captured — an Android HCE phone submits its application-level credential id with kind hce (AID F0010203040506; the RF UID is never identity).\n\nResponse 200: { status, paired_student_name, student_id } — the card works immediately for taps.\nResponse 409: no pairing session active (none armed / expired / consumed).\nResponse 422: card already paired (never reassigned).\nResponse 401: missing/invalid reader key.\n\nTip: set Accept-Language: es to receive Spanish messages."
+        "description": "TASK-010 — step 2 of card pairing: submit a freshly scanned card UID. Auth is the READER Bearer key (same as the tap endpoint), not a user token.\n\nOptional credential_kind (physical | hce, default physical): HOW the credential was captured — an Android HCE phone submits its application-level credential id with kind hce (AID F0010203040506; the RF UID is never identity). TASK-049 (ADR-068): kind hce REQUIRES the per-credential key hand-off — hce_nonce (16 hex), hce_mac (64 hex, HMAC-SHA256(K, credId||nonce)), hce_key_nonce (32 hex) and hce_key_wrapped (64 hex, K XOR HMAC-SHA256(reader_api_key, \"pulse-hce-key-wrap/v1\\n\"||credId||\"\\n\"||hce_key_nonce)). A body with kind hce is not hand-writable: generate it (scripts/e2e.sh hce_body) or use real hardware.\n\nResponse 200: { status, paired_student_name, student_id, rekeyed } — the card works immediately for taps (a phone's taps must carry hce_nonce + hce_mac).\nResponse 403: hce_proof_invalid — the phone's proof did not verify under the handed-over key (window stays armed).\nResponse 409: no pairing session active (none armed / expired / consumed).\nResponse 422: card already paired (never reassigned; the same student's active phone is re-keyed instead), or hce key material missing.\nResponse 401: missing/invalid reader key.\n\nTip: set Accept-Language: es to receive Spanish messages."
       }
     },
     {
@@ -612,6 +612,49 @@
           ]
         },
         "description": "TASK-037 — validate + persist a partial batch. HH:MM windows (breakfast/lunch must not overlap), late cutoff, pairing window 10–600 s. Live for the next request: the meal engine, the late computation and arming all resolve through SettingsService."
+      }
+    },
+    {
+      "name": "10d Admin — Revoke credential / Revocar credencial",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_pat}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "en"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/cards/{{card_id}}/revoke",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "cards",
+            "{{card_id}}",
+            "revoke"
+          ]
+        },
+        "description": "TASK-049 (ADR-068) — revoke a lost/stolen credential (admin-only, school-scoped). Sets status revoked (history kept) and destroys a phone credential's per-credential key in the same transaction; taps answer 404 inactive from the next request, and the id cannot be re-keyed until it is unpaired.\n\nResponse 200: { status, revoked: { card_id, credential_uid, kind, key_destroyed }, message }\nResponse 403: not an admin. Response 404: unknown card or another school's card."
       }
     },
     {
