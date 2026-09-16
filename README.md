@@ -131,6 +131,32 @@ of truth). "Datum" supersedes the old "Signal" value-match contract
 literal token values — they share a family of components instead (the
 marketplace's own "Datum" v3 is documented in its `docs/FRONTEND.md`).
 
+### Schools, organizations and branding
+
+One Core install can host more than one institution. A `schools` row
+owns its people and its data (`users`, `classes`, `students`, `readers`,
+`rewards`, `events`), and that ownership is enforced **server-side** by
+a model-level global scope — index, show, create, update, delete,
+search, bulk, CSV import, realtime frames and NL queries all inherit it,
+and another organization's id answers `404` rather than a leaked row.
+New resources inherit the caller's organization; the client never
+supplies one (TASK-045, ADR-064 — see `docs/DATABASE.md` §8 and
+`docs/API.md` "Organization scoping").
+
+A school may also name a **branding profile** (`schools.brand_key` →
+`config/branding.php`), and the whole shell then renders as *Pulse
+branded for that institution*: its color, its crest, its favicon and
+manifest — same layout, same components, same behavior. Accounts with no
+school keep the stock Pulse identity exactly as before. Shipped today:
+`IE Concejo de Sabaneta J.M.C.B` (`#80193c` + the institution's own
+crest). See `docs/BRAND.md` §3b, including how to add the next school
+(a row, a config block, a logo folder — no UI changes).
+
+An admin whose own `school_id` is `NULL` is the **system
+administrator**: it belongs to no organization and therefore works
+across all of them. That is the one deliberate cross-organization
+capability, granted by the account's own row.
+
 ## Testing
 
 ```bash

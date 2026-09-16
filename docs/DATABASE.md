@@ -118,3 +118,62 @@ from the app layer, not the engine.
   account conventions). Reads resolve row → config default; the config
   defaults remain env-overridable (`PAE_BREAKFAST_START` etc. in
   `.env.example`).
+
+## 8. Schema additions — TASK-045 (schools / organizations)
+
+> ADR-064. Additive and reversible; no data rewrite.
+
+**`schools`** — the organization every org-owned row belongs to, and the
+anchor of the branding chain (`docs/BRAND.md` §3b).
+
+| Column | Notes |
+|---|---|
+| `name` | the institution's own name, unique (e.g. `IE Concejo de Sabaneta J.M.C.B`) |
+| `slug` | stable machine identifier, unique |
+| `brand_key` | which `config/branding.php` profile it renders with; `NULL`/unknown ⇒ stock Pulse |
+
+**`school_id`** (nullable FK, `nullOnDelete`) was added to the ROOT
+organization-owned tables only:
+
+```
+users · classes · students · readers · rewards · events
+roster_updates · recycling_updates
+```
+
+Everything else descends from one of those and is scoped **through its
+parent**, so ownership is stored exactly once and cannot disagree with
+itself:
+
+| Child table | Owner resolved via |
+|---|---|
+| `cards`, `points_ledger`, `reward_redemptions`, `pending_pairings` | `students.school_id` |
+| `recycling_deposits` | `events.school_id` |
+| `pending_captures` | `readers.school_id` |
+
+`events` is the single deliberate denormalization: attendance, PAE and
+recycling are all derived views aggregated straight off that table, so a
+join per aggregate would be paid on every dashboard render. It is
+stamped from its **reader** (the device's own identity — never a
+client-supplied value), and a test pins that every event agrees with its
+reader's school.
+
+Indexes added: `events (school_id, type, occurred_at)` and
+`students (school_id, class_id)` — the two hot reads every dashboard runs.
+
+### `NULL` is a supported value, not a half-migration
+
+Every column is nullable and every pre-existing row keeps working:
+
+- **Admin + `school_id IS NULL` = the system administrator.** It belongs
+  to no organization and therefore operates across all of them. That is
+  the one deliberate cross-organization capability, granted by the
+  account's own row — never by a request parameter.
+- **Any other role with `school_id IS NULL`** is restricted to the
+  unassigned (`NULL`) data set. It never falls open to the whole
+  database.
+
+`./run reset` (DemoSeeder) and `./run reset --pilot` deliberately seed no
+school at all — they are the stock-Pulse fixture. `./run seed-realistic`
+seeds one school (`IE Concejo de Sabaneta J.M.C.B`) owning every row it
+writes, plus exactly one system administrator **outside** it
+(`SystemAdminSeeder`, run separately by the script).

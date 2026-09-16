@@ -48,6 +48,23 @@
                     @endforeach
                 </select>
             </label>
+            @if($isSystemAdmin)
+                {{-- TASK-045 (ADR-064) — organization placement. Only the
+                     system administrator (an admin with no school of
+                     their own) sees this: a school admin's new accounts
+                     inherit their school server-side, so there is nothing
+                     for them to choose and nothing they could override. --}}
+                <label class="field">
+                    <span>{{ __('app.school') }}</span>
+                    <select id="staff-school" aria-label="{{ __('app.school') }}">
+                        <option value="">{{ __('app.school_none') }}</option>
+                        @foreach($schools as $school)
+                            <option value="{{ $school->id }}">{{ $school->name }}</option>
+                        @endforeach
+                    </select>
+                    <span class="muted small">{{ __('app.school_field_hint') }}</span>
+                </label>
+            @endif
             <div class="settings-row">
                 <label class="field">
                     <span>{{ __('app.staff_temp_password') }}</span>
@@ -89,6 +106,7 @@
                     <th scope="col">{{ __('app.staff_email') }}</th>
                     <th scope="col">{{ __('app.staff_role') }}</th>
                     <th scope="col">{{ __('app.staff_classes_optional') }}</th>
+                    @if($isSystemAdmin)<th scope="col">{{ __('app.school') }}</th>@endif
                 </tr>
                 </thead>
                 <tbody id="staff-body">
@@ -100,9 +118,12 @@
                         <td data-label="{{ __('app.staff_classes_optional') }}">
                             {{ $member->classes->pluck('name')->join(', ') ?: __('app.staff_no_classes') }}
                         </td>
+                        @if($isSystemAdmin)
+                            <td data-label="{{ __('app.school') }}">{{ $member->school?->name ?? __('app.school_none') }}</td>
+                        @endif
                     </tr>
                 @empty
-                    <tr id="staff-empty"><td colspan="4" class="muted">{{ __('app.report_none') }}</td></tr>
+                    <tr id="staff-empty"><td colspan="{{ $isSystemAdmin ? 5 : 4 }}" class="muted">{{ __('app.report_none') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -118,6 +139,7 @@
         var TOAST_FAILED = {!! Js::from(__('app.toast_staff_create_failed')) !!};
         var TOAST_NETWORK = {!! Js::from(__('app.toast_network_error')) !!};
         var NO_CLASSES = {!! Js::from(__('app.staff_no_classes')) !!};
+        var SCHOOL_NONE = {!! Js::from(__('app.school_none')) !!};
         var ROLE_LABELS = {!! Js::from([
             'admin' => __('app.role_admin'),
             'teacher' => __('app.role_teacher'),
@@ -172,6 +194,7 @@
             tr.appendChild(email);
             tr.appendChild(td(ROLE_LABELS[s.role] || s.role));
             tr.appendChild(td((s.classes && s.classes.length) ? s.classes.join(', ') : NO_CLASSES));
+            if (document.getElementById('staff-school')) { tr.appendChild(td(s.school || SCHOOL_NONE)); }
             body.insertBefore(tr, body.firstChild);
             tr.classList.remove('js-row-flash');
             void tr.offsetWidth; // restart the flash animation
@@ -179,6 +202,7 @@
         }
 
         var form = document.getElementById('staff-create-form');
+        var schoolSelect = document.getElementById('staff-school');
         // Email auto-suggest: {ascii-name}.{role}@{settings-domain},
         // refreshed while the admin hasn't typed a custom address
         // (first manual edit wins and sticks).
@@ -217,7 +241,11 @@
                 role: document.getElementById('staff-role').value,
                 password: document.getElementById('staff-password').value,
                 password_confirmation: document.getElementById('staff-password-confirmation').value,
-                class_ids: classIds
+                class_ids: classIds,
+                // Sent only by the system administrator's form; a school
+                // admin has no such control and the server ignores the
+                // field for them regardless.
+                school_id: schoolSelect && schoolSelect.value !== '' ? parseInt(schoolSelect.value, 10) : null
             }).then(function (r) {
                 busy(btn, false);
                 // The display-once credentials ride the notice line

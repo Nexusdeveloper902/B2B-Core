@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,14 +10,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Reward extends Model
 {
-    use HasFactory;
+    use BelongsToSchool, HasFactory;
 
     /**
      * TASK-025 item 7 — the catalog columns (spec §19/§20):
      * type (informational), value (optional), active (soft switch),
      * stock (NULL = unlimited; else remaining units).
      */
-    protected $fillable = ['name', 'point_cost', 'description', 'type', 'value', 'active', 'stock'];
+    protected $fillable = ['name', 'point_cost', 'description', 'type', 'value', 'active', 'stock', 'school_id'];
 
     protected function casts(): array
     {

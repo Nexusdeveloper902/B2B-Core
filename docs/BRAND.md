@@ -64,6 +64,102 @@ Error red (`#ba1a1a` family) stays independent of the brand set so
 status never collapses into decoration. Contrast floor: gold on ink
 ≈ 9.7:1, ink on cream ≈ 12.6:1 — every pinned pair passes WCAG AA.
 
+## 3b. School branding (the brand layer)
+
+> TASK-045 · ADR-064 (organizations) · ADR-065 (branding layer)
+
+Pulse can render as itself, or as **Pulse branded for one
+institution** — same layout, same components, same spacing, same
+behavior. It is a *layer over* the design system above, never a second
+design system.
+
+**The chain:** `authenticated account → school → branding profile`.
+
+| Piece | Where |
+|---|---|
+| The organization | `schools` row (`name`, `slug`, `brand_key`) |
+| The account's membership | `users.school_id` |
+| The branding values | `config/branding.php`, keyed by `brand_key` |
+| The resolved profile | `App\Support\Branding\Brand`, resolved by `BrandResolver` |
+| What views consume | `$brand` (shared with every view by `AppServiceProvider`) |
+
+No controller, service or Blade template ever compares a school name to
+a string. Views ask `$brand->logoSrc()`, `$brand->name()`,
+`$brand->isDefault()`, so adding a school never touches markup.
+
+**Fallbacks are the floor, not an error path.** An account with no
+school, a school with no `brand_key`, a `brand_key` whose profile has
+not shipped yet, and a guest with no device memory all resolve to stock
+Pulse.
+
+### The six brand-layer tokens
+
+`public/css/tokens.css` opens with a brand layer; the entire
+primary/action family is *derived* from it:
+
+```css
+--brand-primary            /* the action color            → --primary, --tertiary */
+--brand-primary-hover      /* hover/pressed step          → --primary-container, --surface-tint */
+--brand-primary-contrast   /* the label ON the action color → --on-primary */
+--brand-primary-muted      /* light brand tint            → --primary-fixed */
+--brand-primary-muted-dim  /* dimmer tint                 → --primary-fixed-dim */
+--brand-primary-on-muted   /* text on the light tint      → --on-primary-fixed */
+```
+
+A profile may move **only** these (plus `--brand-mark-height`); a test
+pins that. Surfaces, type, spacing, the gold points/eco accent
+(`--tertiary-fixed`) and the semantic error family stay shared, so a
+brand can change the action color without being able to break contrast,
+hierarchy, or the meaning of a status color.
+
+The rule that decides which gold stayed gold: **`--tertiary-fixed` is
+the data/points/eco accent (hero numerals, meter fills, present stamps,
+success notices, toasts); `--on-primary` is UI chrome sitting on the
+action color (button labels, active nav, chips, pills, tabs, avatars,
+pagination).** For stock Pulse both resolve to `#F5CB5C`, so the
+unbranded shell renders byte-identically to what shipped before.
+
+### No flash, no layout shift
+
+- The profile's tokens are inlined in `<head>` **after** the
+  stylesheets (`<style id="brand-theme">`), so the correct palette is
+  present in the first paint. Stock Pulse emits nothing at all.
+- Every mark carries explicit `width`/`height`, so swapping the Pulse
+  lockup for a school crest reserves the same box before the image
+  loads.
+- The login screen has no account to resolve from, so it wears the
+  brand this device last signed in with (an encrypted `pulse_brand`
+  cookie, written on login). An **authenticated** account always wins
+  over that cookie, and signing in with an unbranded account clears it.
+
+### Shipped profile: IE Concejo de Sabaneta J.M.C.B
+
+| | |
+|---|---|
+| `brand_key` / slug | `ie-concejo-de-sabaneta` |
+| Brand color | `#80193c` |
+| Ramp (derived from the one hue) | hover `#9a1e48` · contrast `#ffffff` · muted `#f5e5eb` · muted-dim `#e8c9d4` · on-muted `#4d0f24` |
+| Assets | `public/brand/schools/ie-concejo-de-sabaneta/` |
+
+The crest is the institution's **own official artwork**
+(`B2B-Logo-Suite/School_Logo.jpeg`): the flat white background was
+flood-filled to transparency from the edges only (the book pages inside
+the crest are white too), trimmed, and padded to a square canvas so it
+can never render stretched. Nothing was redrawn or regenerated.
+
+Contrast (verified in `tests/Feature/Web/SchoolBrandingTest.php`):
+white on `#80193c` ≈ 9.9:1, white on the hover step ≈ 7.9:1, `#80193c`
+on cream ≈ 8.3:1, the gold points accent on `#80193c` ≈ 6.4:1 — every
+rendered pair passes WCAG AA.
+
+### Adding the next school
+
+1. `schools` row — `School::provision('<name>', '<slug>', '<brand_key>')`.
+2. A block in `config/branding.php` under that `brand_key`.
+3. Logo files under `public/brand/schools/<brand_key>/`.
+
+No UI, route, controller or stylesheet changes.
+
 ## 4. Toast feedback system (the one acknowledgment layer)
 
 `public/js/toast.js` + the `.toast-*` block in `app.css`. One system,

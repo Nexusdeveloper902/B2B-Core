@@ -1273,3 +1273,77 @@ amends ADR-062):
   `sha256('abc')` literal, signed classify 200, swapped-image 401,
   signed capture 200). Targeted 30 green; quality green.
 - Firmware half: B2B-Firmware TASK-014 (`postMultipart`, build `hce.18`).
+
+## TASK-045 additions (2026-09-15, RUN-2026-09-15-core-046)
+
+Schools became a first-class organization, and identity hangs off it
+(ADR-064 scoping, ADR-065 branding):
+
+- **`schools`** (`name`, `slug`, `brand_key`) + nullable `school_id` on
+  the 8 ROOT owned tables (`users`, `classes`, `students`, `readers`,
+  `rewards`, `events`, `roster_updates`, `recycling_updates`). Children
+  (`cards`, `points_ledger`, `recycling_deposits`, `reward_redemptions`,
+  `pending_pairings`, `pending_captures`) scope THROUGH their parent —
+  ownership stored once. `events` is the one denormalization and is
+  stamped from its READER, never from a payload.
+- **The wall is a model global scope**, not a controller habit: index,
+  show, create, update, delete, search, bulk, CSV, route-model binding
+  and realtime frames all inherit it; a foreign id answers `404`.
+  `CurrentSchool` resolves the acting organization once (user → device
+  → system-wide). Creation inherits it; the client never sends one.
+- **`NULL` is a supported value.** Admin + `school_id IS NULL` = the
+  SYSTEM ADMINISTRATOR (the one cross-organization capability, granted
+  by the account's own row). Any other role with a null school is
+  restricted to the null-school set — fails closed, never open.
+  `User` deliberately carries NO global scope (session-guard recursion);
+  account lists use `User::inCurrentSchool()`.
+- **Watch out**: `exists:` validation rules query TABLES and bypass the
+  wall — every client-supplied FK now uses `OwnedByCurrentSchool`.
+- **Branding** (`config/branding.php` → `Brand` → `$brand` in every
+  view): a six-token brand layer at the top of `tokens.css` that the
+  whole `--primary` family derives from. Pulse's own values are the
+  defaults, so the unbranded shell is unchanged. Brand color is the
+  ACTION color only — the gold points/eco accent and the semantic error
+  family are out of every profile's reach. Shipped profile:
+  `ie-concejo-de-sabaneta` (`#80193c` + the institution's own crest,
+  processed from `B2B-Logo-Suite/School_Logo.jpeg`). Unknown/absent
+  profiles fall back to Pulse, always.
+- **Seeders**: `./run seed-realistic` = ONE school owning every row +
+  `SystemAdminSeeder` run separately for exactly one operator OUTSIDE
+  it. `./run reset` (demo/pilot) still seeds NO school — it is the
+  stock-Pulse regression baseline.
+- **Tests** +52 (`SchoolBrandingTest`, `OrganizationScopingTest`,
+  `SchoolAssociationTest`, `RealisticSeederOrganizationTest`). Suite 631
+  (628 pass, 3 by-design skips); e2e 44/44; quality green.
+
+## TASK-046 additions (2026-09-15, RUN-2026-09-15-core-047)
+
+Responsive pass over every panel — measured in a real browser at 15
+widths (320 → 1600px) across all 17 panels, not eyeballed:
+
+- **The `min-width: auto` trap was the root cause** of every phone-width
+  failure. Flex/grid items are never narrower than their content by
+  default, which defeats any nested `overflow-x: auto` scroller: the
+  strip can't shrink, so the PAGE scrolls sideways. `min-width: 0` is now
+  declared once for every layout container's items.
+- **`.filterbar` had two column-layout bugs**: it kept `flex-wrap: wrap`
+  when it turned vertical (a wrapping column flex container is a
+  multi-COLUMN one, sized by its widest item), and `.searchbox` kept
+  `flex: 1 1 320px` — `flex-basis` sizes the MAIN axis, so that became a
+  320px-TALL search field on the pairing desk.
+- **The admin topbar overflowed 941–1400px**, pushing logout and EN/ES
+  off-screen (only admin desks — only they have eight nav links).
+  `.topnav` is now the shrinking, self-scrolling element.
+- **`.stat-row` had no CSS rule at all** — both PAE desks' KPI tiles
+  stacked full-width at every viewport. Now an `auto-fit` grid.
+- **`.ledger-wrap`'s edge bleed is scoped to `.panel`** (it exists to
+  cancel panel padding); outside one it pushed the table past the shell
+  gutter at 621–699px.
+- Breakpoints themselves are UNCHANGED (1160/940/620) — the failures were
+  structural. Pinned by `tests/Feature/Web/ResponsiveLayoutTest.php` (7).
+- Docs: `docs/FRONTEND.md`/`.es.md` §1b. Suite 638 (635 pass, 3 skips).
+
+Known, NOT fixed (content bugs, out of that ask): both PAE desks pass
+`:stat=` to `<x-stat>` instead of using its slot, so those KPI values
+never render; and `pae-student.blade.php` calls a missing
+`app.parent_view` key, which prints as `app.parent_view`.

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Models\User;
+use App\Support\Branding\BrandResolver;
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -26,6 +28,17 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+
+        // TASK-045 (ADR-065) — the identity changed mid-request: drop the
+        // guest-resolved brand and re-resolve from the account that just
+        // signed in, then remember it on THIS device so the next visit
+        // paints the right login screen. An unbranded account clears the
+        // memory, which is what stops a school's identity from surviving
+        // into a different account's session.
+        $brands = app(BrandResolver::class);
+        $brands->forget();
+        app(CurrentSchool::class)->forgetOverride();
+        $brands->remember($brands->current());
 
         // TASK-025 item 5 — students land on their self-service desk,
         // staff on the staff dashboard (students have no /dashboard).
@@ -92,6 +105,10 @@ class AuthController extends Controller
     public function logout(): RedirectResponse
     {
         auth()->logout();
+
+        // The brand was resolved from an account that is no longer
+        // authenticated — never let it leak into the guest shell.
+        app(BrandResolver::class)->forget();
 
         session()->invalidate();
         session()->regenerateToken();

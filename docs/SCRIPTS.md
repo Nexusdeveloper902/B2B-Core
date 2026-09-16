@@ -210,6 +210,18 @@ Deterministic: the same flags always produce the same semester. Slow by
 design (tens of thousands of taps — minutes, not seconds); the summary
 re-prints staff logins, reader keys, grade and PAE distributions.
 
+**TASK-045 — one school, one operator.** Every row this seeder writes
+belongs to the organization `IE Concejo de Sabaneta J.M.C.B`
+(`schools.slug = ie-concejo-de-sabaneta`), so the dataset reads as a
+coherent institution and its people see the school-branded shell
+(`docs/BRAND.md` §3b). The seeder creates **no administrator at all**;
+the script then runs `SystemAdminSeeder` separately, which creates
+exactly one system administrator (`admin@presence.test`) belonging to
+**no** school — it renders stock Pulse and sees every organization. To
+get a school-branded admin desk, sign in as that operator and create a
+school admin from `/admin/staff` (the school select appears for the
+system administrator only).
+
 ## `unpair`
 
 ```bash

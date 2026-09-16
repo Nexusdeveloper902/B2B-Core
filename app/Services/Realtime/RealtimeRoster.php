@@ -2,6 +2,7 @@
 
 namespace App\Services\Realtime;
 
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -54,6 +55,10 @@ final class RealtimeRoster
     {
         $query = DB::table('roster_updates');
 
+        // TASK-045 (ADR-064) — same wall as the tap channel: scoped in
+        // the web tier, per-connection inside realtime:serve.
+        app(CurrentSchool::class)->applyTo($query, 'school_id');
+
         if ($afterId !== null) {
             $query->where('id', '>', $afterId);
         }
@@ -61,7 +66,7 @@ final class RealtimeRoster
         $rows = $query
             ->orderBy('id', $direction)
             ->limit($limit)
-            ->get(['id', 'type', 'payload', 'created_at'])
+            ->get(['id', 'type', 'payload', 'school_id', 'created_at'])
             ->map(function ($row) {
                 $payload = json_decode((string) $row->payload, true);
 
@@ -69,6 +74,7 @@ final class RealtimeRoster
                     'id' => (int) $row->id,
                     'type' => (string) $row->type,
                     'payload' => is_array($payload) ? $payload : [],
+                    'school_id' => $row->school_id !== null ? (int) $row->school_id : null,
                     'at' => (string) $row->created_at,
                 ];
             })

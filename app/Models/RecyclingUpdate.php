@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class RecyclingUpdate extends Model
 {
+    use BelongsToSchool;
     use HasFactory;
 
     public const TYPE_CAPTURE_CREATED = 'capture_created';
@@ -30,7 +32,7 @@ class RecyclingUpdate extends Model
 
     public const TYPE_LEADERBOARD_UPDATED = 'leaderboard_updated';
 
-    protected $fillable = ['type', 'payload'];
+    protected $fillable = ['type', 'payload', 'school_id'];
 
     protected function casts(): array
     {

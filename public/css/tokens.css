@@ -30,6 +30,30 @@
    ========================================================================== */
 
 :root {
+    /* ---- brand layer (TASK-045, ADR-065) -----------------------------
+       The ONE place a school's identity enters the design system. Every
+       primary/action token below is DERIVED from these five values, so
+       a branded school is a five-value override injected before first
+       paint (see layouts/app.blade.php) — never a second stylesheet,
+       never a per-component conditional.
+
+       The defaults ARE the Pulse brand (ink + gold): an account with no
+       school, or a school with no branding profile, renders exactly the
+       palette that shipped before this layer existed.
+
+       Deliberately NOT derived from the brand: the gold points/eco
+       accent (--tertiary-fixed), the semantic error/success family and
+       every surface step. Brand color is the ACTION color, not a
+       universal replacement — status must never collapse into
+       decoration (the ADR-047 rule this layer inherits). */
+    --brand-primary:            #242423;   /* brand ink = action color */
+    --brand-primary-hover:      #333533;   /* brand graphite = hover step */
+    --brand-primary-contrast:   #f5cb5c;   /* label color ON the action color */
+    --brand-primary-muted:      #e5e2e0;   /* light brand tint (on-dark text) */
+    --brand-primary-muted-dim:  #c8c6c4;   /* dimmer brand tint */
+    --brand-primary-on-muted:   #1b1c1b;   /* text on the light brand tint */
+    --brand-mark-height:        30px;      /* topbar/footer lockup height */
+
     /* ---- palette (Pulse brand anchors + derived tonal steps) ---- */
     --background:                  #e8eddf;   /* brand cream */
     --on-background:               #242423;   /* brand ink */
@@ -46,15 +70,15 @@
     --on-surface:                  #242423;
     --on-surface-variant:          #4a4c47;
 
-    --primary:                     #242423;   /* brand ink = action color */
-    --on-primary:                  #f5cb5c;   /* brand gold — the mark's chip language */
-    --primary-container:           #333533;   /* brand graphite */
+    --primary:                     var(--brand-primary);
+    --on-primary:                  var(--brand-primary-contrast);
+    --primary-container:           var(--brand-primary-hover);
     --on-primary-container:        #a5a39c;
-    --primary-fixed:               #e5e2e0;
-    --primary-fixed-dim:           #c8c6c4;
-    --on-primary-fixed:            #1b1c1b;
+    --primary-fixed:               var(--brand-primary-muted);
+    --primary-fixed-dim:           var(--brand-primary-muted-dim);
+    --on-primary-fixed:            var(--brand-primary-on-muted);
     --on-primary-fixed-variant:    #474745;
-    --surface-tint:                #333533;   /* hover step for ink surfaces */
+    --surface-tint:                var(--brand-primary-hover); /* hover step for action surfaces */
 
     --secondary:                   #5d5f5c;
     --on-secondary:                #ffffff;
@@ -65,8 +89,8 @@
     --on-secondary-fixed:          #1a1c1a;
     --on-secondary-fixed-variant:  #454745;
 
-    --tertiary:                    #242423;
-    --on-tertiary:                 #f5cb5c;
+    --tertiary:                    var(--brand-primary);
+    --on-tertiary:                 var(--brand-primary-contrast);
     --tertiary-container:          #33290b;
     --on-tertiary-container:       #dfba50;
     --tertiary-fixed:              #f5cb5c;   /* brand gold (points/eco accent) */
@@ -92,8 +116,8 @@
     --text-body:       var(--on-background);
     --text-muted:      var(--on-surface-variant);
     --text-meta:       var(--outline);
-    --accent:          var(--primary);          /* action color = near-black */
-    --accent-contrast: var(--tertiary-fixed);   /* gold on black */
+    --accent:          var(--primary);          /* action color (brand-derived) */
+    --accent-contrast: var(--on-primary);        /* label on the action color */
     --points:          var(--tertiary-fixed);   /* points/eco accent */
     --points-ink:      var(--on-tertiary-fixed);
     --alert:           var(--error);

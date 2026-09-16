@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,11 +24,40 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class PresenceEvent extends Model
 {
-    use HasFactory;
+    use BelongsToSchool, HasFactory;
 
     protected $table = 'events';
 
-    protected $fillable = ['card_id', 'reader_id', 'type', 'occurred_at', 'metadata', 'served', 'reason'];
+    protected $fillable = ['card_id', 'reader_id', 'type', 'occurred_at', 'metadata', 'served', 'reason', 'school_id'];
+
+    /**
+     * TASK-045 (ADR-064) — an event's organization is its READER's.
+     *
+     * The device's own identity (its API key / HMAC secret, ADR-002 and
+     * ADR-062) is the only trustworthy source here: a tap payload is
+     * device-supplied, so nothing in it may decide ownership. This runs
+     * in addition to the generic creation inheritance and always wins,
+     * which keeps an event and its reader in the same organization even
+     * when the row is written from a system-wide context (a seeder).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $event): void {
+            if ($event->reader_id === null) {
+                return;
+            }
+
+            // Read through the wall: a reader in another organization is
+            // still the authority on its OWN event (device requests run
+            // scoped to that reader, so the scope would be a no-op here —
+            // the explicit bypass makes the intent unmissable).
+            $schoolId = Reader::withoutGlobalScopes()
+                ->whereKey($event->reader_id)
+                ->value('school_id');
+
+            $event->school_id = $schoolId !== null ? (int) $schoolId : null;
+        });
+    }
 
     protected function casts(): array
     {

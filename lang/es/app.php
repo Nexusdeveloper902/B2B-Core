@@ -25,6 +25,13 @@ return [
     'skip_to_content' => 'Saltar al contenido',
     'primary_nav' => 'Principal',
     'footer_note' => 'Consola de operaciones — asistencia, comidas PAE y recompensas por reciclaje del día escolar.',
+
+    // TASK-045 (ADR-065) — identidad del colegio. Pulse conserva su
+    // nombre; la institución se nombra a su lado, nunca en su lugar.
+    'branded_for' => 'Personalizado para :school',
+    'school' => 'Colegio',
+    'school_none' => 'Sin colegio (todo el sistema)',
+    'school_field_hint' => 'Los administradores del sistema pueden asignar la cuenta nueva a un colegio. Los administradores de colegio siempre crean dentro del suyo.',
     'demo_credentials' => 'Credenciales demo (seeder)',
     'env' => 'Entorno',
     // TASK-030 (Fix 3) — presencia del proyecto en el pie.

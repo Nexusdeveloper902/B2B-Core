@@ -66,7 +66,15 @@ class PulseIdentityTest extends TestCase
             $this->assertGreaterThan(0, filesize(public_path($asset)), "brand asset is empty: {$asset}");
         }
 
-        $manifest = json_decode(file_get_contents(public_path('manifest.webmanifest')), true);
+        // TASK-045 (ADR-065): the manifest is RENDERED per brand now
+        // (GET /manifest.webmanifest). The static file was deleted on
+        // purpose — a real file in public/ is served by the web server
+        // before PHP ever sees the request, so keeping it would have
+        // silently shadowed the route in production while tests, which
+        // bypass the web server, stayed green.
+        $this->assertFileDoesNotExist(public_path('manifest.webmanifest'));
+
+        $manifest = $this->get('/manifest.webmanifest')->assertOk()->json();
         $this->assertSame('Pulse', $manifest['name']);
         $this->assertNotEmpty($manifest['icons']);
     }

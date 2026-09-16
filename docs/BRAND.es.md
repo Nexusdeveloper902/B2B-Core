@@ -71,6 +71,107 @@ de marca para que el estado nunca colapse en decoración. Suelo de
 contraste: oro sobre tinta ≈ 9,7:1, tinta sobre crema ≈ 12,6:1 — cada
 par fijado pasa WCAG AA.
 
+## 3b. Identidad por colegio (la capa de marca)
+
+> TASK-045 · ADR-064 (organizaciones) · ADR-065 (capa de marca)
+
+Pulse puede renderizarse como sí mismo o como **Pulse personalizado
+para una institución** — misma maquetación, mismos componentes, mismo
+espaciado, mismo comportamiento. Es una *capa sobre* el sistema de
+diseño anterior, nunca un segundo sistema de diseño.
+
+**La cadena:** `cuenta autenticada → colegio → perfil de marca`.
+
+| Pieza | Dónde |
+|---|---|
+| La organización | fila en `schools` (`name`, `slug`, `brand_key`) |
+| La pertenencia de la cuenta | `users.school_id` |
+| Los valores de marca | `config/branding.php`, indexado por `brand_key` |
+| El perfil resuelto | `App\Support\Branding\Brand`, resuelto por `BrandResolver` |
+| Lo que consumen las vistas | `$brand` (compartido con toda vista por `AppServiceProvider`) |
+
+Ningún controlador, servicio o plantilla Blade compara jamás el nombre
+de un colegio con una cadena. Las vistas piden `$brand->logoSrc()`,
+`$brand->name()`, `$brand->isDefault()`, así que agregar un colegio
+nunca toca el marcado.
+
+**Los respaldos son el piso, no una ruta de error.** Una cuenta sin
+colegio, un colegio sin `brand_key`, un `brand_key` cuyo perfil aún no
+existe y un invitado sin memoria de dispositivo resuelven todos a Pulse
+estándar.
+
+### Los seis tokens de la capa de marca
+
+`public/css/tokens.css` abre con una capa de marca; toda la familia
+primaria/de acción se *deriva* de ella:
+
+```css
+--brand-primary            /* el color de acción            → --primary, --tertiary */
+--brand-primary-hover      /* paso hover/activo             → --primary-container, --surface-tint */
+--brand-primary-contrast   /* la etiqueta SOBRE el color de acción → --on-primary */
+--brand-primary-muted      /* tinte claro de marca          → --primary-fixed */
+--brand-primary-muted-dim  /* tinte más apagado             → --primary-fixed-dim */
+--brand-primary-on-muted   /* texto sobre el tinte claro    → --on-primary-fixed */
+```
+
+Un perfil solo puede mover **estos** (más `--brand-mark-height`); una
+prueba lo fija. Superficies, tipografía, espaciado, el acento dorado de
+puntos/eco (`--tertiary-fixed`) y la familia semántica de error siguen
+siendo compartidos: una marca puede cambiar el color de acción sin
+poder romper el contraste, la jerarquía ni el significado de un color
+de estado.
+
+La regla que decide qué dorado se queda dorado: **`--tertiary-fixed` es
+el acento de datos/puntos/eco (cifras destacadas, barras de progreso,
+sellos de presente, avisos de éxito, toasts); `--on-primary` es el
+cromo de interfaz que se apoya sobre el color de acción (etiquetas de
+botón, navegación activa, chips, píldoras, pestañas, avatares,
+paginación).** En Pulse estándar ambos resuelven a `#F5CB5C`, así que
+la interfaz sin marca se renderiza idéntica a como ya venía.
+
+### Sin destellos ni saltos de maquetación
+
+- Los tokens del perfil se incrustan en `<head>` **después** de las
+  hojas de estilo (`<style id="brand-theme">`), así la paleta correcta
+  está presente en el primer pintado. Pulse estándar no emite nada.
+- Cada marca lleva `width`/`height` explícitos: cambiar el lockup de
+  Pulse por un escudo escolar reserva la misma caja antes de que
+  cargue la imagen.
+- La pantalla de acceso no tiene cuenta que resolver, así que lleva la
+  marca con la que este dispositivo entró por última vez (una cookie
+  cifrada `pulse_brand`, escrita al iniciar sesión). Una cuenta
+  **autenticada** siempre gana sobre esa cookie, y entrar con una
+  cuenta sin marca la borra.
+
+### Perfil incluido: IE Concejo de Sabaneta J.M.C.B
+
+| | |
+|---|---|
+| `brand_key` / slug | `ie-concejo-de-sabaneta` |
+| Color de marca | `#80193c` |
+| Rampa (derivada del mismo tono) | hover `#9a1e48` · contraste `#ffffff` · tinte `#f5e5eb` · tinte apagado `#e8c9d4` · texto sobre tinte `#4d0f24` |
+| Recursos | `public/brand/schools/ie-concejo-de-sabaneta/` |
+
+El escudo es la obra **oficial de la propia institución**
+(`B2B-Logo-Suite/School_Logo.jpeg`): el fondo blanco plano se volvió
+transparente con un relleno por inundación desde los bordes (las
+páginas del libro dentro del escudo también son blancas), se recortó y
+se centró en un lienzo cuadrado para que nunca pueda deformarse. No se
+redibujó ni se generó nada.
+
+Contraste (verificado en `tests/Feature/Web/SchoolBrandingTest.php`):
+blanco sobre `#80193c` ≈ 9,9:1, blanco sobre el paso hover ≈ 7,9:1,
+`#80193c` sobre crema ≈ 8,3:1, el dorado de puntos sobre `#80193c`
+≈ 6,4:1 — todo par renderizado cumple WCAG AA.
+
+### Agregar el siguiente colegio
+
+1. Fila en `schools` — `School::provision('<nombre>', '<slug>', '<brand_key>')`.
+2. Un bloque en `config/branding.php` bajo ese `brand_key`.
+3. Archivos de logo en `public/brand/schools/<brand_key>/`.
+
+Sin cambios de UI, rutas, controladores ni hojas de estilo.
+
 ## 4. Sistema de toasts (la única capa de confirmación)
 
 `public/js/toast.js` + el bloque `.toast-*` en `app.css`. Un sistema,

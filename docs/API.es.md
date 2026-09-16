@@ -922,6 +922,12 @@ que crea el escritorio de estudiantes (ver `POST /api/v1/admin/students`).
 { "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "password": "cambia-ya-01", "password_confirmation": "cambia-ya-01", "class_ids": [3] }
 ```
 
+**TASK-045** — la cuenta nueva se une automáticamente a la organización
+del admin que la crea. `school_id` solo se acepta del administrador del
+sistema (un admin sin colegio propio); de un admin de colegio se ignora,
+nunca se obedece. Los `class_ids` deben pertenecer a la organización de
+quien llama, o la petición es `422`.
+
 **Respuesta `200`**:
 
 ```json
@@ -988,6 +994,43 @@ recibe 403 en el muro de roles antes de leer un solo byte del archivo).
 disco.
 
 ---
+
+## Alcance por organización (colegio) — TASK-045, ADR-064
+
+Todo recurso con dueño organizacional está amurallado **en el
+servidor**, en cada verbo y en cada superficie (índice, detalle, crear,
+actualizar, borrar, búsqueda, filtros, operaciones masivas, importación
+CSV, frames en vivo, consultas NL). La muralla es un scope global a
+nivel de modelo, no una comprobación por controlador, así que un
+endpoint nuevo no puede olvidarla.
+
+Dos reglas gobiernan todo el contrato:
+
+1. **La organización se deriva, nunca se envía.** Sale de la cuenta
+   autenticada (`users.school_id`) o, en endpoints de dispositivo, del
+   lector que la clave API/HMAC demostró (ADR-002/ADR-062). Ninguna
+   petición acepta un id de organización como verdad. Un recurso creado
+   hereda automáticamente la organización de quien lo crea.
+2. **Un id ajeno se rechaza, no se filtra.** El route-model binding
+   resuelve a través del scope, así que el id de otra organización
+   responde `404` — un rechazo que además no confirma que la fila exista
+   en otro lado. Las claves foráneas del cuerpo (`class_id`,
+   `reward_id`, `event_id`, `class_ids[]`) se validan a través del
+   modelo acotado, así que responden `422` en vez de dejar una fila sin
+   padre.
+
+**La única excepción deliberada:** un admin cuyo propio `school_id` es
+`NULL` es el *administrador del sistema* y opera sobre todas las
+organizaciones. Esa capacidad la otorga la propia fila de la cuenta.
+`POST /api/v1/admin/staff` es el único endpoint que acepta `school_id`,
+y solo desde esa cuenta — para cualquier otra el campo se ignora (nunca
+se obedece) y la cuenta nueva hereda la organización de quien la crea.
+
+Los endpoints de dispositivo heredan la misma muralla: un lector solo
+puede registrar un toque, clasificar un evento o resolver una captura
+dentro de su propia organización. Una tarjeta de otro colegio responde
+el `404 {"reason":"not_found"}` habitual — la misma respuesta que recibe
+una tarjeta desconocida.
 
 ## Convenciones de errores
 

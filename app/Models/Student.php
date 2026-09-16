@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +11,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Student extends Model
 {
-    use HasFactory;
+    use BelongsToSchool, HasFactory;
 
-    protected $fillable = ['name', 'grade', 'pae_breakfast_enrolled', 'pae_lunch_enrolled', 'class_id'];
+    protected $fillable = ['name', 'grade', 'pae_breakfast_enrolled', 'pae_lunch_enrolled', 'class_id', 'school_id'];
 
     protected function casts(): array
     {

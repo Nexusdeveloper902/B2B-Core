@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class RosterUpdate extends Model
 {
+    use BelongsToSchool;
     use HasFactory;
 
     public const TYPE_STUDENT_CREATED = 'student_created';
@@ -36,7 +38,7 @@ class RosterUpdate extends Model
 
     public const TYPE_READER_DELETED = 'reader_deleted';
 
-    protected $fillable = ['type', 'payload'];
+    protected $fillable = ['type', 'payload', 'school_id'];
 
     protected function casts(): array
     {

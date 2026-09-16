@@ -141,6 +141,35 @@ comparten valores literales de tokens — comparten una familia de
 componentes (el "Datum" v3 del marketplace está documentado en su propio
 `docs/FRONTEND.md`).
 
+### Colegios, organizaciones e identidad visual
+
+Una sola instalación de Core puede alojar más de una institución. Una
+fila de `schools` es dueña de su gente y sus datos (`users`, `classes`,
+`students`, `readers`, `rewards`, `events`), y esa pertenencia se aplica
+**en el servidor** mediante un scope global a nivel de modelo — índice,
+detalle, crear, actualizar, borrar, búsqueda, operaciones masivas,
+importación CSV, tramas en vivo y consultas NL lo heredan, y el id de
+otra organización responde `404` en vez de filtrar una fila. Los
+recursos nuevos heredan la organización de quien los crea; el cliente
+nunca la envía (TASK-045, ADR-064 — ver `docs/DATABASE.es.md` §8 y
+`docs/API.es.md` "Alcance por organización").
+
+Un colegio también puede nombrar un **perfil de marca**
+(`schools.brand_key` → `config/branding.php`), y entonces toda la
+interfaz se renderiza como *Pulse personalizado para esa institución*:
+su color, su escudo, su favicon y su manifest — misma maquetación,
+mismos componentes, mismo comportamiento. Las cuentas sin colegio
+conservan la identidad Pulse estándar exactamente como antes. Incluido
+hoy: `IE Concejo de Sabaneta J.M.C.B` (`#80193c` + el escudo propio de
+la institución). Ver `docs/BRAND.es.md` §3b, incluido cómo agregar el
+siguiente colegio (una fila, un bloque de configuración, una carpeta de
+logos — sin cambios de UI).
+
+Un admin cuyo propio `school_id` es `NULL` es el **administrador del
+sistema**: no pertenece a ninguna organización y por eso trabaja sobre
+todas. Es la única capacidad interorganizacional deliberada, otorgada
+por la propia fila de la cuenta.
+
 ## Pruebas
 
 ```bash

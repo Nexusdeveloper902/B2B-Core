@@ -3,6 +3,7 @@
 namespace App\Services\Recycling;
 
 use App\Models\Student;
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -82,7 +83,7 @@ class LeaderboardService
      */
     private function scored()
     {
-        return DB::table('students')
+        $query = DB::table('students')
             ->leftJoin('points_ledger', 'points_ledger.student_id', '=', 'students.id')
             ->leftJoin('classes', 'classes.id', '=', 'students.class_id')
             ->groupBy('students.id', 'students.name', 'classes.name')
@@ -94,6 +95,12 @@ class LeaderboardService
                 'classes.name as class_name',
                 DB::raw('CAST(COALESCE(SUM(points_ledger.delta), 0) AS INTEGER) as points'),
             ]);
+
+        // TASK-045 (ADR-064) — "school-wide" now means the viewer's OWN
+        // school. The board stays a public competition inside the
+        // institution (spec §22); it never became a cross-institution
+        // ranking. Raw builder, so the wall is applied by hand.
+        return app(CurrentSchool::class)->applyTo($query, 'students.school_id');
     }
 
     /**

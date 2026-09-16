@@ -43,7 +43,9 @@ class AdminStudentsController extends Controller
             // TASK-029 — the class-create form's optional homeroom
             // teacher select (staff only; admins may create classes
             // before assigning anyone).
-            'teachers' => User::where('role', UserRole::Teacher->value)
+            // TASK-045 (ADR-064) — the homeroom picker offers this
+            // school's teachers only.
+            'teachers' => User::query()->inCurrentSchool()->where('role', UserRole::Teacher->value)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             // TASK-029 — the desk is LIVE: roster frames prepend created

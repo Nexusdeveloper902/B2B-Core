@@ -89,6 +89,14 @@ if [ "$DB_CONN" = "sqlite" ]; then
 fi
 REALISTIC_STUDENTS="$STUDENTS" REALISTIC_MONTHS="$MONTHS" \
     "$PHP_BIN" artisan migrate:fresh --seeder=RealisticSeeder --force
+
+# TASK-045 (ADR-064) — the single system administrator is seeded SEPARATELY
+# and deliberately outside the school organization the seeder above built.
+# TASK-045 (ADR-064) — el único administrador del sistema se siembra APARTE
+# y deliberadamente fuera de la organización escolar sembrada arriba.
+log "System administrator (outside the school) / Administrador del sistema (fuera del colegio)"
+"$PHP_BIN" artisan db:seed --class='Database\Seeders\SystemAdminSeeder' --force
+
 ok "Realistic seed complete — summary reprinted above / Siembra realista completa — resumen reimpreso arriba"
 bi "Next: ./run serve" "Siguiente: ./run serve"
 exit 0

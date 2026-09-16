@@ -215,6 +215,19 @@ semestre. Lento por diseño (decenas de miles de toques — minutos, no
 segundos); el resumen reimprime accesos del personal, claves de
 lectores y distribuciones por grado y PAE.
 
+**TASK-045 — un colegio, un operador.** Cada fila que escribe este
+sembrador pertenece a la organización `IE Concejo de Sabaneta J.M.C.B`
+(`schools.slug = ie-concejo-de-sabaneta`), así el conjunto se lee como
+una institución coherente y su gente ve la interfaz con la identidad del
+colegio (`docs/BRAND.es.md` §3b). El sembrador **no crea ningún
+administrador**; luego el script ejecuta `SystemAdminSeeder` aparte, que
+crea exactamente un administrador del sistema (`admin@presence.test`)
+que **no** pertenece a ningún colegio — se renderiza como Pulse estándar
+y ve todas las organizaciones. Para tener un escritorio de admin con la
+identidad del colegio, entra con ese operador y crea un admin de colegio
+desde `/admin/staff` (el selector de colegio aparece solo para el
+administrador del sistema).
+
 ## `unpair`
 
 ```bash

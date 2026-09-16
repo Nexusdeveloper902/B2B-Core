@@ -435,11 +435,18 @@ class DashboardTest extends TestCase
         // #E8EDDF cream ground · #242423 ink action · #F5CB5C gold accent;
         // error red stays independent of the brand set)
         $this->assertMatchesRegularExpression('/--surface:\s*#e8eddf;/', $tokens);
-        $this->assertMatchesRegularExpression('/--primary:\s*#242423;/', $tokens);
+        // TASK-045 (ADR-065): the ink action color now enters through the
+        // brand layer, so the anchor is pinned at its source AND the
+        // derivation is pinned too — an unbranded Pulse shell still
+        // resolves --primary to exactly #242423.
+        $this->assertMatchesRegularExpression('/--brand-primary:\s*#242423;/', $tokens);
+        $this->assertMatchesRegularExpression('/--primary:\s*var\(--brand-primary\);/', $tokens);
+        $this->assertMatchesRegularExpression('/--brand-primary-contrast:\s*#f5cb5c;/', $tokens);
         $this->assertMatchesRegularExpression('/--tertiary-fixed:\s*#f5cb5c;/', $tokens);
         $this->assertMatchesRegularExpression('/--error:\s*#ba1a1a;/', $tokens);
         $this->assertMatchesRegularExpression('/--surface-variant:\s*#cfdbd5;/', $tokens);
-        $this->assertMatchesRegularExpression('/--primary-container:\s*#333533;/', $tokens);
+        $this->assertMatchesRegularExpression('/--brand-primary-hover:\s*#333533;/', $tokens);
+        $this->assertMatchesRegularExpression('/--primary-container:\s*var\(--brand-primary-hover\);/', $tokens);
         // the mockup type scale ships verbatim
         $this->assertMatchesRegularExpression('/--fs-display:\s*56px;/', $tokens);
         $this->assertMatchesRegularExpression('/--fs-label-sm:\s*10px;/', $tokens);
@@ -498,7 +505,11 @@ class DashboardTest extends TestCase
         $this->assertMatchesRegularExpression('/\.stamp-absent\s*{[^}]*var\(--error-container\)/', $css);
         // the chip tone mapping rides the semantic roles too
         $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="PAE_"\]\s*{[^}]*var\(--surface-variant\)/', $css);
-        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="RECYCLING_"\]\s*{[^}]*var\(--primary\)[^}]*var\(--tertiary-fixed\)/', $css);
+        // TASK-045 (ADR-065): a chip label sitting ON the action color is
+        // UI chrome, so it follows the brand's contrast token rather than
+        // the gold points accent. For unbranded Pulse the two resolve to
+        // the same #f5cb5c, so this chip renders exactly as before.
+        $this->assertMatchesRegularExpression('/\.live-chip\[data-event-type\^="RECYCLING_"\]\s*{[^}]*var\(--primary\)[^}]*var\(--on-primary\)/', $css);
     }
 
     #[Test]

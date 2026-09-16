@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\InheritsSchoolFromParent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class RewardRedemption extends Model
 {
     use HasFactory;
+    use InheritsSchoolFromParent;
 
     protected $fillable = ['reward_id', 'student_id', 'ledger_id', 'points_spent', 'request_id'];
 
@@ -31,5 +33,16 @@ class RewardRedemption extends Model
     public function ledger(): BelongsTo
     {
         return $this->belongsTo(PointsLedger::class, 'ledger_id');
+    }
+
+    /**
+     * TASK-045 (ADR-064) — organization ownership is INHERITED:
+     * this row belongs to whatever its student belongs to.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected static function schoolOwnershipPath(): array
+    {
+        return ['student_id', 'students'];
     }
 }

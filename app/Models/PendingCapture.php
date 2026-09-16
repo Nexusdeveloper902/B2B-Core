@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PendingCaptureState;
+use App\Models\Concerns\InheritsSchoolFromParent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PendingCapture extends Model
 {
     use HasFactory;
+    use InheritsSchoolFromParent;
 
     protected $fillable = ['reader_id', 'image_path', 'event_id', 'card_id', 'state', 'expires_at'];
 
@@ -64,5 +66,16 @@ class PendingCapture extends Model
         return $query->where('state', PendingCaptureState::AwaitingCard->value)
             ->where('expires_at', '>', now())
             ->where('created_at', '<=', now());
+    }
+
+    /**
+     * TASK-045 (ADR-064) — organization ownership is INHERITED:
+     * this row belongs to whatever its reader belongs to.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected static function schoolOwnershipPath(): array
+    {
+        return ['reader_id', 'readers'];
     }
 }

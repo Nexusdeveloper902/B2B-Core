@@ -8,12 +8,14 @@ use App\Enums\ReaderType;
 use App\Enums\UserRole;
 use App\Models\Reader;
 use App\Models\Reward;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\StudentAccountService;
+use App\Support\Tenancy\CurrentSchool;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +60,30 @@ use Illuminate\Support\Facades\DB;
  */
 class RealisticSeeder extends Seeder
 {
+    /**
+     * TASK-045 (ADR-064/ADR-065) — the realistic dataset is ONE school.
+     *
+     * Every row this seeder writes (staff, classes, students, cards,
+     * readers, rewards, events, deposits, ledger, redemptions, pairings,
+     * captures and both realtime channels) belongs to this organization,
+     * so the demo reads as a coherent institution instead of a pile of
+     * unrelated records.
+     *
+     * It deliberately creates NO administrator: the platform operator is
+     * a single system-level account seeded OUTSIDE this organization by
+     * SystemAdminSeeder (./run seed-realistic runs it right after this
+     * one). That admin can mint a school administrator from the staff
+     * desk in one click when a branded admin shell is wanted.
+     */
+    private const SCHOOL_NAME = 'IE Concejo de Sabaneta J.M.C.B';
+
+    private const SCHOOL_SLUG = 'ie-concejo-de-sabaneta';
+
+    /** The branding profile in config/branding.php this school renders with. */
+    private const SCHOOL_BRAND = 'ie-concejo-de-sabaneta';
+
+    private ?School $school = null;
+
     private const RNG_SEED = 20260315;
 
     private const DEFAULT_STUDENTS = 300;
@@ -192,6 +218,14 @@ class RealisticSeeder extends Seeder
         [$bfStart, $bfEnd] = $this->parseWindow($windows['breakfast']);
         [$luStart, $luEnd] = $this->parseWindow($windows['lunch']);
 
+        // TASK-045 — the organization comes first, and everything below
+        // is created while ACTING AS it: BelongsToSchool's creation
+        // inheritance stamps every Eloquent row, so nothing in this
+        // seeder has to remember to pass a school id (and nothing can
+        // forget to).
+        $this->school = School::provision(self::SCHOOL_NAME, self::SCHOOL_SLUG, self::SCHOOL_BRAND);
+        app(CurrentSchool::class)->actAs($this->school);
+
         $this->seedSettings();
         $this->seedStaff($initialPassword);
         $classes = $this->seedClasses($initialPassword);
@@ -208,6 +242,30 @@ class RealisticSeeder extends Seeder
         $this->seedOperationalHistory($students, $days, $readers, $stats);
 
         $this->printSummary($days, $students, $classes, $readers, $stats, $redemptionCount, $initialPassword);
+
+        // Leave the process as it found it: a seeder that stays "acting
+        // as" a school would silently scope anything that runs after it.
+        app(CurrentSchool::class)->forgetOverride();
+    }
+
+    /** The organization id every raw (non-Eloquent) insert must carry. */
+    private function schoolId(): int
+    {
+        return (int) $this->school->id;
+    }
+
+    /**
+     * Stamp the organization onto rows headed for a bulk insert.
+     *
+     * Bulk inserts bypass Eloquent entirely (that is the point — 100k
+     * events), so creation inheritance cannot reach them.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function owned(array $rows): array
+    {
+        return array_map(fn (array $row) => $row + ['school_id' => $this->schoolId()], $rows);
     }
 
     // ------------------------------------------------------------------
@@ -234,9 +292,10 @@ class RealisticSeeder extends Seeder
 
     private function seedStaff(string $initialPassword): void
     {
+        // TASK-045 (ADR-064) — NO administrator is created here. The one
+        // admin account lives outside this organization (SystemAdminSeeder),
+        // so the realistic dataset can never grow a second one by accident.
         $staff = [
-            ['School Admin', 'admin@presence.test', UserRole::Admin],
-            ['Marcela Jaramillo', 'coordinacion@presence.test', UserRole::Admin],
             ['Sofía Vargas', 'kitchen@presence.test', UserRole::Kitchen],
             ['Pedro Castaño', 'cocina.manana@presence.test', UserRole::Kitchen],
             ['Luz Mery Díaz', 'cocina.tarde@presence.test', UserRole::Kitchen],
@@ -836,6 +895,9 @@ class RealisticSeeder extends Seeder
             'metadata' => null,
             'served' => $served,
             'reason' => $reason,
+            // TASK-045 — the reader's organization, stamped here because
+            // bulk inserts never reach the model's creating hook.
+            'school_id' => $this->schoolId(),
             'created_at' => $at,
             'updated_at' => $at,
         ];
@@ -1216,7 +1278,7 @@ class RealisticSeeder extends Seeder
             'created_at' => $days[min(40, count($days) - 1)]->toDateString().' 08:00:00',
             'updated_at' => $days[min(40, count($days) - 1)]->toDateString().' 08:00:00',
         ];
-        DB::table('roster_updates')->insert($rosterRows);
+        DB::table('roster_updates')->insert($this->owned($rosterRows));
 
         // --- recycling feed frames for the last 5 school days ---
         $tailDays = array_slice(array_map(fn (Carbon $d) => $d->toDateString(), $days), -5);
@@ -1287,7 +1349,7 @@ class RealisticSeeder extends Seeder
         ];
 
         foreach (array_chunk($feedRows, 500) as $chunk) {
-            DB::table('recycling_updates')->insert($chunk);
+            DB::table('recycling_updates')->insert($this->owned($chunk));
         }
     }
 
@@ -1387,6 +1449,14 @@ class RealisticSeeder extends Seeder
         $this->command->warn(' REALISTIC DATA — a full semester, school-shaped trends (deterministic reseed)');
         $this->command->warn(' DATOS REALISTAS — un semestre completo, tendencias escolares (resiembra determinista)');
         $this->command->warn($line);
+        $this->command->info(sprintf(
+            ' [EN] Organization: %s (slug %s, branding %s) — every row below belongs to it.',
+            self::SCHOOL_NAME, self::SCHOOL_SLUG, self::SCHOOL_BRAND,
+        ));
+        $this->command->info(sprintf(
+            ' [ES] Organización: %s (slug %s, identidad %s) — todo lo de abajo le pertenece.',
+            self::SCHOOL_NAME, self::SCHOOL_SLUG, self::SCHOOL_BRAND,
+        ));
 
         $first = $days[0]->toDateString();
         $last = end($days)->toDateString();
@@ -1435,8 +1505,6 @@ class RealisticSeeder extends Seeder
 
         $this->command->info(" [EN] Staff logins (password: {$initialPassword}) / Accesos del personal (clave: {$initialPassword}):");
         $staffRows = [
-            ['School Admin', 'admin@presence.test', 'admin'],
-            ['Marcela Jaramillo', 'coordinacion@presence.test', 'admin'],
             ['Sofía Vargas', 'kitchen@presence.test', 'kitchen'],
             ['Pedro Castaño', 'cocina.manana@presence.test', 'kitchen'],
             ['Luz Mery Díaz', 'cocina.tarde@presence.test', 'kitchen'],
@@ -1456,6 +1524,8 @@ class RealisticSeeder extends Seeder
         $this->command->warn($line);
         $this->command->warn(" [EN] Student logins follow {first-name}@{$this->accountDomain()} (rotation on first login) — see the users table.");
         $this->command->warn(" [ES] Los accesos de estudiantes siguen {nombre}@{$this->accountDomain()} (rotación al primer login) — ver la tabla users.");
+        $this->command->warn(' [EN] No administrator lives in this dataset — the single system admin is seeded separately (SystemAdminSeeder).');
+        $this->command->warn(' [ES] Este conjunto no tiene administrador — el único admin del sistema se siembra aparte (SystemAdminSeeder).');
         $this->command->warn($line);
     }
 

@@ -25,6 +25,13 @@ return [
     'skip_to_content' => 'Skip to content',
     'primary_nav' => 'Primary',
     'footer_note' => 'Core operations console — attendance, PAE meals and recycling rewards for the school day.',
+
+    // TASK-045 (ADR-065) — school branding. Pulse keeps its name; the
+    // institution is named beside it, never instead of it.
+    'branded_for' => 'Branded for :school',
+    'school' => 'School',
+    'school_none' => 'No school (system-wide)',
+    'school_field_hint' => 'System administrators may place a new account in a school. School administrators always create inside their own school.',
     'demo_credentials' => 'Demo credentials (seeded)',
     'env' => 'Environment',
     // TASK-030 (Fix 3) — project presence in the footer.

@@ -14,11 +14,18 @@
 @section('content')
 <div class="auth-wrap">
     <section class="panel auth-card">
-        <div class="auth-band">
-            <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
+        {{-- TASK-045 (ADR-065) — this screen is authenticated, so the
+             brand resolves from the account itself: a school user
+             rotates their password inside their own school's shell. --}}
+        <div @class(['auth-band', 'is-branded' => ! $brand->isDefault()])>
+            <img class="wordmark-mark" src="{{ asset($brand->logoSrc()) }}" alt=""
+                 width="{{ $brand->logoWidth() }}" height="{{ $brand->logoHeight() }}">
             <div>
                 <p class="auth-band-title">{{ __('app.app_name') }}</p>
                 <p class="auth-band-sub">{{ __('app.password_change_band_sub') }}</p>
+                @unless($brand->isDefault())
+                    <p class="auth-band-school">{{ $brand->name() }}</p>
+                @endunless
             </div>
             <span class="material-symbols-outlined is-16 auth-band-icon" aria-hidden="true">key</span>
         </div>

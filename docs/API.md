@@ -890,6 +890,12 @@ students desk (see `POST /api/v1/admin/students`).
 { "name": "Prof. Luis Gómez", "email": "luis.g@presence.test", "role": "teacher", "password": "cambia-ya-01", "password_confirmation": "cambia-ya-01", "class_ids": [3] }
 ```
 
+**TASK-045** — the new account joins the creating admin's organization
+automatically. `school_id` is accepted ONLY from the system
+administrator (an admin with no school of their own); from a school
+admin it is ignored, never obeyed. `class_ids` must belong to the
+caller's organization or the request is `422`.
+
 **Response `200`**:
 
 ```json
@@ -951,6 +957,41 @@ before any byte of the file is read).
 `404` — the deposit has no stored image, or the file is missing on disk.
 
 ---
+
+## Organization (school) scoping — TASK-045, ADR-064
+
+Every organization-owned resource is walled **server-side**, on every
+verb, for every surface (index, show, create, update, delete, search,
+filter, bulk, CSV import, realtime frames, NL queries). The wall is a
+model-level global scope, not a per-controller check, so it cannot be
+forgotten by a new endpoint.
+
+Two rules govern the whole contract:
+
+1. **The organization is derived, never supplied.** It comes from the
+   authenticated account (`users.school_id`) or, for device endpoints,
+   from the reader the API key/HMAC proved (ADR-002/ADR-062). No request
+   accepts an organization id as truth. A created resource inherits the
+   caller's organization automatically.
+2. **A foreign id is refused, not filtered.** Route-model binding
+   resolves through the scope, so another organization's id answers
+   `404` — a refusal that also does not confirm the row exists
+   elsewhere. Foreign keys in request bodies (`class_id`, `reward_id`,
+   `event_id`, `class_ids[]`) validate through the scoped model, so they
+   answer `422` instead of landing an unparented row.
+
+**The one deliberate exception:** an admin whose own `school_id` is
+`NULL` is the *system administrator* and operates across every
+organization. That capability is granted by the account's own row.
+`POST /api/v1/admin/staff` is the only endpoint that accepts a
+`school_id`, and only from that account — for anyone else the field is
+ignored (never obeyed), and the new account inherits the creator's
+organization.
+
+Device endpoints inherit the same wall: a reader can only tap a card,
+classify an event or resolve a capture inside its own organization. A
+card from another school answers the ordinary
+`404 {"reason":"not_found"}` — the same answer an unknown card gets.
 
 ## Error conventions
 

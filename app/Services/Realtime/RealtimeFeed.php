@@ -2,6 +2,7 @@
 
 namespace App\Services\Realtime;
 
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -59,6 +60,12 @@ final class RealtimeFeed
             ->leftJoin('classes', 'classes.id', '=', 'students.class_id')
             ->leftJoin('readers', 'readers.id', '=', 'events.reader_id');
 
+        // TASK-045 (ADR-064) — the organization wall on a raw builder.
+        // In the web tier this scopes the SSR feed to the viewer's own
+        // school; inside realtime:serve there is no request identity, so
+        // it is a no-op and the per-CONNECTION filter owns the wall.
+        app(CurrentSchool::class)->applyTo($query, 'events.school_id');
+
         if ($afterId !== null) {
             $query->where('events.id', '>', $afterId);
         }
@@ -78,6 +85,7 @@ final class RealtimeFeed
                 'events.occurred_at',
                 'events.served',
                 'events.reason',
+                'events.school_id',
                 'students.id as student_id',
                 'students.name as student_name',
                 'students.class_id as class_id',
@@ -98,6 +106,9 @@ final class RealtimeFeed
                     // kitchen page colors its big state from these and
                     // the dashboards style flagged chips differently.
                     'served' => (bool) $row->served,
+                    // TASK-045 — the owning organization, so the socket
+                    // server can refuse a frame per connection.
+                    'school_id' => $row->school_id !== null ? (int) $row->school_id : null,
                     'reason' => $row->reason !== null ? (string) $row->reason : null,
                     'student_id' => (int) $row->student_id,
                     'student_name' => (string) $row->student_name,

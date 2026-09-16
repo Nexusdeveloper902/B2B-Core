@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -25,8 +26,11 @@ class AdminStaffController extends Controller
     public function page(): View
     {
         $staff = User::query()
+            // TASK-045 (ADR-064) — a school admin manages THEIR school's
+            // staff; only the system administrator sees every account.
+            ->inCurrentSchool()
             ->whereIn('role', [UserRole::Admin->value, UserRole::Teacher->value, UserRole::Kitchen->value])
-            ->with('classes')
+            ->with(['classes', 'school'])
             ->orderBy('name')
             ->get();
 
@@ -36,6 +40,13 @@ class AdminStaffController extends Controller
 
         return view('admin.staff', [
             'staff' => $staff,
+            // TASK-045 — the system administrator (no school of their
+            // own) is the one account that may place a new login into a
+            // named school; a school admin's creations inherit theirs.
+            'schools' => auth()->user()->isSystemAdmin()
+                ? School::orderBy('name')->get(['id', 'name'])
+                : collect(),
+            'isSystemAdmin' => (bool) auth()->user()->isSystemAdmin(),
             'classes' => $classes,
             'roles' => [UserRole::Admin->value, UserRole::Teacher->value, UserRole::Kitchen->value],
             // The email-domain preset from the settings desk (the same

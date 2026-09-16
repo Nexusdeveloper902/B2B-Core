@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ReaderType;
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,9 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Reader extends Model
 {
-    use HasFactory;
+    use BelongsToSchool, HasFactory;
 
-    protected $fillable = ['label', 'type', 'active_event_type', 'api_key'];
+    protected $fillable = ['label', 'type', 'active_event_type', 'api_key', 'school_id'];
 
     protected $hidden = ['api_key'];
 

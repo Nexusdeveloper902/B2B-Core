@@ -127,3 +127,63 @@ aplicación, no del motor.
   lecturas resuelven fila → valor por defecto de config; los valores
   por defecto siguen siendo configurables por entorno
   (`PAE_BREAKFAST_START` etc. en `.env.example`).
+
+## 8. Adiciones de esquema — TASK-045 (colegios / organizaciones)
+
+> ADR-064. Aditivo y reversible; sin reescritura de datos.
+
+**`schools`** — la organización a la que pertenece toda fila con dueño,
+y el ancla de la cadena de marca (`docs/BRAND.es.md` §3b).
+
+| Columna | Notas |
+|---|---|
+| `name` | el nombre propio de la institución, único (p. ej. `IE Concejo de Sabaneta J.M.C.B`) |
+| `slug` | identificador estable de máquina, único |
+| `brand_key` | con qué perfil de `config/branding.php` se renderiza; `NULL`/desconocido ⇒ Pulse estándar |
+
+**`school_id`** (FK nulable, `nullOnDelete`) se agregó solo a las tablas
+RAÍZ con dueño organizacional:
+
+```
+users · classes · students · readers · rewards · events
+roster_updates · recycling_updates
+```
+
+Todo lo demás desciende de alguna de ellas y se acota **a través de su
+padre**, así la pertenencia se guarda una sola vez y no puede
+contradecirse:
+
+| Tabla hija | Dueño resuelto vía |
+|---|---|
+| `cards`, `points_ledger`, `reward_redemptions`, `pending_pairings` | `students.school_id` |
+| `recycling_deposits` | `events.school_id` |
+| `pending_captures` | `readers.school_id` |
+
+`events` es la única desnormalización deliberada: asistencia, PAE y
+reciclaje son vistas derivadas que se agregan directamente sobre esa
+tabla, así que un join por agregado se pagaría en cada render. Se
+estampa desde su **lector** (la identidad propia del dispositivo — nunca
+un valor enviado por el cliente), y una prueba fija que todo evento
+coincide con el colegio de su lector.
+
+Índices agregados: `events (school_id, type, occurred_at)` y
+`students (school_id, class_id)` — las dos lecturas calientes de todo
+panel.
+
+### `NULL` es un valor admitido, no una migración a medias
+
+Toda columna es nulable y toda fila preexistente sigue funcionando:
+
+- **Admin + `school_id IS NULL` = el administrador del sistema.** No
+  pertenece a ninguna organización y por eso opera sobre todas. Es la
+  única capacidad interorganizacional deliberada, otorgada por la propia
+  fila de la cuenta — nunca por un parámetro de la petición.
+- **Cualquier otro rol con `school_id IS NULL`** queda restringido al
+  conjunto sin asignar (`NULL`). Nunca se abre a toda la base de datos.
+
+`./run reset` (DemoSeeder) y `./run reset --pilot` deliberadamente no
+siembran ningún colegio — son el fixture de Pulse estándar. `./run
+seed-realistic` siembra un colegio (`IE Concejo de Sabaneta J.M.C.B`)
+dueño de cada fila que escribe, más exactamente un administrador del
+sistema **fuera** de él (`SystemAdminSeeder`, ejecutado aparte por el
+script).

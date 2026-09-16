@@ -66,6 +66,13 @@ class StaffController extends Controller
                     'password' => (string) $validated['password'],
                     'role' => $validated['role'],
                     'must_change_password' => true,
+                    // TASK-045 (ADR-064) — organization placement. A
+                    // school admin's creations INHERIT their school (the
+                    // model's creation hook fills the null); only the
+                    // system administrator may name one, and only their
+                    // own account grants that. A school admin sending a
+                    // school_id is ignored, not obeyed.
+                    'school_id' => $this->schoolIdFor($validated),
                 ]);
 
                 // Homeroom assignment rides the same transaction: the
@@ -107,6 +114,7 @@ class StaffController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'classes' => $classes,
+                'school' => $user->school?->name,
             ],
             // Display-once credentials (the reader-API-key rule): this
             // response is the ONLY place the temporary password appears.
@@ -121,6 +129,20 @@ class StaffController extends Controller
                 'password' => (string) $validated['password'],
             ]),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function schoolIdFor(array $validated): ?int
+    {
+        if (! auth()->user()?->isSystemAdmin()) {
+            return null; // inherited from the creator (BelongsToSchool)
+        }
+
+        return isset($validated['school_id']) && $validated['school_id'] !== null
+            ? (int) $validated['school_id']
+            : null;
     }
 
     private function duplicate(string $email): JsonResponse

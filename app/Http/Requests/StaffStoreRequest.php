@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\School;
+use App\Models\SchoolClass;
+use App\Rules\OwnedByCurrentSchool;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -47,7 +50,14 @@ class StaffStoreRequest extends FormRequest
             // controller 422s it for any other role (client bug, not a
             // valid assignment).
             'class_ids' => ['sometimes', 'array'],
-            'class_ids.*' => ['integer', Rule::exists('classes', 'id')],
+            'class_ids.*' => ['integer', new OwnedByCurrentSchool(SchoolClass::class)],
+            // TASK-045 (ADR-064) — organization placement. A school admin
+            // never sends this (and it is IGNORED if they do: the
+            // controller derives the school from their own account). Only
+            // the system administrator, who belongs to no organization,
+            // may name one — the explicit cross-organization capability
+            // §15 asks to preserve, granted by the account's own row.
+            'school_id' => ['sometimes', 'nullable', 'integer', Rule::exists(School::class, 'id')],
         ];
     }
 }

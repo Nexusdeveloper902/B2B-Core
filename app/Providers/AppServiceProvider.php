@@ -8,9 +8,12 @@ use App\Services\NlQuery\FunctionRegistry;
 use App\Services\NlQuery\NlQueryService;
 use App\Services\PairingService;
 use App\Services\Recycling\ClassifierFactory;
+use App\Support\Branding\BrandResolver;
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,6 +23,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // TASK-045 (ADR-064) — "which organization is this request acting
+        // for?" is resolved ONCE per request and consulted by every
+        // organization scope and every organization-owned insert.
+        $this->app->singleton(CurrentSchool::class, fn () => new CurrentSchool);
+
+        // TASK-045 (ADR-065) — account -> school -> branding, memoized
+        // for the request (the shell asks for it on every view render).
+        $this->app->singleton(BrandResolver::class, fn () => new BrandResolver);
+
         // MaterialClassifier contract -> configured driver (stub | local |
         // deepseek). Swapping classifiers is a .env change, never a code
         // change (ADR-003/ADR-007). Tests swap this binding with a fake.
@@ -56,6 +68,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // TASK-045 (ADR-065) — every view receives the resolved brand, so
+        // no template ever asks which school it is rendering for. The
+        // resolver memoizes, so this costs one lookup per request even
+        // though partials re-enter it.
+        View::composer('*', function ($view): void {
+            $view->with('brand', app(BrandResolver::class)->current());
+        });
+
         // Brute-force guard on the session login: 6 attempts per minute
         // per IP (shared staff-room NATs stay comfortably under it; a
         // credential-stuffing burst does not).

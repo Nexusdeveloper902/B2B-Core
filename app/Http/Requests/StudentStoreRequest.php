@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SchoolClass;
+use App\Rules\OwnedByCurrentSchool;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -28,7 +30,10 @@ class StudentStoreRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'grade' => ['required', 'string', 'max:64'],
-            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            // TASK-045 (ADR-064) — through the SCOPED model, not a raw
+            // `exists:` probe: another school's class id must be invalid
+            // here, not merely ineffective downstream.
+            'class_id' => ['required', 'integer', new OwnedByCurrentSchool(SchoolClass::class)],
             // TASK-037 — breakfast and lunch enroll independently.
             'pae_breakfast_enrolled' => ['sometimes', 'boolean'],
             'pae_lunch_enrolled' => ['sometimes', 'boolean'],

@@ -6,20 +6,26 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {{-- Pulse identity (productization pass): app_name, real brand mark,
          favicon/PWA icon set, social metadata. The description line is
-         the footer_note copy — one source of truth for the one-liner. --}}
-    <title>@yield('title', __('app.app_name')) — {{ __('app.app_name') }}</title>
+         the footer_note copy — one source of truth for the one-liner.
+
+         TASK-045 (ADR-065) — every identity value below now comes from
+         the resolved brand ($brand, shared with every view). Default
+         Pulse resolves to exactly the values that were hard-coded here
+         before; a branded school swaps its own name, crest and icon set
+         with no change to this markup. --}}
+    <title>@yield('title', __('app.app_name')) — {{ $brand->name() }}</title>
     <meta name="description" content="{{ __('app.footer_note') }}">
-    <meta name="theme-color" content="#E8EDDF">
-    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="48x48">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('brand/favicon-32.png') }}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('brand/favicon-16.png') }}">
-    <link rel="apple-touch-icon" href="{{ asset('brand/apple-touch-icon.png') }}">
-    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+    <meta name="theme-color" content="{{ $brand->themeColor() }}">
+    <link rel="icon" href="{{ asset($brand->icon('ico')) }}" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset($brand->icon('png32')) }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset($brand->icon('png16')) }}">
+    <link rel="apple-touch-icon" href="{{ asset($brand->icon('apple')) }}">
+    <link rel="manifest" href="{{ route('brand.manifest') }}">
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="{{ __('app.app_name') }}">
+    <meta property="og:site_name" content="{{ $brand->name() }}">
     <meta property="og:title" content="@yield('title', __('app.app_name'))">
     <meta property="og:description" content="{{ __('app.footer_note') }}">
-    <meta property="og:image" content="{{ asset('brand/og-image.png') }}">
+    <meta property="og:image" content="{{ asset($brand->ogImage()) }}">
     <meta name="twitter:card" content="summary_large_image">
     {{-- Versioned asset URLs (filemtime): browsers heuristically cache
          unversioned CSS/JS for days — without this, a stylesheet pass
@@ -28,6 +34,15 @@
     <link rel="stylesheet" href="{{ asset('css/fonts.css') }}?v={{ @filemtime(public_path('css/fonts.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/tokens.css') }}?v={{ @filemtime(public_path('css/tokens.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ @filemtime(public_path('css/app.css')) }}">
+    {{-- TASK-045 (ADR-065) — the school's brand layer, INLINE and after
+         the stylesheets: the correct palette is present in the very
+         first paint, so a branded account never flashes Pulse colors
+         and then repaints. Default Pulse emits nothing at all (the
+         stylesheet already IS the Pulse palette), so the unbranded
+         shell keeps byte-identical markup. --}}
+    @if($brand->styleBlock() !== '')
+        <style id="brand-theme">{!! $brand->styleBlock() !!}</style>
+    @endif
     {{-- Motion gate (Signal, marketplace pattern): flags motion availability
          before first paint so reveal states never flash. Never adds the flag
          under prefers-reduced-motion. --}}
@@ -54,10 +69,19 @@
     <div class="shell topbar-in">
         <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : (auth()->user()->isKitchen() ? route('kitchen') : route('dashboard'))) : route('login') }}"
            aria-label="{{ __('app.app_name') }}">
-            {{-- The real Pulse mark (brand suite, knockout on transparent) —
-                 replaces the placeholder "P" tile. --}}
-            <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
+            {{-- The brand mark: the Pulse lockup by default, the school's
+                 own crest for a branded account. width/height carry the
+                 asset's real ratio so the box is reserved before the
+                 image loads — swapping marks never shifts the topbar. --}}
+            <img class="wordmark-mark" src="{{ asset($brand->logoSrc()) }}" alt=""
+                 width="{{ $brand->logoWidth() }}" height="{{ $brand->logoHeight() }}">
             <span class="wordmark-name">{{ __('app.app_name') }}</span>
+            @if($brand->tag())
+                {{-- "Pulse, branded for <school>": the product keeps its
+                     name, the institution is named beside it. Hidden on
+                     narrow viewports so the nav row never wraps. --}}
+                <span class="wordmark-school" title="{{ $brand->name() }}">{{ $brand->tag() }}</span>
+            @endif
         </a>
 
         @auth
@@ -220,10 +244,18 @@
         <div class="footer-in">
             <div class="footer-brand">
                 <a class="wordmark" href="{{ auth()->check() ? (auth()->user()->isStudent() ? route('student.dashboard') : (auth()->user()->isKitchen() ? route('kitchen') : route('dashboard'))) : route('login') }}">
-                    <img class="wordmark-mark" src="{{ asset('brand/mark-96.png') }}" alt="" width="42" height="30">
+                    <img class="wordmark-mark" src="{{ asset($brand->logoSrc()) }}" alt=""
+                         width="{{ $brand->logoWidth() }}" height="{{ $brand->logoHeight() }}">
                     <span class="wordmark-name">{{ __('app.app_name') }}</span>
                 </a>
                 <p class="footer-note">{{ __('app.footer_note') }}</p>
+                @unless($brand->isDefault())
+                    {{-- The full institution name, spelled out once where
+                         there is room for it (the topbar carries the short
+                         tag). This is the "powered by Pulse" line read the
+                         other way round. --}}
+                    <p class="footer-school">{{ __('app.branded_for', ['school' => $brand->name()]) }}</p>
+                @endunless
             </div>
             {{-- Honest ops chip: the only "status" this shell can state without
                  lying is the environment it runs in (mockup's "All Systems

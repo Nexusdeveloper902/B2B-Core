@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\AdminSettingsController;
 use App\Http\Controllers\Web\AdminStaffController;
 use App\Http\Controllers\Web\AdminStudentsController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\BrandManifestController;
 use App\Http\Controllers\Web\KitchenController;
 use App\Http\Controllers\Web\PaeExportController;
 use App\Http\Controllers\Web\PaeReportController;
@@ -35,6 +36,12 @@ Route::get('/', function () {
         default => 'dashboard',
     });
 })->name('home');
+
+// TASK-045 (ADR-065) — the installable-app manifest, rendered from the
+// resolved brand (school crest + institution name, or stock Pulse).
+// Public: it must answer for the login screen too.
+Route::get('/manifest.webmanifest', [BrandManifestController::class, 'show'])
+    ->name('brand.manifest');
 
 // Language switcher (EN / ES).
 Route::get('/locale/{locale}', function (string $locale) {

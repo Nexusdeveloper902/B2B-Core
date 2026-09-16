@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
+use App\Rules\OwnedByCurrentSchool;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 /**
  * TASK-029 — class creation from the /admin/students desk (the owner
@@ -32,7 +33,11 @@ class ClassStoreRequest extends FormRequest
                 'sometimes',
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where('role', 'teacher'),
+                // TASK-045 — and only a teacher of THIS school.
+                new OwnedByCurrentSchool(
+                    User::class,
+                    fn ($query) => $query->inCurrentSchool()->where('role', 'teacher'),
+                ),
             ],
         ];
     }

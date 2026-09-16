@@ -10,6 +10,7 @@ use App\Services\Realtime\RealtimeRecycling;
 use App\Services\Realtime\RealtimeRoster;
 use App\Services\Realtime\RealtimeToken;
 use App\Services\Realtime\WsFrame;
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,7 @@ class RealtimeServeCommand extends Command
     /** Pre-handshake bytes a client may buffer before the drop (an HTTP head is never this big). */
     private const MAX_HANDSHAKE_BUFFER = 32768;
 
-    /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null}> keyed by (int) socket */
+    /** @var array<int, array{sock: resource, buf: string, handshook: bool, admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null, school_id: int|null, school_wide: bool}> keyed by (int) socket */
     private array $clients = [];
 
     private int $lastEventId = 0;
@@ -166,6 +167,11 @@ class RealtimeServeCommand extends Command
             'role' => '',
             'class_ids' => null,
             'student_id' => null,
+            // TASK-045 (ADR-064) — the organization wall on the wire.
+            // Resolved once per connection from the token's user row;
+            // school_wide is the system administrator only.
+            'school_id' => null,
+            'school_wide' => false,
         ];
     }
 
@@ -266,6 +272,8 @@ class RealtimeServeCommand extends Command
         $this->clients[$clientId]['role'] = $scope['role'];
         $this->clients[$clientId]['class_ids'] = $scope['class_ids'];
         $this->clients[$clientId]['student_id'] = $scope['student_id'];
+        $this->clients[$clientId]['school_id'] = $scope['school_id'];
+        $this->clients[$clientId]['school_wide'] = $scope['school_wide'];
 
         $accept = Handshake::acceptKey($request['headers']['sec-websocket-key']);
         @fwrite($socket, Handshake::successResponse($accept));
@@ -286,19 +294,29 @@ class RealtimeServeCommand extends Command
             // TASK-025 — the recycling channel's initial snapshot rides the
             // same hello (student names + points, same exposure level as
             // tap frames — no card UIDs, so every role may receive it).
-            'recycling' => $this->recycling->recent((int) config('realtime.history_limit')),
+            // TASK-045 — the recycling snapshot is walled the same way.
+            'recycling' => \array_values(\array_filter(
+                $this->recycling->recent((int) config('realtime.history_limit')),
+                fn (array $row): bool => $this->clientSeesSchool($this->clients[$clientId], $row['school_id'] ?? null),
+            )),
         ];
         if ($this->clients[$clientId]['admin']) {
             // TASK-020 — the pairing desk's initial state rides the same
             // hello (SSR already painted it; this reconciles the gap) —
             // admins only (card UIDs cross this wire, same as the REST
             // status endpoint the payload mirrors).
-            $hello['pairing'] = $this->pairing->payload();
+            // TASK-045 — the pairing payload is an aggregate, not a row
+            // stream, so it is COMPUTED inside the connection's own
+            // organization instead of being filtered afterwards.
+            $hello['pairing'] = $this->pairingPayloadFor($this->clients[$clientId]);
             // TASK-029 — the roster channel's recent snapshot too: a
             // freshly connected admin page replays it through the same
             // idempotent handlers live frames use, reconciling anything
             // that changed between its SSR paint and this connect.
-            $hello['roster'] = $this->roster->recent(30);
+            $hello['roster'] = \array_values(\array_filter(
+                $this->roster->recent(30),
+                fn (array $row): bool => $this->clientSeesSchool($this->clients[$clientId], $row['school_id'] ?? null),
+            ));
         }
         $this->sendJson($socket, $hello);
     }
@@ -306,14 +324,20 @@ class RealtimeServeCommand extends Command
     /**
      * TASK-027 — resolve the tap-channel scope for one connection.
      *
-     * @return array{admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null}
+     * @return array{admin: bool, role: string, class_ids: array<int, int>|null, student_id: int|null, school_id: int|null, school_wide: bool}
      */
     private function resolveScope(int $userId): array
     {
-        $scope = ['admin' => false, 'role' => '', 'class_ids' => null, 'student_id' => null];
+        $scope = [
+            'admin' => false, 'role' => '', 'class_ids' => null, 'student_id' => null,
+            // FAIL CLOSED on the organization too: an unresolvable user
+            // is not school_wide, and its null school matches only the
+            // unassigned data set.
+            'school_id' => null, 'school_wide' => false,
+        ];
 
         try {
-            $user = DB::table('users')->where('id', $userId)->first(['id', 'role', 'student_id']);
+            $user = DB::table('users')->where('id', $userId)->first(['id', 'role', 'student_id', 'school_id']);
         } catch (\Throwable) {
             return $scope; // fail closed — an unreadable user serves nothing
         }
@@ -323,6 +347,11 @@ class RealtimeServeCommand extends Command
         }
 
         $scope['role'] = (string) $user->role;
+        $scope['school_id'] = $user->school_id !== null ? (int) $user->school_id : null;
+        // TASK-045 (ADR-064) — the system administrator (an admin that
+        // belongs to no organization) is the only cross-organization
+        // connection; a school's own admin stays inside their school.
+        $scope['school_wide'] = $user->role === UserRole::Admin->value && $user->school_id === null;
 
         if ($user->role === UserRole::Admin->value) {
             $scope['admin'] = true;
@@ -373,6 +402,12 @@ class RealtimeServeCommand extends Command
     /** TASK-027 — does this connection's scope cover this feed row? */
     private function clientSeesRow(array $client, array $row): bool
     {
+        // TASK-045 — the organization wall comes FIRST: no class or
+        // student allowance can reach across schools.
+        if (! $this->clientSeesSchool($client, $row['school_id'] ?? null)) {
+            return false;
+        }
+
         if ($client['student_id'] !== null) {
             return (int) $row['student_id'] === (int) $client['student_id'];
         }
@@ -382,6 +417,46 @@ class RealtimeServeCommand extends Command
         }
 
         return true; // admin / unrestricted
+    }
+
+    /**
+     * TASK-045 (ADR-064) — does this connection's ORGANIZATION cover a
+     * row owned by $schoolId? The system administrator sees every
+     * organization; everyone else sees exactly their own (including the
+     * unassigned NULL set, which is its own organization).
+     *
+     * @param  array<string, mixed>  $client
+     */
+    private function clientSeesSchool(array $client, ?int $schoolId): bool
+    {
+        if ($client['school_wide'] === true) {
+            return true;
+        }
+
+        return $schoolId === $client['school_id'];
+    }
+
+    /**
+     * The pairing payload for one connection, computed inside that
+     * connection's organization (the payload is an aggregate built by
+     * PairingService, so the wall has to be applied while it is BUILT).
+     *
+     * @param  array<string, mixed>  $client
+     * @return array<string, mixed>
+     */
+    private function pairingPayloadFor(array $client): array
+    {
+        if ($client['school_wide'] === true) {
+            return $this->pairing->payload();
+        }
+
+        /** @var array<string, mixed> $payload */
+        $payload = app(CurrentSchool::class)->actAs(
+            $client['school_id'],
+            fn () => $this->pairing->payload(),
+        );
+
+        return $payload;
     }
 
     /**
@@ -450,17 +525,27 @@ class RealtimeServeCommand extends Command
 
         if ($signature !== $this->lastPairingSignature) {
             $this->lastPairingSignature = $signature;
-            $frame = WsFrame::encode(json_encode(
-                ['type' => 'pairing'] + $this->pairing->payload(),
-                JSON_UNESCAPED_UNICODE,
-            ));
+            // TASK-045 (ADR-064) — the payload is an aggregate, so it is
+            // built once PER ORGANIZATION present on the wire rather
+            // than once globally. Admin desks are few; this is a handful
+            // of cheap queries on a state change, not on every beat.
+            $frames = [];
             foreach ($this->clients as $clientId => $client) {
                 // Admin connections only — pairing frames carry card
                 // UIDs (see handshake()); teacher dashboards never see
                 // them, exactly like the REST status endpoint.
-                if ($client['handshook'] && $client['admin']) {
-                    $this->write($clientId, $frame);
+                if (! $client['handshook'] || ! $client['admin']) {
+                    continue;
                 }
+
+                $key = $client['school_wide'] ? 'system' : (string) ($client['school_id'] ?? 'none');
+
+                $frames[$key] ??= WsFrame::encode(json_encode(
+                    ['type' => 'pairing'] + $this->pairingPayloadFor($client),
+                    JSON_UNESCAPED_UNICODE,
+                ));
+
+                $this->write($clientId, $frames[$key]);
             }
         }
 
@@ -485,7 +570,8 @@ class RealtimeServeCommand extends Command
                 JSON_UNESCAPED_UNICODE,
             ));
             foreach ($this->clients as $clientId => $client) {
-                if ($client['handshook']) {
+                // TASK-045 — never across organizations, whatever the role.
+                if ($client['handshook'] && $this->clientSeesSchool($client, $update['school_id'] ?? null)) {
                     $this->write($clientId, $frame);
                 }
             }
@@ -510,7 +596,8 @@ class RealtimeServeCommand extends Command
                 JSON_UNESCAPED_UNICODE,
             ));
             foreach ($this->clients as $clientId => $client) {
-                if ($client['handshook'] && $client['admin']) {
+                if ($client['handshook'] && $client['admin']
+                    && $this->clientSeesSchool($client, $update['school_id'] ?? null)) {
                     $this->write($clientId, $frame);
                 }
             }

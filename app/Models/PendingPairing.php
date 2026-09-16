@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\InheritsSchoolFromParent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PendingPairing extends Model
 {
     use HasFactory;
+    use InheritsSchoolFromParent;
 
     protected $fillable = ['student_id', 'reader_id', 'card_id', 'expires_at', 'consumed_at',
         'last_rejected_uid', 'last_rejected_reason', 'last_rejected_at'];
@@ -76,5 +78,16 @@ class PendingPairing extends Model
         return $query->whereNull('consumed_at')
             ->where('expires_at', '>', now())
             ->where('created_at', '<=', now());
+    }
+
+    /**
+     * TASK-045 (ADR-064) — organization ownership is INHERITED:
+     * this row belongs to whatever its student belongs to.
+     *
+     * @return array{0: string, 1: string}
+     */
+    protected static function schoolOwnershipPath(): array
+    {
+        return ['student_id', 'students'];
     }
 }
