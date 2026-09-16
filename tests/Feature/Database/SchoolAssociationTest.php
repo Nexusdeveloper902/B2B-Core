@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -111,7 +112,7 @@ class SchoolAssociationTest extends TestCase
         app(CurrentSchool::class)->actAs($school, function () use ($school): void {
             SchoolClass::create(['name' => '1° A']);
             Student::create(['name' => 'Alumna', 'grade' => '1°']);
-            Reader::create(['label' => 'Aula 1', 'type' => 'classroom', 'active_event_type' => 'CLASS_ATTENDANCE', 'api_key' => 'k-relaciones-1']);
+            Reader::create(['label' => 'Aula 1', 'type' => 'classroom', 'active_event_type' => 'CLASS_ATTENDANCE', 'api_key' => Str::random(32)]);
             Reward::create(['name' => 'Premio', 'point_cost' => 5]);
 
             $this->assertCount(1, $school->classes);

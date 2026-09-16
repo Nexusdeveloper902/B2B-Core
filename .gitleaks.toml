@@ -1,7 +1,7 @@
 # gitleaks configuration — B2B-Core
 #
 # Extends the default ruleset (nothing weakened) and allowlists exactly
-# four literals — all deliberate NON-credentials:
+# five literals — all deliberate NON-credentials:
 #
 #   1. "nope-invalid-key"          — the deliberately-invalid bearer token
 #      the bilingual e2e suite (scripts/e2e.sh) sends to prove the 401
@@ -19,6 +19,12 @@
 #      path with no kind sent). A demo UID, not a credential of any
 #      kind; without this entry the generic `generic-api-key` rule
 #      false-positives on it (blocked CI on the TASK-042 push).
+#   5. "k-relaciones-1"             — a fabricated reader-fixture api_key in
+#      tests/Feature/Database/SchoolAssociationTest.php (TASK-045).
+#      A demo key, not a credential of any kind; without this entry
+#      the generic `generic-api-key` rule false-positives on it
+#      (blocked CI on the TASK-045 push). The fixture now uses
+#      Str::random(32); this entry covers the historic commit.
 #
 # Entries 2 and 3 matter only on FULL-HISTORY scans: push-event gitleaks
 # runs scan just the pushed commit range, but workflow_dispatch runs
@@ -32,10 +38,11 @@ title = "gitleaks config — B2B-Core"
 useDefault = true
 
 [allowlist]
-  description = "Deliberately-invalid / documented-example literals, not credentials: the e2e 401-path token, the HandshakeTest fixture WS token, the RFC 6455 example Sec-WebSocket-Key, and the HceCredentialTest fixture card UID"
+  description = "Deliberately-invalid / documented-example literals, not credentials: the e2e 401-path token, the HandshakeTest fixture WS token, the RFC 6455 example Sec-WebSocket-Key, the HceCredentialTest fixture card UID, and the SchoolAssociationTest fixture reader key"
   regexes = [
     '''nope-invalid-key''',
     '''7\.1893457207\.abcdef''',
     '''dGhlIHNhbXBsZSBub25jZQ==''',
     '''PLAINUID12345''',
+    '''k-relaciones-1''',
   ]
