@@ -601,6 +601,26 @@ and the web-only reports/exports below.
   branded header, summary tiles, bar charts, tables; CSV = raw
   structured rows), plus per-student variants
   `/admin/reports/pae/student/{id}/export/{pdf|csv}`.
+- `/admin/reports/attendance` — the attendance reporting desk: daily
+  present/late/absent with per-class breakdown and SVG trend charts,
+  monthly aggregates, repeat absentees, perfect-attendance count,
+  per-student history. Exports:
+  `/admin/reports/attendance/export/pdf?type=daily|monthly|absentees`
+  and `/admin/reports/attendance/export/csv?type=...`, plus
+  per-student variants
+  `/admin/reports/attendance/student/{id}/export/{pdf|csv}`.
+- `/admin/reports/recycling` — the recycling reporting desk:
+  daily/monthly yields with SVG trend charts, the material mix, the
+  points leaderboard, per-student histories. Exports:
+  `/admin/reports/recycling/export/pdf?type=daily|monthly|leaderboard`
+  and `/admin/reports/recycling/export/csv?type=...`, plus
+  per-student variants
+  `/admin/reports/recycling/student/{id}/export/{pdf|csv}`.
+
+All three desks render inside the school-branded shell, and their PDFs
+wear the generating school's identity too (brand-primary band and
+table heads, the school crest embedded in the header, the school name
+in the footer — stock Pulse otherwise).
 
 ---
 

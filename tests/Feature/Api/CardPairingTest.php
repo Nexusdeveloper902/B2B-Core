@@ -67,7 +67,7 @@ class CardPairingTest extends TestCase
         static $n = 0;
         $n++;
 
-        return Student::create([
+        return $this->schoolStudent([
             'name' => "Estudiante Nueva {$n}",
             'grade' => '5°',
             'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
@@ -239,7 +239,7 @@ class CardPairingTest extends TestCase
             ->where('id', '!=', $first->id)->first();
 
         if ($second === null) {
-            $second = Student::create([
+            $second = $this->schoolStudent([
                 'name' => 'Estudiante Segunda',
                 'grade' => '5°',
                 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,

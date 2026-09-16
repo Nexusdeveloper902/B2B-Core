@@ -4,7 +4,6 @@ namespace App\Services\Pdf;
 
 use App\Models\Student;
 use App\Services\PaeReportService;
-use Dompdf\Dompdf;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,21 +16,12 @@ use Illuminate\Support\Carbon;
  * absolute positioning is fragile.
  *
  * Locale: every string resolves through the session locale at render
- * time (EN/ES parity with the web reports). Brand: the Pulse palette
- * (sage/gold/ink) as flat fills.
+ * time (EN/ES parity with the web reports). Brand: the shell comes
+ * from BrandedReportPdf — a report generated under a school wears its
+ * primary color, crest and name; stock Pulse renders exactly as before.
  */
-class PaeReportPdf
+class PaeReportPdf extends BrandedReportPdf
 {
-    private const INK = '#242423';
-
-    private const GOLD = '#F5CB5C';
-
-    private const SAGE = '#CFDBD5';
-
-    private const PAPER = '#E8EDDF';
-
-    private const MUTED = '#6B6F6D';
-
     public function __construct(
         private readonly PaeReportService $reports,
     ) {}
@@ -59,7 +49,8 @@ class PaeReportPdf
         return $this->render(
             __('app.report_daily_title', ['date' => $this->prettyDate($date)]),
             $date,
-            $body
+            $body,
+            'PAE'
         );
     }
 
@@ -88,7 +79,8 @@ class PaeReportPdf
             $bars .= $this->barRow(
                 $this->prettyDate($day['date']),
                 (string) $total,
-                (int) round(100 * $total / $max)
+                (int) round(100 * $total / $max),
+                self::GOLD
             );
         }
 
@@ -100,7 +92,8 @@ class PaeReportPdf
         return $this->render(
             __('app.report_monthly_title', ['month' => $month]),
             Carbon::parse($month.'-01')->toDateString(),
-            $body
+            $body,
+            'PAE'
         );
     }
 
@@ -124,7 +117,8 @@ class PaeReportPdf
         return $this->render(
             __('app.report_missed_doc_title', ['meal' => __('api.meal_'.$meal)]),
             $date,
-            $body
+            $body,
+            'PAE'
         );
     }
 
@@ -144,7 +138,8 @@ class PaeReportPdf
         return $this->render(
             __('app.report_flagged_title'),
             $from,
-            $body
+            $body,
+            'PAE'
         );
     }
 
@@ -153,7 +148,7 @@ class PaeReportPdf
     {
         $history = $this->reports->studentHistory($student, 30);
 
-        $body = '<p style="margin:0 0 6px;font-size:14px;color:'.self::INK.';">'
+        $body = '<p style="margin:0 0 6px;font-size:14px;color:'.self::TEXT.';">'
             .e($student->name)
             .' <span style="color:'.self::MUTED.';">· '.e((string) $student->schoolClass?->name).'</span></p>';
 
@@ -181,114 +176,9 @@ class PaeReportPdf
         return $this->render(
             __('app.report_student_doc_title', ['name' => $student->name]),
             Carbon::today()->toDateString(),
-            $body
+            $body,
+            'PAE'
         );
-    }
-
-    // ------------------------------------------------------------------
-    // Building blocks (dompdf-safe inline styles only)
-    // ------------------------------------------------------------------
-
-    private function render(string $title, string $period, string $body)
-    {
-        $html = '<html><head><meta charset="utf-8">'
-            .'<style>body{font-family:DejaVu Sans,sans-serif;font-size:10px;color:#242423;}</style>'
-            .'</head><body>'
-            .$this->header($title, $period)
-            .$body
-            .$this->footer()
-            .'</body></html>';
-
-        $dompdf = new Dompdf(['isRemoteEnabled' => false]);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
-
-        $slug = 'pae-report-'.str_replace(' ', '-', strtolower($title));
-
-        // dompdf's stream() echoes directly (bypasses Laravel's response
-        // pipeline); output() + a real Response keeps headers honest.
-        return response($dompdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$slug.'.pdf"',
-        ]);
-    }
-
-    private function header(string $title, string $period): string
-    {
-        return '<table style="width:100%;background-color:'.self::INK.';border-collapse:collapse;" cellpadding="10"><tr>'
-            .'<td style="color:'.self::GOLD.';font-size:20px;font-weight:bold;width:30%;">Pulse</td>'
-            .'<td style="color:'.self::PAPER.';font-size:14px;text-align:right;">'
-            .e($title).'<br><span style="font-size:10px;color:'.self::SAGE.';">'.e($period).'</span></td>'
-            .'</tr></table><div style="height:14px;"></div>';
-    }
-
-    private function summaryRow(string $labelA, string $valueA, string $labelB, string $valueB, string $labelC, string $valueC): string
-    {
-        $cells = '';
-        foreach ([$labelA => $valueA, $labelB => $valueB, $labelC => $valueC] as $label => $value) {
-            if ($label === '') {
-                continue;
-            }
-            $cells .= '<td style="background-color:'.self::SAGE.';padding:10px;width:33%;border:1px solid '.self::PAPER.';">'
-                .'<span style="font-size:9px;color:'.self::MUTED.';">'.e($label).'</span><br>'
-                .'<span style="font-size:20px;color:'.self::INK.';">'.e($value).'</span></td>';
-        }
-
-        return '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;"><tr>'.$cells.'</tr></table>';
-    }
-
-    private function section(string $title, string $content): string
-    {
-        return '<p style="margin:0 0 6px;font-size:12px;border-bottom:2px solid '.self::GOLD.';padding-bottom:3px;">'
-            .e($title).'</p>'.$content.'<div style="height:12px;"></div>';
-    }
-
-    /**
-     * Horizontal CSS bars — dompdf-reliable "chart": one row per entry,
-     * bar width proportional to the max.
-     */
-    private function barRow(string $label, string $value, int $percent): string
-    {
-        $percent = max(2, min(100, $percent));
-
-        return '<table style="width:100%;border-collapse:collapse;margin-bottom:2px;"><tr>'
-            .'<td style="width:22%;font-size:9px;color:'.self::MUTED.';">'.e($label).'</td>'
-            .'<td style="width:66%;background-color:'.self::PAPER.';padding:2px;">'
-            .'<div style="background-color:'.self::GOLD.';height:10px;width:'.$percent.'%;"></div></td>'
-            .'<td style="width:12%;font-size:10px;text-align:right;">'.e($value).'</td>'
-            .'</tr></table>';
-    }
-
-    /**
-     * @param  array<int, array<int, string>>  $headerRow
-     * @param  array<int, array<int, string>>  $rows
-     */
-    private function tableSection(string $title, array $headerRow, array $rows): string
-    {
-        $rowsHtml = '';
-        foreach ($rows as $i => $row) {
-            $bg = $i % 2 === 1 ? self::PAPER : '#FFFFFF';
-            $cells = '';
-            foreach ($row as $cell) {
-                $cells .= '<td style="padding:5px 8px;border:1px solid '.self::SAGE.';font-size:10px;">'.e((string) $cell).'</td>';
-            }
-            $rowsHtml .= '<tr style="background-color:'.$bg.';">'.$cells.'</tr>';
-        }
-
-        if ($rows === []) {
-            $span = max(1, count($headerRow[0]));
-            $rowsHtml = '<tr><td colspan="'.$span.'" style="padding:8px;border:1px solid '.self::SAGE
-                .';color:'.self::MUTED.';font-size:10px;">'.e(__('app.report_empty')).'</td></tr>';
-        }
-
-        $headCells = '';
-        foreach ($headerRow[0] as $cell) {
-            $headCells .= '<td style="padding:5px 8px;background-color:'.self::INK.';color:'.self::PAPER
-                .';font-size:9px;border:1px solid '.self::INK.';">'.e((string) $cell).'</td>';
-        }
-
-        return $this->section($title, '<table style="width:100%;border-collapse:collapse;"><tr>'.$headCells.'</tr>'.$rowsHtml.'</table>');
     }
 
     /**
@@ -306,7 +196,7 @@ class PaeReportPdf
             $body .= '<tr>'
                 .'<td style="width:30%;font-size:10px;">'.e(__('api.pae_reason_'.$reason)).'</td>'
                 .'<td style="width:58%;background-color:'.self::PAPER.';padding:2px;">'
-                .'<div style="background-color:'.self::INK.';height:9px;width:'.max(2, $percent).'%;"></div></td>'
+                .'<div style="background-color:'.$this->primary().';height:9px;width:'.max(2, $percent).'%;"></div></td>'
                 .'<td style="width:12%;font-size:10px;text-align:right;">'.e((string) $count).'</td>'
                 .'</tr>';
         }
@@ -330,22 +220,5 @@ class PaeReportPdf
         ]], $rows);
 
         return $this->section(__('app.report_excluded_note'), $body);
-    }
-
-    private function footer(): string
-    {
-        return '<div style="height:18px;"></div><table style="width:100%;border-collapse:collapse;"><tr>'
-            .'<td style="font-size:8px;color:'.self::MUTED.';">Pulse · PAE</td>'
-            .'<td style="font-size:8px;color:'.self::MUTED.';text-align:right;">'
-            .e(now()->format('Y-m-d H:i')).'</td></tr></table>';
-    }
-
-    private function prettyDate(string $date): string
-    {
-        try {
-            return Carbon::parse($date)->isoFormat('MMM D, YYYY');
-        } catch (\Throwable) {
-            return $date;
-        }
     }
 }

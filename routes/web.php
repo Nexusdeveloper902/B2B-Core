@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\AdminReadersController;
 use App\Http\Controllers\Web\AdminSettingsController;
 use App\Http\Controllers\Web\AdminStaffController;
 use App\Http\Controllers\Web\AdminStudentsController;
+use App\Http\Controllers\Web\AttendanceReportController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BrandManifestController;
 use App\Http\Controllers\Web\KitchenController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Web\PaeReportController;
 use App\Http\Controllers\Web\ParentViewController;
 use App\Http\Controllers\Web\PasswordController;
 use App\Http\Controllers\Web\RealtimeTokenController;
+use App\Http\Controllers\Web\RecyclingReportController;
 use App\Http\Controllers\Web\StudentDashboardController;
 use App\Http\Controllers\Web\TeacherDashboardController;
 use Illuminate\Http\Request;
@@ -146,6 +148,56 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/reports/pae/student/{student}/export/csv', [PaeExportController::class, 'studentCsv'])
         ->middleware('role:admin')
         ->name('admin.reports.pae.student.export.csv');
+
+    // The attendance + recycling reporting desks mirror the PAE desk
+    // above: general report, per-student report, CSV + PDF exports.
+    Route::get('/admin/reports/attendance', [AttendanceReportController::class, 'index'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance');
+
+    Route::get('/admin/reports/attendance/student/{student}', [AttendanceReportController::class, 'student'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance.student');
+
+    Route::get('/admin/reports/attendance/export/csv', [AttendanceReportController::class, 'csv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance.export.csv');
+
+    Route::get('/admin/reports/attendance/export/pdf', [AttendanceReportController::class, 'pdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance.export.pdf');
+
+    Route::get('/admin/reports/attendance/student/{student}/export/csv', [AttendanceReportController::class, 'studentCsv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance.student.export.csv');
+
+    Route::get('/admin/reports/attendance/student/{student}/export/pdf', [AttendanceReportController::class, 'studentPdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.attendance.student.export.pdf');
+
+    Route::get('/admin/reports/recycling', [RecyclingReportController::class, 'index'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling');
+
+    Route::get('/admin/reports/recycling/student/{student}', [RecyclingReportController::class, 'student'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling.student');
+
+    Route::get('/admin/reports/recycling/export/csv', [RecyclingReportController::class, 'csv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling.export.csv');
+
+    Route::get('/admin/reports/recycling/export/pdf', [RecyclingReportController::class, 'pdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling.export.pdf');
+
+    Route::get('/admin/reports/recycling/student/{student}/export/csv', [RecyclingReportController::class, 'studentCsv'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling.student.export.csv');
+
+    Route::get('/admin/reports/recycling/student/{student}/export/pdf', [RecyclingReportController::class, 'studentPdf'])
+        ->middleware('role:admin')
+        ->name('admin.reports.recycling.student.export.pdf');
 
     Route::get('/admin/reports/pae/student/{student}/export/pdf', [PaeExportController::class, 'studentPdf'])
         ->middleware('role:admin')

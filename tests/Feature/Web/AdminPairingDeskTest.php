@@ -74,7 +74,7 @@ class AdminPairingDeskTest extends TestCase
     #[Test]
     public function a_completed_pairing_appears_in_the_history_list(): void
     {
-        $student = Student::create([
+        $student = $this->schoolStudent([
             'name' => 'Estudiante Escritorio',
             'grade' => '5°',
             'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
@@ -163,7 +163,7 @@ class AdminPairingDeskTest extends TestCase
     {
         // TASK-014 — F5 mid-window keeps the operator informed: the armed
         // line rides with the rejection note (uid, reason, remediation).
-        $target = Student::create([
+        $target = $this->schoolStudent([
             'name' => 'Estudiante Escritorio',
             'grade' => '5°',
             'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
@@ -189,7 +189,7 @@ class AdminPairingDeskTest extends TestCase
     public function the_rejection_note_is_fully_translated_into_spanish(): void
     {
         $teacher = User::where('email', 'teacher@presence.test')->firstOrFail();
-        $target = Student::create([
+        $target = $this->schoolStudent([
             'name' => 'Estudiante Escritorio ES',
             'grade' => '5°',
             'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
@@ -220,7 +220,7 @@ class AdminPairingDeskTest extends TestCase
         // escaped json_encode's quotes into &quot;, killing the WHOLE
         // desk script (dead arm buttons + no polling on every reload).
         // JSON literals inside the script MUST render unescaped ({!! !!}).
-        $student = Student::create([
+        $student = $this->schoolStudent([
             'name' => 'Estudiante Script',
             'grade' => '5°',
             'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false,
@@ -374,7 +374,7 @@ class AdminPairingDeskTest extends TestCase
     {
         // 300 names on one page is unusable: the desk shows one grade at
         // a time (lowest first) with a pill menu to switch grades.
-        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+        $this->schoolStudent(['name' => 'Ana Primero', 'grade' => '1°']);
 
         $response = $this->actingAs($this->admin())->get('/admin/pairing');
 
@@ -390,7 +390,7 @@ class AdminPairingDeskTest extends TestCase
     #[Test]
     public function the_roster_shows_only_the_requested_grade(): void
     {
-        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+        $this->schoolStudent(['name' => 'Ana Primero', 'grade' => '1°']);
 
         $response = $this->actingAs($this->admin())->get('/admin/pairing?grade=5°');
 
@@ -402,7 +402,7 @@ class AdminPairingDeskTest extends TestCase
     #[Test]
     public function an_unknown_grade_falls_back_to_the_default_grade(): void
     {
-        Student::create(['name' => 'Ana Primero', 'grade' => '1°']);
+        $this->schoolStudent(['name' => 'Ana Primero', 'grade' => '1°']);
 
         $response = $this->actingAs($this->admin())->get('/admin/pairing?grade=99°');
 

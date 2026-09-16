@@ -100,7 +100,7 @@ class StudentAccountProvisioningTest extends TestCase
     #[Test]
     public function same_first_name_in_another_class_disambiguates(): void
     {
-        $other = SchoolClass::create(['name' => '5° A']);
+        $other = $this->schoolClass(['name' => '5° A']);
 
         // maria@presence.test already belongs to the seeded Maria González.
         $this->actingAs($this->admin())
@@ -284,7 +284,7 @@ class StudentAccountProvisioningTest extends TestCase
     public function the_backfill_endpoint_provisions_a_pre_feature_row(): void
     {
         // A row with no account — exactly what pre-TASK-030 rows look like.
-        $legacy = Student::create([
+        $legacy = $this->schoolStudent([
             'name' => 'Legado Antiguo',
             'grade' => '5°',
             'class_id' => SchoolClass::firstOrFail()->id,

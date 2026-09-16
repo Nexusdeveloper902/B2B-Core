@@ -44,7 +44,7 @@ class HceCredentialTest extends TestCase
     {
         $existing = Student::whereDoesntHave('cards')->first();
 
-        return $existing ?? Student::create([
+        return $existing ?? $this->schoolStudent([
             'name' => 'Estudiante HCE '.uniqid(),
             'grade' => '5°',
             'pae_breakfast_enrolled' => false,

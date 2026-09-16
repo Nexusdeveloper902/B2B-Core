@@ -191,7 +191,7 @@ class RealtimePassoverTest extends TestCase
         // 30 students → the students desk paginates (page size 25).
         $class = SchoolClass::firstOrFail();
         foreach (range(1, 30) as $i) {
-            Student::create([
+            $this->schoolStudent([
                 'name' => 'Pager Student '.$i,
                 'grade' => '5°',
                 'class_id' => $class->id,

@@ -148,6 +148,14 @@
                            @class(['is-active' => request()->routeIs('admin.reports.pae', 'admin.reports.pae.student')])>
                             {{ __('app.reports_pae') }}
                         </a>
+                        <a href="{{ route('admin.reports.attendance') }}"
+                           @class(['is-active' => request()->routeIs('admin.reports.attendance', 'admin.reports.attendance.student')])>
+                            {{ __('app.reports_attendance') }}
+                        </a>
+                        <a href="{{ route('admin.reports.recycling') }}"
+                           @class(['is-active' => request()->routeIs('admin.reports.recycling', 'admin.reports.recycling.student')])>
+                            {{ __('app.reports_recycling') }}
+                        </a>
                         <a href="{{ route('admin.settings') }}"
                            @class(['is-active' => request()->routeIs('admin.settings')])>
                             {{ __('app.settings_page') }}
@@ -213,6 +221,8 @@
                                     <a href="{{ route('admin.pairing') }}">{{ __('app.pairing_desk') }}</a>
                                     <a href="{{ route('admin.ecostation') }}">{{ __('app.ecostation') }}</a>
                                     <a href="{{ route('admin.reports.pae') }}">{{ __('app.reports_pae') }}</a>
+                                    <a href="{{ route('admin.reports.attendance') }}">{{ __('app.reports_attendance') }}</a>
+                                    <a href="{{ route('admin.reports.recycling') }}">{{ __('app.reports_recycling') }}</a>
                                     <a href="{{ route('admin.settings') }}">{{ __('app.settings_page') }}</a>
                                 @endif
                                 <a href="{{ route('teacher.dashboard') }}">{{ __('app.teacher_dashboard') }}</a>

@@ -39,7 +39,10 @@ class SchoolBrandingTest extends TestCase
 
     private function brandedSchool(): School
     {
-        return School::factory()->ieConcejoDeSabaneta()->create();
+        // The demo fixture already provisions this exact school, and
+        // provision is idempotent — so this returns the same row
+        // instead of colliding on the unique slug.
+        return School::provision('IE Concejo de Sabaneta J.M.C.B', 'ie-concejo-de-sabaneta', 'ie-concejo-de-sabaneta');
     }
 
     private function adminOf(?School $school): User

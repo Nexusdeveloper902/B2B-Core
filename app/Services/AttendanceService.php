@@ -486,6 +486,57 @@ class AttendanceService
     }
 
     /**
+     * One calendar month of attendance: per-day distinct-student counts
+     * (zero-filled) + totals. The monthly attendance report page and PDF
+     * share this exact shape.
+     *
+     * @param  array<int, int>|null  $classIds
+     * @return array{month: string, days: array<int, array{date: string, students: int}>, totals: array{attendances: int, school_days: int, peak: int}}
+     */
+    public function monthlyAttendance(string $month, ?array $classIds = null): array
+    {
+        $stamp = Carbon::parse($month.'-01');
+        $from = $stamp->copy()->startOfMonth()->toDateString();
+        $to = $stamp->copy()->endOfMonth()->toDateString();
+
+        $counts = PresenceEvent::query()
+            ->where('events.type', 'CLASS_ATTENDANCE')
+            ->whereBetween('occurred_at', [
+                Carbon::parse($from)->startOfDay(),
+                Carbon::parse($to)->endOfDay(),
+            ])
+            ->join('cards', 'cards.id', '=', 'events.card_id')
+            ->join('students', 'students.id', '=', 'cards.student_id')
+            ->when($classIds !== null, fn ($q) => $q->whereIn('students.class_id', $classIds))
+            ->selectRaw('date(events.occurred_at) as day, count(distinct students.id) as attended')
+            ->groupByRaw('date(events.occurred_at)')
+            ->get();
+
+        $countsByDay = Collection::make($counts)->pluck('attended', 'day')->all();
+
+        $days = [];
+        $cursor = Carbon::parse($from);
+        $end = Carbon::parse($to);
+        while ($cursor <= $end) {
+            $day = $cursor->toDateString();
+            $days[] = ['date' => $day, 'students' => (int) ($countsByDay[$day] ?? 0)];
+            $cursor = $cursor->addDay();
+        }
+
+        $nonZero = array_filter(array_column($days, 'students'), fn ($n) => $n > 0);
+
+        return [
+            'month' => $stamp->format('Y-m'),
+            'days' => $days,
+            'totals' => [
+                'attendances' => array_sum(array_column($days, 'students')),
+                'school_days' => count($nonZero),
+                'peak' => $nonZero === [] ? 0 : max($nonZero),
+            ],
+        ];
+    }
+
+    /**
      * Students absent on at least $minAbsences of the last $days' SCHOOL
      * days — a school day is a date inside the window on which at least
      * one in-scope student attended (weekends/holidays drop out by
@@ -603,6 +654,65 @@ class AttendanceService
                 'school_days' => count($schoolDays),
             ])
             ->all();
+    }
+
+    /**
+     * One student's attendance history: per school-day status rows
+     * (present / late / absent from the first tap vs the late cutoff),
+     * newest first, plus aggregates. The per-student attendance report
+     * page shares this exact shape.
+     *
+     * @return array{student: array{id: int, name: string, class_name: ?string}, days: array<int, array{date: string, status: string, tapped_at: ?string}>, totals: array{present: int, late: int, absent: int, school_days: int}}
+     */
+    public function studentAttendanceHistory(Student $student, int $days = 30): array
+    {
+        $days = max(1, min(90, $days));
+        $cutoff = settings()->lateCutoff();
+        $from = Carbon::today()->subDays($days - 1)->startOfDay();
+
+        $firstTaps = PresenceEvent::query()
+            ->where('events.type', 'CLASS_ATTENDANCE')
+            ->whereIn('card_id', $student->cards()->pluck('id'))
+            ->where('occurred_at', '>=', $from)
+            ->selectRaw('date(events.occurred_at) as day, min(time(events.occurred_at)) as first_tap')
+            ->groupByRaw('date(events.occurred_at)')
+            ->pluck('first_tap', 'day');
+
+        $classIds = $student->class_id !== null ? [(int) $student->class_id] : null;
+        $schoolDays = $this->schoolDaysInWindow($days, $classIds);
+
+        $rows = [];
+        $present = 0;
+        $late = 0;
+        foreach (array_reverse($schoolDays) as $day) {
+            $tap = $firstTaps[$day] ?? null;
+            $status = $tap === null ? 'absent' : (substr((string) $tap, 0, 5) > $cutoff ? 'late' : 'present');
+            if ($status === 'present') {
+                $present++;
+            } elseif ($status === 'late') {
+                $late++;
+            }
+            $rows[] = [
+                'date' => $day,
+                'status' => $status,
+                'tapped_at' => $tap !== null ? substr((string) $tap, 0, 5) : null,
+            ];
+        }
+
+        return [
+            'student' => [
+                'id' => (int) $student->id,
+                'name' => (string) $student->name,
+                'class_name' => $student->schoolClass?->name,
+            ],
+            'days' => $rows,
+            'totals' => [
+                'present' => $present,
+                'late' => $late,
+                'absent' => count($schoolDays) - $present - $late,
+                'school_days' => count($schoolDays),
+            ],
+        ];
     }
 
     /**

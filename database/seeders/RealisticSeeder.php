@@ -69,11 +69,12 @@ class RealisticSeeder extends Seeder
      * so the demo reads as a coherent institution instead of a pile of
      * unrelated records.
      *
-     * It deliberately creates NO administrator: the platform operator is
-     * a single system-level account seeded OUTSIDE this organization by
+     * It creates exactly ONE school-scoped administrator
+     * (admin.colegio@presence.test): the account that opens the
+     * school-branded shell. The platform operator is a different,
+     * single system-level account seeded OUTSIDE this organization by
      * SystemAdminSeeder (./run seed-realistic runs it right after this
-     * one). That admin can mint a school administrator from the staff
-     * desk in one click when a branded admin shell is wanted.
+     * one).
      */
     private const SCHOOL_NAME = 'IE Concejo de Sabaneta J.M.C.B';
 
@@ -292,10 +293,14 @@ class RealisticSeeder extends Seeder
 
     private function seedStaff(string $initialPassword): void
     {
-        // TASK-045 (ADR-064) — NO administrator is created here. The one
-        // admin account lives outside this organization (SystemAdminSeeder),
-        // so the realistic dataset can never grow a second one by accident.
+        // One school-scoped administrator lives INSIDE this organization
+        // (first row): it opens the school-branded shell — colors, crest
+        // and branded report exports — one login away. The platform
+        // operator is a different account seeded OUTSIDE every
+        // organization by SystemAdminSeeder (stock Pulse, sees all
+        // schools), so the two can never collide: different emails.
         $staff = [
+            ['Administración IE Concejo', 'admin.colegio@presence.test', UserRole::Admin],
             ['Sofía Vargas', 'kitchen@presence.test', UserRole::Kitchen],
             ['Pedro Castaño', 'cocina.manana@presence.test', UserRole::Kitchen],
             ['Luz Mery Díaz', 'cocina.tarde@presence.test', UserRole::Kitchen],
@@ -1505,6 +1510,7 @@ class RealisticSeeder extends Seeder
 
         $this->command->info(" [EN] Staff logins (password: {$initialPassword}) / Accesos del personal (clave: {$initialPassword}):");
         $staffRows = [
+            ['Administración IE Concejo', 'admin.colegio@presence.test', 'admin'],
             ['Sofía Vargas', 'kitchen@presence.test', 'kitchen'],
             ['Pedro Castaño', 'cocina.manana@presence.test', 'kitchen'],
             ['Luz Mery Díaz', 'cocina.tarde@presence.test', 'kitchen'],
@@ -1524,8 +1530,8 @@ class RealisticSeeder extends Seeder
         $this->command->warn($line);
         $this->command->warn(" [EN] Student logins follow {first-name}@{$this->accountDomain()} (rotation on first login) — see the users table.");
         $this->command->warn(" [ES] Los accesos de estudiantes siguen {nombre}@{$this->accountDomain()} (rotación al primer login) — ver la tabla users.");
-        $this->command->warn(' [EN] No administrator lives in this dataset — the single system admin is seeded separately (SystemAdminSeeder).');
-        $this->command->warn(' [ES] Este conjunto no tiene administrador — el único admin del sistema se siembra aparte (SystemAdminSeeder).');
+        $this->command->warn(' [EN] The school administrator above opens the branded shell — the single system admin (stock Pulse, all schools) is seeded separately (SystemAdminSeeder).');
+        $this->command->warn(' [ES] El administrador del colegio abre la interfaz con identidad — el único admin del sistema (Pulse estándar, todos los colegios) se siembra aparte (SystemAdminSeeder).');
         $this->command->warn($line);
     }
 

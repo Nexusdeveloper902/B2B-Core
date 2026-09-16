@@ -65,8 +65,8 @@ class PaeEnrollmentGateTest extends TestCase
 
     private function paeReader(): Reader
     {
-        return Reader::firstOrCreate(
-            ['label' => 'Gate Test — Cafeteria'],
+        return $this->schoolReader(
+            'Gate Test — Cafeteria',
             [
                 'type' => 'pae',
                 'active_event_type' => 'PAE_BREAKFAST',

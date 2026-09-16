@@ -116,14 +116,25 @@ class RealisticSeederOrganizationTest extends TestCase
     }
 
     #[Test]
-    public function there_is_exactly_one_admin_and_it_lives_outside_the_school(): void
+    public function there_are_exactly_two_admins_the_operator_outside_and_one_branded_inside(): void
     {
-        $admins = User::withoutGlobalScopes()->where('role', UserRole::Admin->value)->get();
+        $admins = User::withoutGlobalScopes()->where('role', UserRole::Admin->value)->orderBy('email')->get();
 
-        $this->assertCount(1, $admins, 'the realistic seeder must not mint administrators');
-        $this->assertNull($admins->first()->school_id);
-        $this->assertTrue($admins->first()->isSystemAdmin());
-        $this->assertSame('admin@presence.test', $admins->first()->email);
+        $this->assertCount(2, $admins);
+
+        // The platform operator: no school, stock Pulse, sees everything.
+        $system = $admins->firstWhere('email', 'admin@presence.test');
+        $this->assertNotNull($system);
+        $this->assertNull($system->school_id);
+        $this->assertTrue($system->isSystemAdmin());
+
+        // The school administrator: inside the organization, so it opens
+        // the school-branded shell (colors, crest, branded exports).
+        $schoolAdmin = $admins->firstWhere('email', 'admin.colegio@presence.test');
+        $this->assertNotNull($schoolAdmin);
+        $this->assertSame(School::firstOrFail()->id, $schoolAdmin->school_id);
+        $this->assertTrue($schoolAdmin->isAdmin());
+        $this->assertFalse($schoolAdmin->isSystemAdmin());
     }
 
     #[Test]
@@ -144,9 +155,15 @@ class RealisticSeederOrganizationTest extends TestCase
     {
         $this->artisan('db:seed', ['--class' => 'Database\Seeders\SystemAdminSeeder', '--force' => true]);
 
+        // Still exactly the school admin plus the one system operator —
+        // the reseed mints nothing twice.
+        $this->assertSame(
+            2,
+            User::withoutGlobalScopes()->where('role', UserRole::Admin->value)->count(),
+        );
         $this->assertSame(
             1,
-            User::withoutGlobalScopes()->where('role', UserRole::Admin->value)->count(),
+            User::withoutGlobalScopes()->where('role', UserRole::Admin->value)->whereNull('school_id')->count(),
         );
     }
 
@@ -156,6 +173,18 @@ class RealisticSeederOrganizationTest extends TestCase
         $teacher = User::withoutGlobalScopes()->where('role', UserRole::Teacher->value)->firstOrFail();
 
         $html = $this->actingAs($teacher)->get('/teacher')->getContent();
+
+        $this->assertStringContainsString('#80193c', $html);
+        $this->assertStringContainsString('brand/schools/ie-concejo-de-sabaneta/crest-96.png', $html);
+        $this->assertStringContainsString(self::SCHOOL, $html);
+    }
+
+    #[Test]
+    public function the_school_admin_opens_the_branded_shell(): void
+    {
+        $schoolAdmin = User::withoutGlobalScopes()->where('email', 'admin.colegio@presence.test')->firstOrFail();
+
+        $html = $this->actingAs($schoolAdmin)->get('/admin')->getContent();
 
         $this->assertStringContainsString('#80193c', $html);
         $this->assertStringContainsString('brand/schools/ie-concejo-de-sabaneta/crest-96.png', $html);

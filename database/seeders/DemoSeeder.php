@@ -10,12 +10,14 @@ use App\Models\Card;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\Reward;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\StudentAccountService;
+use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -46,8 +48,23 @@ use Illuminate\Support\Str;
  */
 class DemoSeeder extends Seeder
 {
+    /** The only supported school right now: every demo row belongs to it. */
+    private const SCHOOL_NAME = 'IE Concejo de Sabaneta J.M.C.B';
+
+    private const SCHOOL_SLUG = 'ie-concejo-de-sabaneta';
+
+    /** The branding profile in config/branding.php this school renders with. */
+    private const SCHOOL_BRAND = 'ie-concejo-de-sabaneta';
+
     public function run(): void
     {
+        // The organization comes first, and everything below is created
+        // while ACTING AS it: BelongsToSchool's creation inheritance
+        // stamps every row, and the demo admin therefore opens the
+        // school-branded shell (same pattern as RealisticSeeder).
+        $school = School::provision(self::SCHOOL_NAME, self::SCHOOL_SLUG, self::SCHOOL_BRAND);
+        app(CurrentSchool::class)->actAs($school);
+
         // ---------- Users ----------
         // TASK-030-A (ADR-044) — demo accounts opt OUT of the forced
         // rotation (must_change_password=false): one-tap demo logins
@@ -249,6 +266,10 @@ class DemoSeeder extends Seeder
 
         // ---------- Console output (hard requirement, bilingual) ----------
         $this->printCredentials($cards, $classroomReader, $cafeteriaReader, $recyclingReader, $admin, $teacher, $kitchen, array_values($studentRows), $scenarioDate, $initialPassword);
+
+        // Leave the process as it found it: a seeder that stays "acting
+        // as" a school would silently scope anything that runs after it.
+        app(CurrentSchool::class)->forgetOverride();
     }
 
     /**
@@ -324,6 +345,8 @@ class DemoSeeder extends Seeder
         $this->command->warn(' DEMO CREDENTIALS — copy/paste into Postman or curl');
         $this->command->warn(' CREDENCIALES DE DEMO — copiar/pegar en Postman o curl');
         $this->command->warn($line);
+        $this->command->info(' [EN] Organization: '.self::SCHOOL_NAME.' (slug '.self::SCHOOL_SLUG.', branding '.self::SCHOOL_BRAND.') — every row below belongs to it.');
+        $this->command->info(' [ES] Organización: '.self::SCHOOL_NAME.' (slug '.self::SCHOOL_SLUG.', identidad '.self::SCHOOL_BRAND.') — todo lo de abajo le pertenece.');
 
         $this->command->info(' [EN] Dashboard users / Usuarios del panel:');
         $this->command->table(

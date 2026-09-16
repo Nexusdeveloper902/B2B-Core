@@ -58,8 +58,8 @@ class MealServingTest extends TestCase
 
     private function cafeteria(): Reader
     {
-        return Reader::firstOrCreate(
-            ['label' => 'Engine Test — Cafeteria'],
+        return $this->schoolReader(
+            'Engine Test — Cafeteria',
             [
                 'type' => 'pae',
                 'active_event_type' => 'PAE_LUNCH', // deliberately "wrong": auto-detection owns the meal

@@ -39,7 +39,7 @@ class UnpairCardsCommandTest extends TestCase
         // A completed pairing (arm + pair) + one tap event on the new card,
         // plus the seeded cards and any seeded events: the full card surface.
         $student = Student::whereDoesntHave('cards')->first()
-            ?? Student::create(['name' => 'Estudiante Nueva', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
+            ?? $this->schoolStudent(['name' => 'Estudiante Nueva', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         $this->actingAs(User::where('email', 'admin@presence.test')->firstOrFail())
             ->postJson("/api/v1/admin/students/{$student->id}/arm-pairing");
         $this->postJson('/api/v1/admin/cards/pair', [
@@ -84,7 +84,7 @@ class UnpairCardsCommandTest extends TestCase
         // point balances (the ledger) survive.
         $this->seedDemo();
 
-        $student = Student::create(['name' => 'Depositante', 'grade' => '6°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
+        $student = $this->schoolStudent(['name' => 'Depositante', 'grade' => '6°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         $this->actingAs(User::where('email', 'admin@presence.test')->firstOrFail())
             ->postJson("/api/v1/admin/students/{$student->id}/arm-pairing");
         $this->postJson('/api/v1/admin/cards/pair', [
@@ -116,8 +116,8 @@ class UnpairCardsCommandTest extends TestCase
     {
         $this->seedDemo();
 
-        $first = Student::create(['name' => 'Estudiante Uno', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
-        $second = Student::create(['name' => 'Estudiante Dos', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
+        $first = $this->schoolStudent(['name' => 'Estudiante Uno', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
+        $second = $this->schoolStudent(['name' => 'Estudiante Dos', 'grade' => '5°', 'pae_breakfast_enrolled' => false, 'pae_lunch_enrolled' => false]);
         $admin = User::where('email', 'admin@presence.test')->firstOrFail();
         $readerHeaders = ['Authorization' => 'Bearer '.$this->readerToken('classroom')];
         $uid = '62041607'; // the owner's bench card

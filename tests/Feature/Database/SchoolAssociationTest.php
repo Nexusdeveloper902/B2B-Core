@@ -70,9 +70,16 @@ class SchoolAssociationTest extends TestCase
     #[Test]
     public function pre_existing_rows_without_a_school_stay_valid_and_usable(): void
     {
-        // Exactly the shape the demo fixture (and every pre-feature
-        // install) has: no schools table entries at all.
-        $this->seedDemo();
+        // Exactly the shape every pre-feature install has: rows with no
+        // school at all (built by hand — the demo fixture now provisions
+        // the branded school, so it can no longer play this role).
+        $admin = app(CurrentSchool::class)->withoutScoping(fn () => User::factory()->create([
+            'email' => 'admin@presence.test',
+            'school_id' => null,
+        ]));
+        app(CurrentSchool::class)->withoutScoping(fn () => Student::create([
+            'name' => 'Sin Colegio', 'grade' => '5°', 'school_id' => null,
+        ]));
 
         $this->assertSame(0, School::count());
         $this->assertGreaterThan(0, Student::count());

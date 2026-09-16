@@ -625,6 +625,29 @@ bilingüe) y los reportes/exportaciones de solo web que siguen.
   encabezado de marca, tarjetas de resumen, barras, tablas; el CSV son
   filas crudas estructuradas), más las variantes por estudiante
   `/admin/reports/pae/student/{id}/export/{pdf|csv}`.
+- `/admin/reports/attendance` — el escritorio de reportes de
+  asistencia: presentes/tarde/ausentes por día con desglose por clase
+  y gráficas SVG de tendencia, agregados mensuales, ausentes
+  frecuentes, conteo de asistencia perfecta e historial por
+  estudiante. Exportaciones:
+  `/admin/reports/attendance/export/pdf?type=daily|monthly|absentees`
+  y `/admin/reports/attendance/export/csv?type=...`, más las
+  variantes por estudiante
+  `/admin/reports/attendance/student/{id}/export/{pdf|csv}`.
+- `/admin/reports/recycling` — el escritorio de reportes de
+  reciclaje: rendimiento diario/mensual con gráficas SVG de
+  tendencia, mezcla de materiales, clasificación por puntos e
+  historiales por estudiante. Exportaciones:
+  `/admin/reports/recycling/export/pdf?type=daily|monthly|leaderboard`
+  y `/admin/reports/recycling/export/csv?type=...`, más las
+  variantes por estudiante
+  `/admin/reports/recycling/student/{id}/export/{pdf|csv}`.
+
+Los tres escritorios se muestran dentro de la interfaz con identidad
+escolar, y sus PDFs también llevan la identidad del colegio que los
+genera (banda y encabezados de tabla en el color primario de marca,
+cresta escolar incrustada en el encabezado, nombre del colegio en el
+pie — Pulse estándar en caso contrario).
 
 ---
 

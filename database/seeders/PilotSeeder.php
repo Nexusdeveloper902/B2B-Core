@@ -13,12 +13,14 @@ use App\Models\Reader;
 use App\Models\RecyclingDeposit;
 use App\Models\Reward;
 use App\Models\RewardRedemption;
+use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\SettingsService;
 use App\Services\StudentAccountService;
+use App\Support\Tenancy\CurrentSchool;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 
@@ -55,6 +57,14 @@ use Illuminate\Database\Seeder;
  */
 class PilotSeeder extends Seeder
 {
+    /** The only supported school right now: every pilot row belongs to it. */
+    private const SCHOOL_NAME = 'IE Concejo de Sabaneta J.M.C.B';
+
+    private const SCHOOL_SLUG = 'ie-concejo-de-sabaneta';
+
+    /** The branding profile in config/branding.php this school renders with. */
+    private const SCHOOL_BRAND = 'ie-concejo-de-sabaneta';
+
     private const RNG_SEED = 20260911;
 
     private const SCHOOL_DAYS = 10;
@@ -111,6 +121,13 @@ class PilotSeeder extends Seeder
             return;
         }
 
+        // The organization comes first, and everything below is created
+        // while ACTING AS it: BelongsToSchool's creation inheritance
+        // stamps every row, and the pilot admin therefore opens the
+        // school-branded shell (same pattern as RealisticSeeder).
+        $school = School::provision(self::SCHOOL_NAME, self::SCHOOL_SLUG, self::SCHOOL_BRAND);
+        app(CurrentSchool::class)->actAs($school);
+
         mt_srand(self::RNG_SEED);
 
         // TASK-039 — every fixture password equals the effective
@@ -165,6 +182,10 @@ class PilotSeeder extends Seeder
         $redemptions = $this->seedRedemptions($students);
 
         $this->printSummary($admin, $kitchen, $classes, $students, $readers, $days, $eventCount, $depositCount, $redemptions, $initialPassword);
+
+        // Leave the process as it found it: a seeder that stays "acting
+        // as" a school would silently scope anything that runs after it.
+        app(CurrentSchool::class)->forgetOverride();
     }
 
     /** @return array<string, SchoolClass> */
@@ -480,6 +501,8 @@ class PilotSeeder extends Seeder
         $this->command->warn(' PILOT DATA — a school that looks alive (deterministic reseed)');
         $this->command->warn(' DATOS PILOTO — un colegio que se ve vivo (resiembra determinista)');
         $this->command->warn($line);
+        $this->command->info(' [EN] Organization: '.self::SCHOOL_NAME.' (slug '.self::SCHOOL_SLUG.', branding '.self::SCHOOL_BRAND.') — every row below belongs to it.');
+        $this->command->info(' [ES] Organización: '.self::SCHOOL_NAME.' (slug '.self::SCHOOL_SLUG.', identidad '.self::SCHOOL_BRAND.') — todo lo de abajo le pertenece.');
 
         $this->command->info(sprintf(
             ' [EN] %d classes, %d students, %d readers, %d school days (%s → %s), %d taps, %d deposits, %d redemptions',

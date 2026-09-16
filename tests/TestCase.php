@@ -4,6 +4,8 @@ namespace Tests;
 
 use App\Models\Card;
 use App\Models\Reader;
+use App\Models\School;
+use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\SettingsService;
@@ -38,6 +40,43 @@ abstract class TestCase extends BaseTestCase
             'teacher' => User::where('email', 'teacher@presence.test')->firstOrFail(),
             'students' => Student::orderBy('id')->get(),
         ];
+    }
+
+    /** The school the demo/pilot seeders provision (the only supported one). */
+    protected function demoSchool(): School
+    {
+        return School::where('slug', 'ie-concejo-de-sabaneta')->firstOrFail();
+    }
+
+    /**
+     * Create a student inside the demo school, visible to the demo
+     * admin. A bare Student::create() in a test builds a NULL-school
+     * row, which the organization wall correctly hides from a school
+     * account — so fixtures that the demo admin must SEE go through
+     * here.
+     */
+    protected function schoolStudent(array $attributes): Student
+    {
+        return Student::create($attributes + ['school_id' => $this->demoSchool()->id]);
+    }
+
+    /** Create a class inside the demo school (same wall, same reason). */
+    protected function schoolClass(array $attributes): SchoolClass
+    {
+        return SchoolClass::create($attributes + ['school_id' => $this->demoSchool()->id]);
+    }
+
+    /**
+     * Find-or-create a reader inside the demo school. A bare
+     * Reader::firstOrCreate() in a test builds a NULL-school device,
+     * whose taps then cannot see the school's cards.
+     */
+    protected function schoolReader(string $label, array $values): Reader
+    {
+        return Reader::firstOrCreate(
+            ['label' => $label, 'school_id' => $this->demoSchool()->id],
+            $values
+        );
     }
 
     /** Bearer token for a demo reader by type ('classroom' | 'pae' | 'recycling'). */
