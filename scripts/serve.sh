@@ -23,6 +23,12 @@
 # hard-coded IP. Ctrl+C withdraws the advertisement. Missing CLI or a
 # down avahi-daemon only warns (devices keep their compiled fallback).
 #
+# TASK-047 — plus scripts/mdns/announce.py (python3, stdlib): the same
+# records re-announced unasked every second from port 5353. avahi only
+# ANSWERS; on networks that drop multicast arriving at this host (bench-
+# measured: the ESP32's query never arrived), the unasked announcement is
+# what the device actually hears. No python3 = warn, avahi still answers.
+#
 # Fails BEFORE binding (not at request time) when setup is incomplete, and
 # prints exactly which ./run command fixes it (ADR-011).
 # ---------------------------------------------------------------------------
@@ -66,6 +72,7 @@ WS_PID=""
 WEB_PID=""
 MDNS_ENABLED="${B2B_MDNS:-1}"
 MDNS_PID=""
+ANNOUNCE_PID=""
 
 # port_open <port> — exit 0 when something is already listening on 127.0.0.1:<port>.
 # Uses the resolved PHP (portable: no /dev/tcp, no ss, works on Git Bash too).
@@ -77,6 +84,7 @@ cleanup() {
     [ -n "$WEB_PID" ] && kill "$WEB_PID" 2>/dev/null || true
     [ -n "$WS_PID" ]  && kill "$WS_PID" 2>/dev/null || true
     [ -n "$MDNS_PID" ] && kill "$MDNS_PID" 2>/dev/null || true
+    [ -n "$ANNOUNCE_PID" ] && kill "$ANNOUNCE_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -121,11 +129,22 @@ start_mdns() {
         >>"$B2B_ROOT/storage/logs/mdns.log" 2>&1 &
     MDNS_PID=$!
 
+    # TASK-047 — the unasked re-announcer (see header). Independent of
+    # avahi's outcome below: even with avahi down it still reaches devices.
+    if command -v python3 >/dev/null 2>&1; then
+        python3 "$B2B_ROOT/scripts/mdns/announce.py" --port "$PORT" \
+            >>"$B2B_ROOT/storage/logs/mdns.log" 2>&1 &
+        ANNOUNCE_PID=$!
+    else
+        warn "python3 not found — _pulse._tcp is answered but not re-announced; devices on multicast-lossy Wi-Fi may fall back / python3 no encontrado — sin re-anuncio; en Wi-Fi con pérdida de multidifusión los equipos pueden usar su reserva"
+    fi
+
     sleep 0.5
     if kill -0 "$MDNS_PID" 2>/dev/null; then
         return 0
     fi
     MDNS_PID=""
+    [ -n "$ANNOUNCE_PID" ] && kill -0 "$ANNOUNCE_PID" 2>/dev/null && return 0
     warn "mDNS advertisement failed (is avahi-daemon running?) — ESP32 devices use their compiled fallback; see storage/logs/mdns.log / Falló el anuncio mDNS (¿corre avahi-daemon?) — los ESP32 usan su reserva; ver storage/logs/mdns.log"
     return 1
 }

@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\PresenceEvent;
 use App\Models\Reader;
 use App\Models\Student;
+use App\Services\Realtime\TapFeedback;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -46,10 +47,14 @@ class TapService
         $card = Card::where('credential_uid', $credentialUid)->first();
 
         if ($card === null) {
+            TapFeedback::record($reader, 'rejected', 'not_found');
+
             return ['ok' => false, 'reason' => 'not_found', 'message' => __('api.card_not_recognized')];
         }
 
         if (! $card->isActive()) {
+            TapFeedback::record($reader, 'rejected', 'inactive');
+
             return ['ok' => false, 'reason' => 'inactive', 'message' => __('api.card_not_active')];
         }
 
@@ -80,6 +85,11 @@ class TapService
                     ->first();
 
                 if ($first !== null) {
+                    // TASK-047 — no row is written, so the realtime tap
+                    // channel stays silent; the feedback channel still
+                    // tells a speaker bridge the device answered OK.
+                    TapFeedback::record($reader, 'accepted', 'duplicate', $first->id);
+
                     return ['ok' => true, 'duplicate' => true, 'event' => $first];
                 }
             }

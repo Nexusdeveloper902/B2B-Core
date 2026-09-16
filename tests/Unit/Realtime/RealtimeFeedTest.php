@@ -80,6 +80,31 @@ class RealtimeFeedTest extends TestCase
     }
 
     #[Test]
+    public function rows_carry_the_feedback_cue_derived_from_served(): void
+    {
+        // TASK-047 — the Android feedback bridge maps this to a local beep.
+        $served = PresenceEvent::create([
+            'card_id' => $this->cardOf('Maria González')->id,
+            'reader_id' => $this->reader('classroom')->id,
+            'type' => 'CLASS_ATTENDANCE',
+            'occurred_at' => now()->setTime(7, 50),
+        ]);
+        $flagged = PresenceEvent::create([
+            'card_id' => $this->cardOf('Carlos Pérez')->id,
+            'reader_id' => $this->reader('classroom')->id,
+            'type' => 'PAE_ATTEMPT',
+            'served' => false,
+            'reason' => 'out_of_window',
+            'occurred_at' => now()->setTime(8, 5),
+        ]);
+
+        $rows = array_column((new RealtimeFeed)->eventsAfter($served->id - 1), null, 'id');
+
+        $this->assertSame('accepted', $rows[$served->id]['feedback']);
+        $this->assertSame('rejected', $rows[$flagged->id]['feedback']);
+    }
+
+    #[Test]
     public function latest_event_id_tracks_the_head(): void
     {
         $feed = new RealtimeFeed;

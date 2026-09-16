@@ -100,6 +100,9 @@ Since TASK-043 `serve` also advertises the backend on the LAN as
 `_pulse._tcp` (TXT `version=1 protocol=1 api=/api`, this web port) via
 `avahi-publish-service`, so ESP32 devices discover it with no
 hard-coded IP — withdrawn on Ctrl+C, `B2B_MDNS=0` starts without it.
+It also starts `scripts/mdns/announce.py` (python3, stdlib), which
+re-announces the same records every second so devices on Wi-Fi that
+drops their mDNS queries still discover the backend (TASK-047).
 Hardware demos need `--host=0.0.0.0` (loopback warns). Contract and
 bench test: `docs/MDNS.md`.
 

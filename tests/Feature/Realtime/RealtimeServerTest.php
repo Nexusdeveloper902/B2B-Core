@@ -440,6 +440,45 @@ class RealtimeServerTest extends TestCase
         fclose($sock);
     }
 
+    #[Test]
+    public function feedback_cues_reach_staff_speaker_connections_but_not_teachers(): void
+    {
+        // TASK-047 — answered taps that wrote NO events row (duplicate /
+        // unknown card) broadcast as `feedback` frames, so the Android
+        // speaker bridge (a kitchen login) still beeps for them.
+        config(['app.key' => self::APP_KEY]);
+
+        $db = $this->freshFileDatabase();
+        $kitchenId = $this->seedUser($db, 'kitchen');
+        $teacherId = $this->seedUser($db, 'teacher');
+
+        $port = $this->startServer($db);
+        $this->assertNotNull($port, 'the realtime server failed to boot');
+
+        [$kitchen] = $this->upgrade($port, RealtimeToken::issue($kitchenId, time() + 120));
+        [$teacher] = $this->upgrade($port, RealtimeToken::issue($teacherId, time() + 120));
+        $this->assertSame('hello', $this->readMessage($kitchen)['type'] ?? null);
+        $this->assertSame('hello', $this->readMessage($teacher)['type'] ?? null);
+
+        $now = now()->format('Y-m-d H:i:s');
+        DB::connection('realtime_file')->table('tap_feedback')->insert([
+            'cue' => 'accepted', 'reason' => 'duplicate', 'event_id' => 41,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+
+        $frame = $this->readMessage($kitchen);
+        $this->assertNotNull($frame, 'no feedback frame reached the kitchen connection');
+        $this->assertSame('feedback', $frame['type']);
+        $this->assertSame('accepted', $frame['feedback']['cue']);
+        $this->assertSame('duplicate', $frame['feedback']['reason']);
+        $this->assertSame(41, $frame['feedback']['event_id']);
+
+        $this->assertNull($this->readMessageIfAny($teacher, 1.5), 'teacher dashboards must not receive feedback frames');
+
+        fclose($kitchen);
+        fclose($teacher);
+    }
+
     private function freshFileDatabase(): string
     {
         $db = storage_path('framework/testing/realtime-'.uniqid().'.sqlite');

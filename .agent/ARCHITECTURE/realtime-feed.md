@@ -145,6 +145,23 @@ frames use. Page hook: `document` CustomEvent **`realtime:roster`**
 adds class options, the readers desk and the admin dashboard's
 readers table repaint reader changes.
 
+## Feedback cues (TASK-047, ADR-066)
+
+- **`tap` rows carry a cue:** every `tap` row (hello and live) carries
+  `feedback: accepted|rejected`, derived from `served`.
+- **A fifth frame type, `feedback`:**
+  `{"type":"feedback","feedback":{id,cue,reason,event_id,school_id}}`.
+  It covers answered taps that wrote **no** `events` row: `duplicate`
+  (first tap counts), `not_found` and `inactive`.
+  - **Source:** the append-only `tap_feedback` table, written
+    best-effort by `TapService`.
+  - **Delivery:** admin and kitchen connections, inside their
+    organization. No hello replay.
+- **One cue per tap:** either a `tap` or a `feedback` frame, never
+  both.
+- **Consumer:** the Android speaker bridge (B2B-App ADR-003), logged in
+  as kitchen. Dashboards ignore the type.
+
 ## Degradation honesty
 
 | Failure | Behavior |
@@ -163,6 +180,9 @@ readers table repaint reader changes.
 - `tests/Feature/Realtime/RealtimeServerTest` — the REAL server
   process over real sockets: hello with history, live broadcast after
   a row written by another process, pairing frames on arm/consume,
-  401 on bad token.
+  401 on bad token, and `feedback` frames reaching kitchen but not
+  teacher connections.
+- `tests/Feature/Api/TapFeedbackTest` — which taps leave a cue, and
+  that a broken log never fails a tap.
 - `scripts/_lib/realtime-probe.php` — manual bench probe (exit 0 =
   hello ok, 2 = 401); used by e2e (2 checks).

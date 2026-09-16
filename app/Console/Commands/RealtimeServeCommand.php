@@ -9,6 +9,7 @@ use App\Services\Realtime\RealtimePairing;
 use App\Services\Realtime\RealtimeRecycling;
 use App\Services\Realtime\RealtimeRoster;
 use App\Services\Realtime\RealtimeToken;
+use App\Services\Realtime\TapFeedback;
 use App\Services\Realtime\WsFrame;
 use App\Support\Tenancy\CurrentSchool;
 use Illuminate\Console\Command;
@@ -78,6 +79,11 @@ class RealtimeServeCommand extends Command
     /** TASK-029 — head id of the roster channel. */
     private int $lastRosterId = 0;
 
+    /** TASK-047 — head id of the feedback channel. */
+    private int $lastFeedbackId = 0;
+
+    private TapFeedback $tapFeedback;
+
     private RealtimeFeed $feed;
 
     private RealtimePairing $pairing;
@@ -86,9 +92,10 @@ class RealtimeServeCommand extends Command
 
     private RealtimeRoster $roster;
 
-    public function handle(RealtimeFeed $feed, RealtimePairing $pairing, RealtimeRecycling $recycling, RealtimeRoster $roster): int
+    public function handle(RealtimeFeed $feed, RealtimePairing $pairing, RealtimeRecycling $recycling, RealtimeRoster $roster, TapFeedback $tapFeedback): int
     {
         $this->feed = $feed;
+        $this->tapFeedback = $tapFeedback;
         $this->pairing = $pairing;
         $this->recycling = $recycling;
         $this->roster = $roster;
@@ -119,6 +126,8 @@ class RealtimeServeCommand extends Command
         $this->lastRecyclingId = $recycling->latestUpdateId();
         // TASK-029 — and the roster channel: same rule.
         $this->lastRosterId = $roster->latestUpdateId();
+        // TASK-047 — and the feedback channel (live only, no hello replay).
+        $this->lastFeedbackId = $tapFeedback->latestId();
 
         $this->info("realtime:serve listening on ws://{$host}:{$port} — poll {$pollMs} ms, history {$historyLimit}, head id {$this->lastEventId}.");
 
@@ -572,6 +581,30 @@ class RealtimeServeCommand extends Command
             foreach ($this->clients as $clientId => $client) {
                 // TASK-045 — never across organizations, whatever the role.
                 if ($client['handshook'] && $this->clientSeesSchool($client, $update['school_id'] ?? null)) {
+                    $this->write($clientId, $frame);
+                }
+            }
+        }
+
+        // TASK-047 — the feedback channel: answered taps that wrote no
+        // events row (duplicate / unknown / inactive card). A bare cue,
+        // no student data; delivered to school-wide STAFF connections
+        // (admin, kitchen) — the speaker bridge signs in as kitchen.
+        try {
+            $cues = $this->tapFeedback->after($this->lastFeedbackId);
+        } catch (QueryException) {
+            DB::purge();
+
+            return;
+        }
+
+        foreach ($cues as $cue) {
+            $this->lastFeedbackId = $cue['id'];
+            $frame = WsFrame::encode(json_encode(['type' => 'feedback', 'feedback' => $cue], JSON_UNESCAPED_UNICODE));
+            foreach ($this->clients as $clientId => $client) {
+                if ($client['handshook']
+                    && in_array($client['role'], [UserRole::Admin->value, UserRole::Kitchen->value], true)
+                    && $this->clientSeesSchool($client, $cue['school_id'])) {
                     $this->write($clientId, $frame);
                 }
             }

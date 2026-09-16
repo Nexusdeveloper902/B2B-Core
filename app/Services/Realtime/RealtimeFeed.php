@@ -110,6 +110,11 @@ final class RealtimeFeed
                     // server can refuse a frame per connection.
                     'school_id' => $row->school_id !== null ? (int) $row->school_id : null,
                     'reason' => $row->reason !== null ? (string) $row->reason : null,
+                    // TASK-047 — the audible cue a feedback device (the
+                    // Android bridge) plays for this row. Derived from
+                    // `served` — the same accept/reject truth the kitchen
+                    // desk colors from — so no second event stream exists.
+                    'feedback' => $row->served ? 'accepted' : 'rejected',
                     'student_id' => (int) $row->student_id,
                     'student_name' => (string) $row->student_name,
                     // TASK-027 — class_id lets the realtime server apply

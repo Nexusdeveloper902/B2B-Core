@@ -100,7 +100,11 @@ salud del canal; el contrato del protocolo vive en
 Desde TASK-043 `serve` también anuncia el backend en la LAN como
 `_pulse._tcp` (TXT `version=1 protocol=1 api=/api`, este puerto web)
 vía `avahi-publish-service`, para que los ESP32 lo descubran sin IP
-fija — se retira con Ctrl+C, `B2B_MDNS=0` arranca sin él. Las demos con
+fija — se retira con Ctrl+C, `B2B_MDNS=0` arranca sin él.
+También arranca `scripts/mdns/announce.py` (python3, stdlib), que
+re-anuncia los mismos registros cada segundo para que los equipos en
+Wi-Fi que descarta sus consultas mDNS igual descubran el backend
+(TASK-047). Las demos con
 hardware necesitan `--host=0.0.0.0` (loopback avisa). Contrato y prueba
 de banco: `docs/MDNS.es.md`.
 

@@ -1347,3 +1347,40 @@ Known, NOT fixed (content bugs, out of that ask): both PAE desks pass
 `:stat=` to `<x-stat>` instead of using its slot, so those KPI values
 never render; and `pae-student.blade.php` calls a missing
 `app.parent_view` key, which prints as `app.parent_view`.
+
+## TASK-047 additions (2026-09-16, RUN-2026-09-16-core-048)
+
+Audible feedback for the demo: the Android credential app is also a
+Bluetooth-speaker bridge (B2B-App TASK-002).
+
+- **Tap rows carry a cue.** `RealtimeFeed` rows carry
+  `feedback: accepted|rejected`, derived from `served`.
+- **Taps without a row are broadcast too.** The three answered taps
+  that write no `events` row (duplicate, unknown card, inactive card)
+  are logged in the append-only `tap_feedback` table, best-effort, and
+  pushed as `feedback` frames to admin and kitchen connections
+  (ADR-066). One cue per tap.
+- **The phone uses no new auth.** It logs in through the normal web
+  form as the seeded kitchen account and uses `GET /realtime/token`.
+- **Discovery works without station → host multicast.**
+  `./run serve` also runs `scripts/mdns/announce.py`, which
+  re-announces `_pulse._tcp` unasked every second from port 5353
+  (ADR-067). Bench: the ESP32 discovered the backend 4/4 with it and
+  0/2 without it. The firmware was unchanged.
+- **Deploy order matters:** migrate before serving the new
+  `TapService`. It is best-effort now, but a missing table still means
+  no cue.
+
+## TASK-048 additions (2026-09-16, RUN-2026-09-16-core-049)
+
+- **Attendance and recycling reporting desks**
+  (`/admin/reports/attendance|recycling`) mirror the PAE desk: charts,
+  per-student pages, and CSV/PDF exports.
+- **All report PDFs share `Pdf/BrandedReportPdf`**, which applies the
+  school's primary color, crest and name. Stock Pulse is unchanged.
+- **Correction to the TASK-045 note:** `./run reset` (demo/pilot) now
+  DOES seed the one school (`ie-concejo-de-sabaneta`).
+  `seed-realistic` also adds a school admin
+  (`admin.colegio@presence.test`) beside the system operator.
+- **Test fixtures:** create rows the demo admin must see through
+  `TestCase::schoolStudent/schoolClass/schoolReader`.
